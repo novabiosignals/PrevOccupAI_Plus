@@ -10,9 +10,10 @@ PROCESS_PSICOSSOCIAL = False
 PROCESS_PESSOAIS = False
 PROCESS_AMBIENTE = False
 PROCESS_BIOMECANICO = False
-GENERATE_LS_RESULTS = True
+GENERATE_QUESTIONNAIRES_DATASET = False
 
 quest_path = "D:\\Backup PrevOccupAI data\\jan2023\\data\\group3\\questionnaires"
+ls_input_path = "C:\\Users\\srale\\Desktop\\limesurvey_questionarios"
 ls_output_path = "C:\\Users\\srale\\Desktop\\TESTE"
 
 # ------------------------------------------------------------------------------------------------------------------- #
@@ -34,6 +35,5 @@ if __name__ == '__main__':
     if PROCESS_BIOMECANICO:
         qp.calculate_biomechanical_scores(quest_path)
 
-
-    if GENERATE_LS_RESULTS:
-        qp.generate_results_csv_files(ls_output_path)
+    if GENERATE_QUESTIONNAIRES_DATASET:
+        qp.generate_questionnaires_dataset(ls_input_path, ls_output_path)

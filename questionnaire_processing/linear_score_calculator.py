@@ -10,7 +10,7 @@ import pandas as pd
 from utils import load_json_file, create_dir, get_group_from_path
 from .questionnaire_loader import load_questionnaire_answers
 from .json_parser import get_questionnaire_name_from_json
-from constants import CONFIG_FOLDER_NAME, RESULTS_FOLDER_NAME, CSV
+from constants import CONFIG_FOLDER_NAME, RESULTS_FOLDER_NAME, CSV, AMBIENTE
 
 # ------------------------------------------------------------------------------------------------------------------- #
 # constants
@@ -80,7 +80,7 @@ def calculate_linear_scores(folder_path: str, domain: str) -> None:
                 max_value = scores_dict[subtopic_name]["max"]
 
                 # calculate scores
-                scores_series = _calculate_scores(subtopic_df, calculation_method, scale, values, inverted, max_value)
+                scores_series = _calculate_scores(domain, subtopic_df, calculation_method, scale, values, inverted, max_value)
 
                 # add subject id column and scores
                 if not 'id' in questionnaire_scores_df.columns:
@@ -105,7 +105,7 @@ def calculate_linear_scores(folder_path: str, domain: str) -> None:
 # private functions
 # ------------------------------------------------------------------------------------------------------------------- #
 
-def _calculate_scores(results_df: pd.DataFrame, calculation_method: str, scale: List[int], values: List[int],
+def _calculate_scores(domain:str, results_df: pd.DataFrame, calculation_method: str, scale: List[int], values: List[int],
                       inverted: List[Optional[int]], max_value: int) -> pd.Series:
     """
 
@@ -130,7 +130,15 @@ def _calculate_scores(results_df: pd.DataFrame, calculation_method: str, scale: 
 
         # calculate the mean of all values per row and normalize
         scores_series = results_df.mean(axis=1)
-        scores_series_norm = ((scores_series - min(scale))/(max_value - min(scale))).round(2)
+
+        if domain == AMBIENTE:
+
+            # normalize
+            scores_series_norm = ((scores_series - min(values)) / (max_value - min(values))).round(2)
+
+        else:
+
+            scores_series_norm = ((scores_series - min(scale)) / (max_value - min(scale))).round(2)
 
     else:
         raise ValueError(f"The calculation method {calculation_method} does not exist.")

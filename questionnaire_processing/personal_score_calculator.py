@@ -4,12 +4,14 @@
 import os
 from pathlib import Path
 import pandas as pd
+from typing import Tuple
 
 # internal imports
 from .questionnaire_loader import load_questionnaire_answers
 from utils import load_json_file, create_dir, get_group_from_path
-from constants import (CONFIG_FOLDER_NAME, RESULTS_FOLDER_NAME, EV_COLUMN_NAMES_MAP, EV_ANSWERS_MAP, AF_NEW_COLUMNS,
-                       AF_OLD_COLUMNS, DD_ANSWERS_MAP, CSV)
+from constants import CONFIG_FOLDER_NAME, RESULTS_FOLDER_NAME, CSV
+from .questionnaire_mappings import EV_COLUMN_NAMES_MAP, EV_ANSWERS_MAP, AF_NEW_COLUMNS, AF_OLD_COLUMNS, DD_ANSWERS_MAP, \
+    AF_TIME_PAIRS, AF_EXTRA_COLUMN_MAPPINGS
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # constants
@@ -18,19 +20,11 @@ DADOS_DEMOGRAFICOS = "Dados Demográficos"
 ESTILO_DE_VIDA = "Estilo de Vida"
 ATIVIDADE_FISICA = "Atividade Física"
 
-AF_TIME_PAIRS = [
-        ('vigorosa_horas', 'vigorosa_minutos'),
-        ('moderada_horas', 'moderada_minutos'),
-        ('caminhada_horas', 'caminhada_minutos'),
-        ('sentada_semana_horas', 'sentada_semana_minutos'),
-        ('sentada_fds_horas', 'sentada_fds_minutos'),
-    ]
-
 # -------------------------------------------------------------------------------------------------------------------- #
 # public functions
 # -------------------------------------------------------------------------------------------------------------------- #
 
-def calculate_personal_scores(folder_path):
+def calculate_personal_scores(folder_path, prevoccupai_plus: bool = True):
 
     # load results for all domain questionnaires into a dictionary
     # (keys: questionnaire id, values: dataframe with the results)
@@ -59,7 +53,7 @@ def calculate_personal_scores(folder_path):
 
         # it's atividade fisica
         else:
-            results_df = _get_atividade_fisica_results(answers_df)
+            results_df = _get_atividade_fisica_results(answers_df, prevoccupai_plus=prevoccupai_plus)
 
 
         # set id column to int, set as index of the dataframe, and order
@@ -130,7 +124,7 @@ def _get_estilo_vida_results(results_df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def _get_atividade_fisica_results(results_df: pd.DataFrame) -> pd.DataFrame:
+def _get_atividade_fisica_results(results_df: pd.DataFrame, prevoccupai_plus: bool) -> pd.DataFrame:
     """
 
     :param results_df:
@@ -146,6 +140,12 @@ def _get_atividade_fisica_results(results_df: pd.DataFrame) -> pd.DataFrame:
     # Correct false/wrong inputs in time-related columns
     for hours_col, minutes_col in AF_TIME_PAIRS:
         df[minutes_col] = df.apply(lambda x: _correct_false_input(x[hours_col], x[minutes_col]), axis=1)
+
+    # correct working days/hours
+    df[["diasTrabalho", "horasTrabalho"]] = df.apply(
+        lambda row: pd.Series(_correct_false_working_time(row["diasTrabalho"], row["horasTrabalho"])),
+        axis=1
+    )
 
     # Calculate total time and truncate activity durations
     df = _calculate_total_time_and_truncate(df, ['vigorosa', 'moderada', 'caminhada'])
@@ -299,6 +299,23 @@ def _correct_false_input(hours, minutes):
             return minutes
     else:
 
-        # here it is assumed that the subject inserted the physical activty ONLY as minutes, meaning that even values
+        # here it is assumed that the subject inserted the physical activity ONLY as minutes, meaning that even values
         # above 60.0 are valid
         return minutes
+
+
+def _correct_false_working_time(working_days: float, working_hours: float) -> Tuple[float, float]:
+
+    # if the subject has entered that they worked that last 7 days, but the hours don't match 7 * 7 = 49 hours, correct
+    # the input assuming that they worked 5 days and 5*7=35 hours
+    if working_days == 7 and working_hours < 49:
+
+        working_days = 5
+
+    # correct working hours of the subject inserted daily working hours
+    if working_days > 1 and working_hours < 10:
+
+        working_hours = working_days * working_hours
+
+    return working_days, working_hours
+

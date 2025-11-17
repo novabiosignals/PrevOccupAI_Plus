@@ -27,7 +27,9 @@
       <w>graduado</w>
       <w>habilitacoes</w>
       <w>heur</w>
+      <w>hiddenid</w>
       <w>incapacidade</w>
+      <w>interviewtime</w>
       <w>ipaq</w>
       <w>licenciatura</w>
       <w>mban</w>
@@ -40,6 +42,7 @@
       <w>noiserecorder</w>
       <w>nseq</w>
       <w>obrigatório</w>
+      <w>occup</w>
       <w>passado</w>
       <w>pessoais</w>
       <w>pred</w>
@@ -55,6 +58,7 @@
       <w>slerp</w>
       <w>sofrimento</w>
       <w>solteiro</w>
+      <w>submitdate</w>
       <w>teclado</w>
       <w>telefone</w>
       <w>trabalho</w>

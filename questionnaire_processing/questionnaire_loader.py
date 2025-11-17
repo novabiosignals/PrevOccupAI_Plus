@@ -102,6 +102,7 @@ def generate_results_csv_files(output_folder_path: str) -> None:
 # ------------------------------------------------------------------------------------------------------------------- #
 
 
+
 def _get_ls_results(dom: str, survey_id: str, participants, data_folder: str):
     """
     Function to generate a csv file with the answers exported from limesurvey questionnaires

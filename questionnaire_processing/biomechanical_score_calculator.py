@@ -8,9 +8,10 @@ import pandas as pd
 # internal imports
 from .questionnaire_loader import load_questionnaire_answers
 from utils import load_json_file, create_dir, get_group_from_path
-from constants import CONFIG_FOLDER_NAME, RESULTS_FOLDER_NAME, CSV, ID_OLD_COLUMNS, ID_NEW_COLUMNS, ID_ANSWERS_MAP
+from constants import CONFIG_FOLDER_NAME, RESULTS_FOLDER_NAME, CSV
 import questionnaire_processing.rosa.rosa_tools as rt
 import questionnaire_processing.rosa.rosa_question_mappings as rosa_qm
+from .questionnaire_mappings import ID_OLD_COLUMNS, ID_NEW_COLUMNS, ID_ANSWERS_MAP
 
 
 # -------------------------------------------------------------------------------------------------------------------- #
