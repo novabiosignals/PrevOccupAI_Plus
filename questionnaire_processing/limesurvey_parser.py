@@ -15,7 +15,7 @@ from utils import create_dir, load_json_file
 
 def generate_questionnaires_dataset(file_paths_dir: str, output_folder_path: str) -> None:
     # load metadata
-    meta_data_df = pd.read_csv('participants_cml.csv', sep=';', encoding='utf-8')
+    meta_data_df = pd.read_csv('participants_info.csv', sep=';', encoding='utf-8')
 
     # cycle over unique groups
     for group_num in meta_data_df['group'].unique():
@@ -80,13 +80,14 @@ def _load_and_clean_limesurvey_results(limesurvey_csv_path: str, subject_ids: pd
     # clean df
     group_df = _clean_limesurvey_files(group_df)
 
+
     return group_df
 
 
 def _clean_limesurvey_files(df: pd.DataFrame):
 
     # rename hiddenid column to just id
-    df.rename(columns={'hiddenid': 'id.1'})
+    df = df.rename(columns={'hiddenid': 'id.1'})
 
     # drop all irrelevant initial columns except submitdate and the hidden ids
     df = df.drop(df.columns[[0, *range(2, 9)]], axis=1)
@@ -96,6 +97,15 @@ def _clean_limesurvey_files(df: pd.DataFrame):
 
     # drop those columns
     df = df.drop(columns=cols_to_drop)
+
+    # convert submitdate to real datetime
+    df['submitdate'] = pd.to_datetime(df['submitdate'], errors='coerce')
+
+    # drop submissions with no submitdate
+    df = df.dropna(subset=['submitdate'])
+
+    # sort by submitdate, then keep only the most recent submission per participant
+    df = (df.sort_values('submitdate').drop_duplicates(subset=['id'], keep='last').reset_index(drop=True))
 
     return df
 

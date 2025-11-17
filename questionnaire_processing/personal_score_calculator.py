@@ -11,7 +11,7 @@ from .questionnaire_loader import load_questionnaire_answers
 from utils import load_json_file, create_dir, get_group_from_path
 from constants import CONFIG_FOLDER_NAME, RESULTS_FOLDER_NAME, CSV
 from .questionnaire_mappings import EV_COLUMN_NAMES_MAP, EV_ANSWERS_MAP, AF_NEW_COLUMNS, AF_OLD_COLUMNS, DD_ANSWERS_MAP, \
-    AF_TIME_PAIRS, AF_EXTRA_COLUMN_MAPPINGS
+    AF_TIME_PAIRS, DD_COLUMN_NAMES_MAP
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # constants
@@ -24,7 +24,7 @@ ATIVIDADE_FISICA = "Atividade Física"
 # public functions
 # -------------------------------------------------------------------------------------------------------------------- #
 
-def calculate_personal_scores(folder_path, prevoccupai_plus: bool = True):
+def calculate_personal_scores(folder_path):
 
     # load results for all domain questionnaires into a dictionary
     # (keys: questionnaire id, values: dataframe with the results)
@@ -53,7 +53,7 @@ def calculate_personal_scores(folder_path, prevoccupai_plus: bool = True):
 
         # it's atividade fisica
         else:
-            results_df = _get_atividade_fisica_results(answers_df, prevoccupai_plus=prevoccupai_plus)
+            results_df = _get_atividade_fisica_results(answers_df)
 
 
         # set id column to int, set as index of the dataframe, and order
@@ -76,6 +76,8 @@ def _get_dados_demograficos_results(results_df: pd.DataFrame) -> pd.DataFrame:
     """
     # create copy to avoid warnings
     df = results_df.copy()
+
+    df.rename(columns=DD_COLUMN_NAMES_MAP, inplace=True)
 
     # replace coded answers with readable text
     for col, mapping in DD_ANSWERS_MAP.items():
@@ -124,7 +126,7 @@ def _get_estilo_vida_results(results_df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def _get_atividade_fisica_results(results_df: pd.DataFrame, prevoccupai_plus: bool) -> pd.DataFrame:
+def _get_atividade_fisica_results(results_df: pd.DataFrame) -> pd.DataFrame:
     """
 
     :param results_df:
@@ -142,8 +144,8 @@ def _get_atividade_fisica_results(results_df: pd.DataFrame, prevoccupai_plus: bo
         df[minutes_col] = df.apply(lambda x: _correct_false_input(x[hours_col], x[minutes_col]), axis=1)
 
     # correct working days/hours
-    df[["diasTrabalho", "horasTrabalho"]] = df.apply(
-        lambda row: pd.Series(_correct_false_working_time(row["diasTrabalho"], row["horasTrabalho"])),
+    df[["dias_trabalho_semana", "horas_trabalho_semana"]] = df.apply(
+        lambda row: pd.Series(_correct_false_working_time(row["dias_trabalho_semana"], row["horas_trabalho_semana"])),
         axis=1
     )
 

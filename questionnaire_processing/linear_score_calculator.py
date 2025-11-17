@@ -89,13 +89,13 @@ def calculate_linear_scores(folder_path: str, domain: str) -> None:
                     id_col = results_df.filter(regex='id', axis=1).iloc[:, 0]
 
                     # add id column to the scores df
-                    questionnaire_scores_df['id'] = id_col
+                    questionnaire_scores_df['id.1'] = id_col
 
                 questionnaire_scores_df[subtopic_name] = scores_series
 
         # set id column to int, set as index of the dataframe, and order
-        questionnaire_scores_df = questionnaire_scores_df.apply(pd.to_numeric, errors='coerce')
-        questionnaire_scores_df = questionnaire_scores_df.set_index('id').sort_index()
+        questionnaire_scores_df['id.1'] = questionnaire_scores_df['id.1'].apply(pd.to_numeric, errors='coerce')
+        questionnaire_scores_df = questionnaire_scores_df.set_index('id.1').sort_index()
 
         # save dataframe into a csv file
         folder_path = create_dir(Path(__file__).parent, os.path.join(RESULTS_FOLDER_NAME, get_group_from_path(folder_path), domain))

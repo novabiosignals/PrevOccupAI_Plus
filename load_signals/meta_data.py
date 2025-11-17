@@ -26,7 +26,7 @@ def load_meta_data():
     :return: DataFrame containing the meta-data
     """
 
-    return pd.read_csv('participants_cml.csv', sep=';', encoding='utf-8', index_col='subject_id')
+    return pd.read_csv('participants_info.csv', sep=';', encoding='utf-8', index_col='subject_id')
 
 
 def get_muscleban_side(meta_data_df, mac_address):

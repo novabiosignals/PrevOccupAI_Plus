@@ -10,10 +10,12 @@ the code responses to readable text
 
 EV_COLUMN_NAMES_MAP = {
         'q1': 'fuma',
-        'q1a': 'cigarros',
-        'q1b': 'tempo',
-        'q1c': 'cigarros_passado',
-        'q1d': 'tempo_passado',
+        'q1a': 'cigarros_dia',
+        'q1b[SQ001]': 'tempo_fuma_meses',
+        'q1b[SQ002]': 'tempo_fuma_anos',
+        'q1c': 'cigarros_passado_unit',
+        'q1d[SQ001]': 'tempo_passado_meses',
+        'q1d[SQ002]': 'tempo_passado_anos',
         'q2': 'alcool',
         'q2a': 'bebidas',
     }
@@ -74,6 +76,12 @@ AF_TIME_PAIRS = [
 # ------------------------------------------------------------------------------------------------------------------- #
 # Dados Demográficos mappings
 # ------------------------------------------------------------------------------------------------------------------- #
+DD_COLUMN_NAMES_MAP = {
+        'profissao[other]': 'profissao_outro',
+        'anosProf[SQ001]': 'anos_profissao',
+        'anosProf[SQ002]': 'meses_profissao'
+    }
+
 
 DD_ANSWERS_MAP = {
     'sexo': {
@@ -100,6 +108,14 @@ DD_ANSWERS_MAP = {
         'A4': 'Ensino Superior (bacharelato ou licenciatura)',
         'A5': 'Ensino Superior Pós-graduado (mestrado ou doutoramento)',
     },
+    'profissao':{
+        'A1': 'Atendimento ao publico presencial',
+        'A2': 'Atendimento ao publico por telefone',
+        'A3': 'Atendimento ao publico online/chat',
+        'A4': 'Back Office',
+        'A5': 'Atendimento ao publico e Back Office',
+        'A6': 'Outro'
+    }
 }
 
 # ------------------------------------------------------------------------------------------------------------------- #
