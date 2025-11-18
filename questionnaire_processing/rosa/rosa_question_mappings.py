@@ -105,6 +105,12 @@ rosa_mappings_section_c = {
     "snAcimaTeclado": {
         "N": 0,
         "Y": 1
+    },
+    "opRatoUtil": {
+        "A1": 1,
+        "A2": 0,
+        "A3": -1,
+        "A4": 0,
     }
 
 }
