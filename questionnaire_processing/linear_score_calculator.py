@@ -22,6 +22,10 @@ LIKERT_SCALE = 'likert'
 # public functions
 # ------------------------------------------------------------------------------------------------------------------- #
 
+def calculate_COPSOQ_scores():
+    pass
+
+
 def calculate_linear_scores(folder_path: str, domain: str) -> None:
     """
     Calculates the scores for the Psicossocial and Ambiente questionnaires and saves the results into a csv file

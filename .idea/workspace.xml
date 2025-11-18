@@ -4,17 +4,10 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="d6637f5a-b481-472e-9cbc-1b523cdb0fbc" name="Changes" comment="added dataset generator and some other changes">
+    <list default="true" id="d6637f5a-b481-472e-9cbc-1b523cdb0fbc" name="Changes" comment="removed multiple submissions from csv files. Corrected some column names and a bug in Bem-estar geral scores. Changed participants info to have type of atendimento">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/load_signals/meta_data.py" beforeDir="false" afterPath="$PROJECT_DIR$/load_signals/meta_data.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/main_quest.py" beforeDir="false" afterPath="$PROJECT_DIR$/main_questionnaires.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/participants_cml.csv" beforeDir="false" afterPath="$PROJECT_DIR$/participants_info.csv" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/questionnaire_processing/config_files/cfg_psicosocial.json" beforeDir="false" afterPath="$PROJECT_DIR$/questionnaire_processing/config_files/cfg_psicosocial.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/questionnaire_processing/limesurvey_parser.py" beforeDir="false" afterPath="$PROJECT_DIR$/questionnaire_processing/limesurvey_parser.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/questionnaire_processing/config_files/lime_survey.json" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/questionnaire_processing/linear_score_calculator.py" beforeDir="false" afterPath="$PROJECT_DIR$/questionnaire_processing/linear_score_calculator.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/questionnaire_processing/personal_score_calculator.py" beforeDir="false" afterPath="$PROJECT_DIR$/questionnaire_processing/personal_score_calculator.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/questionnaire_processing/questionnaire_loader.py" beforeDir="false" afterPath="$PROJECT_DIR$/questionnaire_processing/questionnaire_loader.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/questionnaire_processing/questionnaire_mappings.py" beforeDir="false" afterPath="$PROJECT_DIR$/questionnaire_processing/questionnaire_mappings.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -51,20 +44,20 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent"><![CDATA[{
-  "keyToString": {
-    "ModuleVcsDetector.initialDetectionPerformed": "true",
-    "Python.main.executor": "Run",
-    "Python.main_quest.executor": "Run",
-    "Python.main_questionnaires.executor": "Run",
-    "Python.main_signals.executor": "Run",
-    "Python.personal_score_calculator.executor": "Run",
-    "RunOnceActivity.ShowReadmeOnStart": "true",
-    "RunOnceActivity.git.unshallow": "true",
-    "git-widget-placeholder": "master",
-    "last_opened_file_path": "C:/Users/srale/PycharmProjects/PrevOccupAI_Plus/questionnaire_processing/config_files"
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;ModuleVcsDetector.initialDetectionPerformed&quot;: &quot;true&quot;,
+    &quot;Python.main.executor&quot;: &quot;Run&quot;,
+    &quot;Python.main_quest.executor&quot;: &quot;Run&quot;,
+    &quot;Python.main_questionnaires.executor&quot;: &quot;Run&quot;,
+    &quot;Python.main_signals.executor&quot;: &quot;Run&quot;,
+    &quot;Python.personal_score_calculator.executor&quot;: &quot;Run&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;master&quot;,
+    &quot;last_opened_file_path&quot;: &quot;C:/Users/srale/PycharmProjects/PrevOccupAI_Plus/questionnaire_processing/config_files&quot;
   }
-}]]></component>
+}</component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
       <recent name="C:\Users\srale\PycharmProjects\PrevOccupAI_Plus\questionnaire_processing\config_files" />
@@ -279,7 +272,15 @@
       <option name="project" value="LOCAL" />
       <updated>1763376189621</updated>
     </task>
-    <option name="localTasksCounter" value="21" />
+    <task id="LOCAL-00021" summary="removed multiple submissions from csv files. Corrected some column names and a bug in Bem-estar geral scores. Changed participants info to have type of atendimento">
+      <option name="closed" value="true" />
+      <created>1763400177025</created>
+      <option name="number" value="00021" />
+      <option name="presentableId" value="LOCAL-00021" />
+      <option name="project" value="LOCAL" />
+      <updated>1763400177025</updated>
+    </task>
+    <option name="localTasksCounter" value="22" />
     <servers />
   </component>
   <component name="VcsManagerConfiguration">
@@ -302,7 +303,8 @@
     <MESSAGE value="fixed bugs with pessoais questionnaires and started implementing biomecanical" />
     <MESSAGE value="implemented biomechanical questionnaire processing. trying to generate results csv from limesurvey" />
     <MESSAGE value="added dataset generator and some other changes" />
-    <option name="LAST_COMMIT_MESSAGE" value="added dataset generator and some other changes" />
+    <MESSAGE value="removed multiple submissions from csv files. Corrected some column names and a bug in Bem-estar geral scores. Changed participants info to have type of atendimento" />
+    <option name="LAST_COMMIT_MESSAGE" value="removed multiple submissions from csv files. Corrected some column names and a bug in Bem-estar geral scores. Changed participants info to have type of atendimento" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
