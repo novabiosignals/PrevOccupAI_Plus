@@ -1,0 +1,85 @@
+# ------------------------------------------------------------------------------------------------------------------- #
+# internal imports
+# ------------------------------------------------------------------------------------------------------------------- #
+import load_signals
+import signal_processing
+try:
+    import visualization
+except ImportError:
+    from EMG import visualization
+
+# ------------------------------------------------------------------------------------------------------------------- #
+# external imports
+# ------------------------------------------------------------------------------------------------------------------- #
+
+import matplotlib.pyplot as plt
+
+# ------------------------------------------------------------------------------------------------------------------- #
+# constants
+# ------------------------------------------------------------------------------------------------------------------- #
+LOAD_DAILY_ACQUISITIONS = True
+SELECTED_SENSORS = {'mban': ['EMG']}
+DAILY_FOLDER_PATH = "C:\\Users\\gonba\\PrevOccupAI_plus_Data"
+W_SIZE = 5.0
+FS = 1000
+
+# ------------------------------------------------------------------------------------------------------------------- #
+# program starts here
+# ------------------------------------------------------------------------------------------------------------------- #
+
+def main(run_all=False, load_data=False, preprocess=False, visualize=False):
+    """
+    Main function to run the EMG processing pipeline.
+    
+    :param run_all: If True, activates all pipeline steps (load, preprocess, visualize)
+    :param load_data: If True, loads daily acquisitions
+    :param preprocess: If True, applies preprocessing pipeline
+    :param visualize: If True, visualizes the processed data
+    """
+    
+    # If run_all is True, override individual flags
+    if run_all:
+        load_data = True
+        preprocess = True
+        visualize = True
+    
+    df_dict = None
+    processed_df_dict = None
+    
+    # Load data
+    if load_data:
+        print("Loading daily acquisitions...")
+        df_dict = load_signals.load_daily_acquisitions(DAILY_FOLDER_PATH, SELECTED_SENSORS)
+        print(f"Loaded sensors: {list(df_dict.keys())}") # debugging line
+    
+    # Preprocess data
+    if preprocess:
+        if df_dict is None:
+            raise ValueError("Cannot preprocess: data not loaded. Set load_data=True or run_all=True")
+        print("Preprocessing data...")
+        processed_df_dict = signal_processing.apply_pre_processing_pipeline(df_dict, downsample_muscleban=False)
+    
+    # Visualize data
+    if visualize:
+        if processed_df_dict is None:
+            raise ValueError("Cannot visualize: data not preprocessed. Set preprocess=True or run_all=True")
+        print("Visualizing data...")
+        visualization.visualize_emg_sessions(processed_df_dict, fs=FS)
+
+    
+    return processed_df_dict
+
+
+if __name__ == '__main__':
+    # Example usage:
+    
+    # Run everything
+    main(run_all=True)
+    
+    # Or run specific steps
+    # main(load_data=True, preprocess=True)
+    # main(load_data=True, preprocess=True, visualize=True)
+
+
+
+
