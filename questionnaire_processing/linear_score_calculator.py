@@ -223,12 +223,12 @@ def calculate_linear_scores(folder_path: str, domain: str) -> None:
         list_dfs.append(questionnaire_scores_df)
 
 
-    # concat dataframes horizontally to have all psicossocial/ambiente questionnaires into
+    # concat dataframes horizontally to have all psicossocial/ambiente questionnaires
     final_df = pd.concat(list_dfs, axis=1)
 
     # save dataframe into a csv file
-    folder_path = create_dir(Path(__file__).parent, os.path.join(RESULTS_FOLDER_NAME, get_group_from_path(folder_path), domain))
-    final_df.to_csv(os.path.join(folder_path, f"results_all_{domain}{CSV}"))
+    folder_path = create_dir(Path(__file__).parent, os.path.join(RESULTS_FOLDER_NAME, get_group_from_path(folder_path)))
+    final_df.to_csv(os.path.join(folder_path, f"results_{domain}{CSV}"))
 
 # ------------------------------------------------------------------------------------------------------------------- #
 # private functions

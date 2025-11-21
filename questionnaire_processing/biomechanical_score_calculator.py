@@ -4,6 +4,7 @@
 import os
 from pathlib import Path
 import pandas as pd
+from typing import List
 
 # internal imports
 from .questionnaire_loader import load_questionnaire_answers
@@ -43,11 +44,14 @@ def calculate_rosa_scores(folder_path: str):
 
     # save dataframe into a csv file
     folder_path = create_dir(Path(__file__).parent,
-                             os.path.join(RESULTS_FOLDER_NAME, get_group_from_path(folder_path), 'biomecanico'))
+                             os.path.join(RESULTS_FOLDER_NAME, get_group_from_path(folder_path)))
     scores_df.to_csv(os.path.join(folder_path, f"rosa_scores{CSV}"))
 
 
 def calculate_biomechanical_scores(folder_path, pure_rosa: bool):
+
+    # list for holding the scores_df for all questionnaires
+    list_dfs: List[pd.DataFrame] = []
 
     # load results for all domain questionnaires into a dictionary
     # (keys: questionnaire id, values: dataframe with the results)
@@ -83,9 +87,16 @@ def calculate_biomechanical_scores(folder_path, pure_rosa: bool):
         results_df['id.1'] = pd.to_numeric(results_df['id.1'], errors='coerce')
         results_df = results_df.set_index('id.1').sort_index()
 
-        # save dataframe into a csv file
-        folder_path = create_dir(Path(__file__).parent, os.path.join(RESULTS_FOLDER_NAME, get_group_from_path(folder_path),'biomecanico'))
-        results_df.to_csv(os.path.join(folder_path, f"{questionnaire_name}{CSV}"))
+        # add dataframe to list
+        list_dfs.append(results_df)
+
+    # concat dataframes horizontally to have all personal questionnaires
+    final_df = pd.concat(list_dfs, axis=1)
+
+    # save dataframe into a csv file
+    folder_path = create_dir(Path(__file__).parent,
+                             os.path.join(RESULTS_FOLDER_NAME, get_group_from_path(folder_path)))
+    final_df.to_csv(os.path.join(folder_path, f"results_biomecanico{CSV}"))
 
 
 # -------------------------------------------------------------------------------------------------------------------- #

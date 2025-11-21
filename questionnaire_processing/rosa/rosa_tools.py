@@ -212,7 +212,7 @@ def calc_a_score(df: pd.DataFrame, pure_rosa: bool) -> pd.DataFrame:
 
         chair_score_min = rosa_sc.card_a['min']
         chair_score_max = rosa_sc.card_a['max_horizontal_new']
-        df['score_a_normalized'] = (df['score_a_rosa'] - chair_score_min)/(chair_score_max - chair_score_min)
+        df['score_a_normalized'] = ((df['score_a_rosa'] - chair_score_min)/(chair_score_max - chair_score_min)).round(2)
 
         # keep only the relevant columns
         df = df[['id.1', 'score_a_normalized']]
@@ -318,5 +318,7 @@ def calc_final_rosa_score(df_a_scores: pd.DataFrame, df_b_c_scores: pd.DataFrame
 
     # get Rosa Final Score
     scores_df['final_rosa_score'] = scores_df.apply(lambda x: get_score_from_card(x['score_a_rosa'], x['monitor_peripherals_scores'], rosa_sc.card_final), axis=1)
+
+    scores_df['final_rosa_score_normalized'] = ((scores_df['final_rosa_score'] - 1) / (10 - 1)).round(2)
 
     return scores_df

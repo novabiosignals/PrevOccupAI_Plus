@@ -10,13 +10,13 @@ import questionnaire_processing as qp
 # ------------------------------------------------------------------------------------------------------------------- #
 # constants
 # ------------------------------------------------------------------------------------------------------------------- #
-PROCESS_PSICOSSOCIAL = False
-PROCESS_PESSOAIS = False
-PROCESS_AMBIENTE = False
+PROCESS_PSICOSSOCIAL = True
+PROCESS_PESSOAIS = True
+PROCESS_AMBIENTE = True
 PROCESS_BIOMECANICO = True
 GENERATE_QUESTIONNAIRES_DATASET = False
 
-quest_path = "C:\\Users\\srale\\Desktop\\TESTE\\group5\\questionnaires"
+quest_path = "C:\\Users\\srale\\Desktop\\TESTE\\group7\\questionnaires"
 ls_input_path = "C:\\Users\\srale\\Desktop\\limesurvey_questionarios"
 ls_output_path = "C:\\Users\\srale\\Desktop\\TESTE"
 # ------------------------------------------------------------------------------------------------------------------- #
