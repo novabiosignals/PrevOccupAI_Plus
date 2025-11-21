@@ -130,9 +130,9 @@ def _get_incapacidade_dor_results(results_df: pd.DataFrame) -> pd.DataFrame:
     # create copy
     df = results_df.copy()
 
-    # Rename columns for readability
-    rename_map = dict(zip(ID_OLD_COLUMNS, ID_NEW_COLUMNS))
-    df.rename(columns=rename_map)
+    # Replace any column substring "SQ00X" with the new descriptive name
+    for old, new in zip(ID_OLD_COLUMNS, ID_NEW_COLUMNS):
+        df.columns = df.columns.str.replace(old, new, regex=False)
 
     # replace missing values with '0'
     df = df.fillna('0')

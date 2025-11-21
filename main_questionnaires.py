@@ -10,13 +10,13 @@ import questionnaire_processing as qp
 # ------------------------------------------------------------------------------------------------------------------- #
 # constants
 # ------------------------------------------------------------------------------------------------------------------- #
-PROCESS_PSICOSSOCIAL = True
+PROCESS_PSICOSSOCIAL = False
 PROCESS_PESSOAIS = False
 PROCESS_AMBIENTE = False
-PROCESS_BIOMECANICO = False
+PROCESS_BIOMECANICO = True
 GENERATE_QUESTIONNAIRES_DATASET = False
 
-quest_path = "C:\\Users\\srale\\Desktop\\TESTE\\group7\\questionnaires"
+quest_path = "C:\\Users\\srale\\Desktop\\TESTE\\group5\\questionnaires"
 ls_input_path = "C:\\Users\\srale\\Desktop\\limesurvey_questionarios"
 ls_output_path = "C:\\Users\\srale\\Desktop\\TESTE"
 # ------------------------------------------------------------------------------------------------------------------- #
@@ -28,7 +28,7 @@ if __name__ == '__main__':
 
     if PROCESS_PSICOSSOCIAL:
         qp.calculate_linear_scores(quest_path, domain='psicosocial')
-        qp.calculate_copsoq_mean_scores(os.path.join(Path(__file__).parent, 'questionnaire_processing', 'results'), average_method='atendimento')
+        qp.calculate_copsoq_mean_scores(os.path.join(Path(__file__).parent, 'questionnaire_processing', 'results'), average_method='all')
 
     if PROCESS_AMBIENTE:
         qp.calculate_linear_scores(quest_path, domain='ambiente')

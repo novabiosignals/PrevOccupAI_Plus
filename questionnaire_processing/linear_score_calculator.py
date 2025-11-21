@@ -18,6 +18,7 @@ from constants import CONFIG_FOLDER_NAME, RESULTS_FOLDER_NAME, CSV, AMBIENTE, PS
 # ------------------------------------------------------------------------------------------------------------------- #
 JSON_SCORES_FILENAME = 'scores.json'
 LIKERT_SCALE = 'likert'
+COPSOQ_RESULTS_FOLDER = 'COPSOQ_results'
 
 BEM_ESTAR = 'Bem-Estar Geral.csv'
 EXIGENCIAS = 'Exigências Laborais.csv'
@@ -58,7 +59,7 @@ def calculate_copsoq_mean_scores(folder_path, average_method: str) -> None:
         # drop id column
         all_results_df = all_results_df.drop(columns=['id.1'], errors='ignore')
 
-        copsoq_df = pd.DataFrame([all_results_df.mean(), all_results_df.std()], index = ['mean', 'std'])
+        copsoq_df = pd.DataFrame([all_results_df.mean().round(2)], index = ['mean'])
 
     # it's average by atendimento
     elif average_method == ATENDIMENTO:
@@ -79,13 +80,13 @@ def calculate_copsoq_mean_scores(folder_path, average_method: str) -> None:
         bo_df = bo_df.drop(columns=['id.1'], errors='ignore')
 
         # calculate statistics and save in a dataframe
-        copsoq_df = pd.DataFrame([fo_df.mean(), fo_df.std(), bo_df.mean(), bo_df.std()], index=['mean_FO', 'std_FO', 'mean_BO', 'std_BO'])
+        copsoq_df = pd.DataFrame([fo_df.mean().round(2), bo_df.mean().round(2)], index=['mean_FO', 'mean_BO'])
 
     else:
         raise ValueError(f"The following average method is not supported. \nSupported methods are 'all' and 'atendimento'")
     # save dataframe into a csv file
-    folder_path = create_dir(Path(__file__).parent,RESULTS_FOLDER_NAME)
-    copsoq_df.to_csv(os.path.join(folder_path, f"results_copsoq{CSV}"))
+    folder_path = create_dir(Path(__file__).parent,COPSOQ_RESULTS_FOLDER)
+    copsoq_df.to_csv(os.path.join(folder_path, f"results_copsoq_{average_method}{CSV}"))
 
 
 def calculate_copsoq_scores(folder_path: str) -> pd.DataFrame:

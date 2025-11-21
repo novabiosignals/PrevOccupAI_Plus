@@ -281,16 +281,10 @@ def calc_b_c_scores(df: pd.DataFrame, pure_rosa: bool) -> pd.DataFrame:
     else:
 
         # normalise the scores
-        monitor_score = normalise_to_range(monitor_score, rosa_sc.card_b, score_type='vertical', answer='monitor')
-        telefone_score = normalise_to_range(telefone_score, rosa_sc.card_b, score_type='horizontal', answer='telefone')
-        mouse_score = normalise_to_range(mouse_score, rosa_sc.card_c, score_type='vertical', answer='mouse')
-        keyboard_score = normalise_to_range(keyboard_score, rosa_sc.card_c, score_type='horizontal', answer='keyboard')
-
-        # ceil the scores (always round up)
-        monitor_score = monitor_score.apply(np.ceil)
-        telefone_score = telefone_score.apply(np.ceil)
-        mouse_score = mouse_score.apply(np.ceil)
-        keyboard_score = keyboard_score.apply(np.ceil)
+        monitor_score = normalise_to_range(monitor_score, rosa_sc.card_b, score_type='vertical', answer='monitor').round(2)
+        telefone_score = normalise_to_range(telefone_score, rosa_sc.card_b, score_type='horizontal', answer='telefone').round(2)
+        mouse_score = normalise_to_range(mouse_score, rosa_sc.card_c, score_type='vertical', answer='mouse').round(2)
+        keyboard_score = normalise_to_range(keyboard_score, rosa_sc.card_c, score_type='horizontal', answer='keyboard').round(2)
 
         # add the calculated scores as new columns
         df['monitor_score_adapted'] = monitor_score
@@ -323,6 +317,6 @@ def calc_final_rosa_score(df_a_scores: pd.DataFrame, df_b_c_scores: pd.DataFrame
     scores_df['monitor_peripherals_scores'] = scores_df.apply(lambda x: get_score_from_card(x['score_b_rosa'], x['score_c_rosa'], rosa_sc.card_map), axis=1)
 
     # get Rosa Final Score
-    scores_df['final_rosa_score'] = scores_df.apply(lambda x: get_score_from_card(x['score_a_rosa'], x['monitor_peripherals_scores'], rosa_sc.card_map), axis=1)
+    scores_df['final_rosa_score'] = scores_df.apply(lambda x: get_score_from_card(x['score_a_rosa'], x['monitor_peripherals_scores'], rosa_sc.card_final), axis=1)
 
     return scores_df
