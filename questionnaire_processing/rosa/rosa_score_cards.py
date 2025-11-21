@@ -70,7 +70,7 @@ CARD_FINAL_MATRIX = np.array([[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
 CARD_FINAL_MIN_SCORE = 1
 CARD_FINAL_MAX_SCORE = 10
 
-# ---------------------- SCORE CARDS DICTONARIES ----------------------
+# ---------------------- SCORE CARDS DICTIONARIES ----------------------
 # the values are taken from the ROSA paper the values with the suffix 'new' are based on the sum of ROSA points and the
 # points from the added questions
 card_a = {
@@ -95,7 +95,7 @@ card_c = {
     'matrix': CARD_C_MATRIX,
     'min': 0,
     'max_vertical': 7,
-    'max_vertical_new': 8,
+    'max_vertical_new': 9,
     'max_horizontal': 7,
     'max_horizontal_new': 9
 }

@@ -11,6 +11,7 @@ the scale is re-scaled to its original range.
 import questionnaire_processing.rosa.rosa_question_mappings as rosa_qm
 import questionnaire_processing.rosa.rosa_score_cards as rosa_sc
 import numpy as np
+import pandas as pd
 
 
 def replace_values_by_mapping(df, mappings_list):
@@ -110,7 +111,6 @@ def get_score_from_card(vertical_score, horizontal_score, score_card_dict):
     :param score_card_dict: the corresponding score card dictionary. The dictionaries can be found in 'rosa_score_cards.py'
     :return: the score from the score card
     """
-
     return score_card_dict['matrix'][int(vertical_score)][int(horizontal_score)]
 
 
@@ -145,7 +145,7 @@ def pre_process_rosa(df, rosa_mappings_list):
     return df
 
 
-def calc_a_score(df):
+def calc_a_score(df: pd.DataFrame, pure_rosa: bool) -> pd.DataFrame:
     """
     Function to calculate the score for score card A (arm rest / back support + seat pan height/depth)
     :param df: dataframe containing the answers to the questions.
@@ -154,8 +154,14 @@ def calc_a_score(df):
     - the additional time factor is the first element in the array
     - column names are distinguishable by having the name of the assessed equipment
     (i.e. opDuracaoCadeira, snFormaAssento, opAnguloEncosto, etc.)
+    :param pure_rosa: boolean indicating the type of score to be calculated. If True, calculate pure rosa score.
+    If False, calculate the scores with the added questions
     :return: no return type; the dataframe is overwritten by this function
     """
+    if pure_rosa:
+
+        # drop all columns except the pure rosa ones
+        df = df[rosa_qm.rosa_a_score_columns]
 
     # calculate the score for the chair (exclude the first value as this is the time factor)
     cadeira_score = df.filter(regex="Cadeira").iloc[:, 1:].sum(axis=1)
@@ -175,33 +181,49 @@ def calc_a_score(df):
     # sum the two scores and the score for the desk
     arm_backrest_score = backrest_score + armrest_score + df.filter(regex="Mesa").squeeze()
 
-    # normalise the scores
-    cadeira_seatpan_score = normalise_to_range(cadeira_seatpan_score, rosa_sc.card_a, score_type='vertical', answer='cadeira')
-    arm_backrest_score = normalise_to_range(arm_backrest_score, rosa_sc.card_a, score_type='horizontal', answer='cadeira')
+    if not pure_rosa:
 
-    # ceil the scores (always round up)
-    cadeira_seatpan_score = cadeira_seatpan_score.apply(np.ceil)
-    arm_backrest_score = arm_backrest_score.apply(np.ceil)
+        # normalise the scores
+        cadeira_seatpan_score = normalise_to_range(cadeira_seatpan_score, rosa_sc.card_a, score_type='vertical', answer='cadeira')
+        arm_backrest_score = normalise_to_range(arm_backrest_score, rosa_sc.card_a, score_type='horizontal', answer='cadeira')
+
+        # ceil the scores (always round up)
+        cadeira_seatpan_score = cadeira_seatpan_score.apply(np.ceil)
+        arm_backrest_score = arm_backrest_score.apply(np.ceil)
 
     # add the calculated scores as new columns
     df['seatpan_score'] = cadeira_seatpan_score
     df['arm_backrest_score'] = arm_backrest_score
 
     # get the rosa score according to the corresponding score card
-    df['score_a'] = df.apply(lambda x: get_score_from_card(x['seatpan_score'], x['arm_backrest_score'], rosa_sc.card_a), axis=1)
+    df['score_a_rosa'] = df.apply(lambda x: get_score_from_card(x['seatpan_score'], x['arm_backrest_score'], rosa_sc.card_a), axis=1)
 
     # get the time factor
     df['time_factor'] = df.filter(regex="Cadeira").iloc[:, 0]
 
     # add the time factor (for the score_a the time factor is added after getting the score from the card
-    df['score_a'] = df['score_a'] + df['time_factor']
+    df['score_a_rosa'] = df['score_a_rosa'] + df['time_factor']
 
-    chair_score_min = rosa_sc.card_a['min']
-    chair_score_max = rosa_sc.card_a['max_horizontal'] + 1
-    df['score_a_normalized'] = (df['score_a'] - chair_score_min)/(chair_score_max - chair_score_min)
+    # keep only the relevant columns
+    df = df[['id.1', 'score_a_rosa']]
+
+    # if it's not pure rosa, normalize the results
+    if not pure_rosa:
+
+        chair_score_min = rosa_sc.card_a['min']
+        chair_score_max = rosa_sc.card_a['max_horizontal_new']
+        df['score_a_normalized'] = (df['score_a_rosa'] - chair_score_min)/(chair_score_max - chair_score_min)
+
+        # keep only the relevant columns
+        df = df[['id.1', 'score_a_normalized']]
+
+        # rename scores column name
+        df.rename(columns={"score_a_normalized": "cadeira_adapted"})
+
+    return df
 
 
-def calc_b_c_scores(df):
+def calc_b_c_scores(df: pd.DataFrame, pure_rosa: bool) -> pd.DataFrame:
     """
     Function to calculate the score for score card B (Phone + Monitor) and score card C (Mouse + Keyboard)
     :param df: dataframe containing the answers to the questions.
@@ -210,8 +232,14 @@ def calc_b_c_scores(df):
     - the additional time factor is the last element in the array telefone array and the one for the computer is called "opDuracaoComputador"
     - column names are distinguishable by having the name of the assessed equipment
     (i.e. opDuracaoCadeira, snFormaAssento, opAnguloEncosto, etc.)
+    :param pure_rosa: boolean indicating the type of score to be calculated. If True, calculate pure rosa score.
+    If False, calculate the scores with the added questions
     :return: no return type; the dataframe is overwritten by this function
     """
+    if pure_rosa:
+
+        # keep only the pure rosa columns
+        df = df[rosa_qm.rosa_b_c_score_columns]
 
     # get the time factor for the monitor, keyboard & mouse (computer)
     tf_computer = df.filter(regex="Computador").replace({-3: -1, 0: 0, 3: 1}).squeeze()
@@ -220,40 +248,81 @@ def calc_b_c_scores(df):
     monitor_score = df.filter(regex="Monitor").sum(axis=1)
 
     # calculate the phone score (exclude the last value as this is the time factor)
-    telefone_score = df.filter(regex="Telefone").iloc[:, :-1].sum(axis=1)
+    telefone_score = df.filter(regex="Telefone").sum(axis=1)
 
-    # calculate keyboard score
-    keyboard_score = df.filter(regex="Teclado").sum(axis=1)
+    # calculate keyboard score (filter all column with the name Teclado, except snPosTecladoRato)
+    keyboard_score = df.filter(regex=r"^(?!snPosTecladoRato$).*Teclado").sum(axis=1)
 
     # calculate mouse score
     mouse_score = df.filter(regex="Rato").sum(axis=1)
 
-    ''''''
-    # add the time factors for computer, phone, mouse, keyboard
+    # for section B and C the time is added before getting the score in the card
+    # add the time factors for computer, mouse, keyboard
     monitor_score = monitor_score + tf_computer
-    telefone_score = telefone_score + df.filter(regex="Telefone").iloc[:, -1]
     mouse_score = mouse_score + tf_computer
     keyboard_score = keyboard_score + tf_computer
 
-    # normalise the scores
-    monitor_score = normalise_to_range(monitor_score, rosa_sc.card_b, score_type='vertical', answer='monitor')
-    telefone_score = normalise_to_range(telefone_score, rosa_sc.card_b, score_type='horizontal', answer='telefone')
-    mouse_score = normalise_to_range(mouse_score, rosa_sc.card_c, score_type='vertical', answer='mouse')
-    keyboard_score = normalise_to_range(keyboard_score, rosa_sc.card_c, score_type='horizontal', answer='keyboard')
+    if pure_rosa:
 
-    # ceil the scores (always round up)
-    # monitor_score = monitor_score.apply(np.ceil)
-    # telefone_score = telefone_score.apply(np.ceil)
-    # mouse_score = mouse_score.apply(np.ceil)
-    # keyboard_score = keyboard_score.apply(np.ceil)
+        # add monitor, mouse, keyboard, and telephone scores to the df
+        df['monitor_score'] = monitor_score
+        df['mouse_score'] = mouse_score
+        df['keyboard_score'] = keyboard_score
+        df['phone_score'] = telefone_score
 
-    # add the calculated scores as new columns
-    df['monitor_score'] = monitor_score
-    df['phone_score'] = telefone_score
-    df['mouse_score'] = mouse_score
-    df['keyboard_score'] = keyboard_score
+        # get the rosa score according to the corresponding score card
+        df['score_b_rosa'] = df.apply(lambda x: get_score_from_card(x['phone_score'], x['monitor_score'], rosa_sc.card_b), axis=1)
+        # get the rosa score according to the corresponding score card
+        df['score_c_rosa'] = df.apply(lambda x: get_score_from_card(x['mouse_score'], x['keyboard_score'], rosa_sc.card_c), axis=1)
 
-    # # get the rosa score according to the corresponding score card
-    # df['score_b'] = df.apply(lambda x: get_score_from_card(x['monitor_score'], x['phone_score'], rosa_sc.card_b), axis=1)
-    # # get the rosa score according to the corresponding score card
-    # df['score_c'] = df.apply(lambda x: get_score_from_card(x['mouse_score'], x['keyboard_score'], rosa_sc.card_c), axis=1)
+        # keep only the relevant columns
+        df = df[['id.1', 'score_b_rosa', 'score_c_rosa']]
+
+    else:
+
+        # normalise the scores
+        monitor_score = normalise_to_range(monitor_score, rosa_sc.card_b, score_type='vertical', answer='monitor')
+        telefone_score = normalise_to_range(telefone_score, rosa_sc.card_b, score_type='horizontal', answer='telefone')
+        mouse_score = normalise_to_range(mouse_score, rosa_sc.card_c, score_type='vertical', answer='mouse')
+        keyboard_score = normalise_to_range(keyboard_score, rosa_sc.card_c, score_type='horizontal', answer='keyboard')
+
+        # ceil the scores (always round up)
+        monitor_score = monitor_score.apply(np.ceil)
+        telefone_score = telefone_score.apply(np.ceil)
+        mouse_score = mouse_score.apply(np.ceil)
+        keyboard_score = keyboard_score.apply(np.ceil)
+
+        # add the calculated scores as new columns
+        df['monitor_score_adapted'] = monitor_score
+        df['phone_score_adapted'] = telefone_score
+        df['mouse_score_adapted'] = mouse_score
+        df['keyboard_score_adapted'] = keyboard_score
+
+        # keep only the relevant columns with the scores
+        df = df[['id.1', 'monitor_score_adapted', 'phone_score_adapted', 'mouse_score_adapted', 'keyboard_score_adapted']]
+
+    return df
+
+
+def calc_final_rosa_score(df_a_scores: pd.DataFrame, df_b_c_scores: pd.DataFrame) -> pd.DataFrame:
+
+    # set id column as index on both dfs
+    df_a_scores['id.1'] = pd.to_numeric(df_a_scores['id.1'], errors='coerce')
+    df_a_scores = df_a_scores.set_index('id.1')
+
+    df_b_c_scores['id.1'] = pd.to_numeric(df_b_c_scores['id.1'], errors='coerce')
+    df_b_c_scores = df_b_c_scores.set_index('id.1')
+
+    # concat into one df
+    scores_df = pd.concat([df_a_scores, df_b_c_scores], axis=1)
+
+    # sort on index
+    scores_df = scores_df.sort_index()
+
+    # get 'Monitor and Peripherals Score'
+    scores_df['monitor_peripherals_scores'] = scores_df.apply(lambda x: get_score_from_card(x['score_b_rosa'], x['score_c_rosa'], rosa_sc.card_map), axis=1)
+
+    # get Rosa Final Score
+    scores_df['final_rosa_score'] = scores_df.apply(lambda x: get_score_from_card(x['score_a_rosa'], x['monitor_peripherals_scores'], rosa_sc.card_map), axis=1)
+
+    return scores_df

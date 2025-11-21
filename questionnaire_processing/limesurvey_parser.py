@@ -105,7 +105,7 @@ def _clean_limesurvey_files(df: pd.DataFrame):
     df = df.dropna(subset=['submitdate'])
 
     # sort by submitdate, then keep only the most recent submission per participant
-    df = (df.sort_values('submitdate').drop_duplicates(subset=['id'], keep='last').reset_index(drop=True))
+    df = (df.sort_values('submitdate').drop_duplicates(subset=['id.1'], keep='last').reset_index(drop=True))
 
     return df
 

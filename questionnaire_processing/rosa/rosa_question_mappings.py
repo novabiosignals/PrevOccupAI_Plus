@@ -2,6 +2,16 @@
 File containing a dictionaries for multiple choice questions of the ROSA questionnaire.
 The dictionary names are according to the question names defined in LimeSurvey
 """
+rosa_a_score_columns = ['submitdate', 'id.1', 'opDuracaoCadeira', 'opAlturaCadeira', 'snEspacoCadeira', 'snAjustCadeira', 'opProfunAssento',
+                        'snProfunAjustAssento', 'opAnguloEncosto', 'snAjustEncosto', 'opAltApoioBrasos', 'snSuperfiApoioBrasos',
+                        'snAfastadApoioBracos', 'snAjustApoioBracos', 'opAlturaMesa']
+
+rosa_b_c_score_columns = ['submitdate', 'id.1', 'opDuracaoComputador', 'opPosMonitor', 'snDistancMonitor', 'snPosPrincMonitor',
+                          'snDocSupMonitor', 'opPosRato', 'snFormTamRato', 'snApoioErgonRato', 'snPosTecladoRato', 'opPosTeclado',
+                          'snDesvioTeclado', 'snAltoTeclado', 'snAcimaTeclado', 'snAjustTeclado', 'snFonesTelefone', 'opSeguraTelefone',
+                          'snDistanciaTelefone', 'opDuracaoTelefone'
+
+]
 
 # dictionary containing all the mappings for the rosa multiple choice questions of section a
 rosa_mappings_section_a = {
@@ -110,7 +120,7 @@ rosa_mappings_section_c = {
         "A1": 1,
         "A2": 0,
         "A3": -1,
-        "A4": 0,
+        "A4": -1,
     }
 
 }

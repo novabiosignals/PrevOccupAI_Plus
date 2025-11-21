@@ -4,11 +4,17 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="d6637f5a-b481-472e-9cbc-1b523cdb0fbc" name="Changes" comment="started working on rosa adaptations">
+    <list default="true" id="d6637f5a-b481-472e-9cbc-1b523cdb0fbc" name="Changes" comment="corrected subject info file">
+      <change beforePath="$PROJECT_DIR$/.idea/dictionaries/project.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/dictionaries/project.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/main_signals.py" beforeDir="false" afterPath="$PROJECT_DIR$/main_signals.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/participants_info.csv" beforeDir="false" afterPath="$PROJECT_DIR$/participants_info.csv" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/main_questionnaires.py" beforeDir="false" afterPath="$PROJECT_DIR$/main_questionnaires.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/questionnaire_processing/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/questionnaire_processing/__init__.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/questionnaire_processing/biomechanical_score_calculator.py" beforeDir="false" afterPath="$PROJECT_DIR$/questionnaire_processing/biomechanical_score_calculator.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/questionnaire_processing/limesurvey_parser.py" beforeDir="false" afterPath="$PROJECT_DIR$/questionnaire_processing/limesurvey_parser.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/questionnaire_processing/linear_score_calculator.py" beforeDir="false" afterPath="$PROJECT_DIR$/questionnaire_processing/linear_score_calculator.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/questionnaire_processing/rosa/rosa_question_mappings.py" beforeDir="false" afterPath="$PROJECT_DIR$/questionnaire_processing/rosa/rosa_question_mappings.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/questionnaire_processing/rosa/rosa_score_cards.py" beforeDir="false" afterPath="$PROJECT_DIR$/questionnaire_processing/rosa/rosa_score_cards.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/questionnaire_processing/rosa/rosa_tools.py" beforeDir="false" afterPath="$PROJECT_DIR$/questionnaire_processing/rosa/rosa_tools.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -50,7 +56,7 @@
     "ModuleVcsDetector.initialDetectionPerformed": "true",
     "Python.main.executor": "Run",
     "Python.main_quest.executor": "Run",
-    "Python.main_questionnaires.executor": "Run",
+    "Python.main_questionnaires.executor": "Debug",
     "Python.main_signals.executor": "Run",
     "Python.personal_score_calculator.executor": "Run",
     "RunOnceActivity.ShowReadmeOnStart": "true",
@@ -289,7 +295,15 @@
       <option name="project" value="LOCAL" />
       <updated>1763481178679</updated>
     </task>
-    <option name="localTasksCounter" value="23" />
+    <task id="LOCAL-00023" summary="corrected subject info file">
+      <option name="closed" value="true" />
+      <created>1763484057827</created>
+      <option name="number" value="00023" />
+      <option name="presentableId" value="LOCAL-00023" />
+      <option name="project" value="LOCAL" />
+      <updated>1763484057827</updated>
+    </task>
+    <option name="localTasksCounter" value="24" />
     <servers />
   </component>
   <component name="VcsManagerConfiguration">
@@ -314,7 +328,8 @@
     <MESSAGE value="added dataset generator and some other changes" />
     <MESSAGE value="removed multiple submissions from csv files. Corrected some column names and a bug in Bem-estar geral scores. Changed participants info to have type of atendimento" />
     <MESSAGE value="started working on rosa adaptations" />
-    <option name="LAST_COMMIT_MESSAGE" value="started working on rosa adaptations" />
+    <MESSAGE value="corrected subject info file" />
+    <option name="LAST_COMMIT_MESSAGE" value="corrected subject info file" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
@@ -325,9 +340,9 @@
           <option name="timeStamp" value="2" />
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
-          <url>file://$PROJECT_DIR$/questionnaire_processing/personal_score_calculator.py</url>
-          <line>55</line>
-          <option name="timeStamp" value="9" />
+          <url>file://$PROJECT_DIR$/questionnaire_processing/linear_score_calculator.py</url>
+          <line>64</line>
+          <option name="timeStamp" value="17" />
         </line-breakpoint>
       </breakpoints>
     </breakpoint-manager>

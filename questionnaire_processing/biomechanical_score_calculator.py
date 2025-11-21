@@ -24,7 +24,30 @@ INCAPACIDADE_DOR = "Incapacidade e Sofrimento associados a Dor"
 # -------------------------------------------------------------------------------------------------------------------- #
 # public functions
 # -------------------------------------------------------------------------------------------------------------------- #
-def calculate_biomechanical_scores(folder_path):
+def calculate_rosa_scores(folder_path: str):
+
+    # load results for all domain questionnaires into a dictionary
+    # (keys: questionnaire id, values: dataframe with the results)
+    results_dict = load_questionnaire_answers(folder_path, domain="biomecanico")
+
+    # get the dataframe of equipamentos and design escritório
+    df_equip = results_dict['622581']
+    df_design = results_dict['537796']
+
+    # get rosa scores
+    df_a_scores = _get_design_escritorio_results(df_design, pure_rosa=True)
+    df_b_c_scores = _get_equipamentos_results(df_equip, pure_rosa=True)
+
+    # get final rosa scores
+    scores_df = rt.calc_final_rosa_score(df_a_scores, df_b_c_scores)
+
+    # save dataframe into a csv file
+    folder_path = create_dir(Path(__file__).parent,
+                             os.path.join(RESULTS_FOLDER_NAME, get_group_from_path(folder_path), 'biomecanico'))
+    scores_df.to_csv(os.path.join(folder_path, f"rosa_scores{CSV}"))
+
+
+def calculate_biomechanical_scores(folder_path, pure_rosa: bool):
 
     # load results for all domain questionnaires into a dictionary
     # (keys: questionnaire id, values: dataframe with the results)
@@ -45,11 +68,11 @@ def calculate_biomechanical_scores(folder_path):
 
         if questionnaire_name == DESIGN_ESCRITORIO:
 
-            results_df = _get_design_escritorio_results(answers_df)
+            results_df = _get_design_escritorio_results(answers_df, pure_rosa=pure_rosa)
 
         elif questionnaire_name == EQUIPAMENTOS:
 
-            results_df = _get_equipamentos_results(answers_df)
+            results_df = _get_equipamentos_results(answers_df, pure_rosa=pure_rosa)
 
         # it's incapacidade....
         else:
@@ -69,7 +92,7 @@ def calculate_biomechanical_scores(folder_path):
 # private functions
 # -------------------------------------------------------------------------------------------------------------------- #
 
-def _get_design_escritorio_results(results_df: pd.DataFrame) -> pd.DataFrame:
+def _get_design_escritorio_results(results_df: pd.DataFrame, pure_rosa: bool) -> pd.DataFrame:
 
     # copy df
     df = results_df.copy()
@@ -78,18 +101,12 @@ def _get_design_escritorio_results(results_df: pd.DataFrame) -> pd.DataFrame:
     df = rt.pre_process_rosa(df, [rosa_qm.rosa_mappings_section_a])
 
     # calculate scores for section a - chair
-    rt.calc_a_score(df)
+    df = rt.calc_a_score(df, pure_rosa=pure_rosa)
 
-    # keep only the relevant columns
-    scores_df = df[['id.1', 'score_a_normalized']]
-
-    # rename scores column name
-    scores_df.rename(columns={"score_a_normalized": "cadeira"})
-
-    return scores_df
+    return df
 
 
-def _get_equipamentos_results(results_df: pd.DataFrame) -> pd.DataFrame:
+def _get_equipamentos_results(results_df: pd.DataFrame, pure_rosa: bool) -> pd.DataFrame:
 
     # copy original df
     df = results_df.copy()
@@ -98,15 +115,9 @@ def _get_equipamentos_results(results_df: pd.DataFrame) -> pd.DataFrame:
     df = rt.pre_process_rosa(df, [rosa_qm.rosa_mappings_section_b, rosa_qm.rosa_mappings_section_c])
 
     # calculate score for section b and c
-    rt.calc_b_c_scores(df)
+    df = rt.calc_b_c_scores(df, pure_rosa=pure_rosa)
 
-    # keep only the relevant columns with the scores
-    scores_df = df[['id.1', 'monitor_score', 'phone_score', 'mouse_score', 'keyboard_score']]
-
-    # rename for easier read and portuguese
-    scores_df = scores_df.rename(columns={"monitor_score": "Monitor", "phone_score": "Telefone", "mouse_score": "Rato", "keyboard_score": "Teclado"})
-
-    return scores_df
+    return df
 
 
 def _get_incapacidade_dor_results(results_df: pd.DataFrame) -> pd.DataFrame:
