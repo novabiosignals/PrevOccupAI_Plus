@@ -130,7 +130,7 @@ ID_NEW_COLUMNS = ['Cervical / pescoço', 'Ombros', 'Região dorsal superior / To
 
 ID_ANSWERS_MAP = {
     "incapacidade_sofrimento": {
-        "A1": "A2",
+        "A1": "leve",
         "A2": "leve",
         "A3": "leve",
         "A4": "leve",
