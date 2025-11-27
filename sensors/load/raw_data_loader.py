@@ -33,7 +33,7 @@ import math
 from constants import PHONE, WATCH, VALID_MBAN_DATA, NSEQ, IMU_SENSORS, TIME_COLUMN_NAME, ROT, NOISE, HEART, MBAN
 from .path_handler import get_sensor_paths_per_device
 from .parser import extract_sensor_from_filename
-from .interpolate import cubic_spline_interpolation, slerp_interpolation, zero_order_hold_interpolation, \
+from sensors.process.interpolate import cubic_spline_interpolation, slerp_interpolation, zero_order_hold_interpolation, \
     interpolate_heart_rate_sensor
 # ------------------------------------------------------------------------------------------------------------------- #
 # file specific constants

@@ -1,7 +1,7 @@
 # ------------------------------------------------------------------------------------------------------------------- #
 # imports
 # ------------------------------------------------------------------------------------------------------------------- #
-import load_signals
+from sensors.load import load_daily_acquisitions
 
 # ------------------------------------------------------------------------------------------------------------------- #
 # constants
@@ -23,7 +23,7 @@ def main(classify_and_sync=True):
     if classify_and_sync:
 
         # load_signals all acquisitions from the same day into a nested dictionary
-        df_dict = load_signals.load_daily_acquisitions(DAILY_FOLDER_PATH, SELECTED_SENSORS)
+        df_dict = load_daily_acquisitions(DAILY_FOLDER_PATH, SELECTED_SENSORS)
 
         # # pre-process data
         # processed_df_dict = process.apply_pre_processing_pipeline(df_dict, fs_android=FS, downsample_muscleban=True)
