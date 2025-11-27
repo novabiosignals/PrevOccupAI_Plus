@@ -77,7 +77,7 @@ MBAN_RIGHT = 'mBAN_right'
 # Questionnaire constants
 # ------------------------------------------------------------------------------------------------------------------- #
 CONFIG_FOLDER_NAME = 'config_files'
-RESULTS_FOLDER_NAME = 'results'
+RESULTS_FOLDER_NAME = 'results_questionnaires'
 
 PSICOSSOCIAL = 'psicosocial'
 AMBIENTE = 'ambiente'

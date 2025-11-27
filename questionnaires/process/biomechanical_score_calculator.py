@@ -7,12 +7,12 @@ import pandas as pd
 from typing import List
 
 # internal imports
-from .questionnaire_loader import load_questionnaire_answers
-from utils import load_json_file, create_dir, get_group_from_path
+from questionnaires.load.questionnaire_loader import load_questionnaire_answers
+from utils import load_json_file, create_dir, get_group_from_path, find_project_root
 from constants import CONFIG_FOLDER_NAME, RESULTS_FOLDER_NAME, CSV
-import questionnaire_processing.rosa.rosa_tools as rt
-import questionnaire_processing.rosa.rosa_question_mappings as rosa_qm
-from .questionnaire_mappings import ID_OLD_COLUMNS, ID_NEW_COLUMNS, ID_ANSWERS_MAP
+import questionnaires.process.rosa_tools as rt
+import questionnaires.process.mappings.rosa_question_mappings as rosa_qm
+from questionnaires.process.mappings.questionnaire_mappings import ID_OLD_COLUMNS, ID_NEW_COLUMNS, ID_ANSWERS_MAP
 
 
 # -------------------------------------------------------------------------------------------------------------------- #
@@ -27,8 +27,8 @@ INCAPACIDADE_DOR = "Incapacidade e Sofrimento associados a Dor"
 # -------------------------------------------------------------------------------------------------------------------- #
 def calculate_rosa_scores(folder_path: str):
 
-    # load results for all domain questionnaires into a dictionary
-    # (keys: questionnaire id, values: dataframe with the results)
+    # load results_questionnaires for all domain questionnaires into a dictionary
+    # (keys: questionnaire id, values: dataframe with the results_questionnaires)
     results_dict = load_questionnaire_answers(folder_path, domain="biomecanico")
 
     # get the dataframe of equipamentos and design escritório
@@ -43,8 +43,7 @@ def calculate_rosa_scores(folder_path: str):
     scores_df = rt.calc_final_rosa_score(df_a_scores, df_b_c_scores)
 
     # save dataframe into a csv file
-    folder_path = create_dir(Path(__file__).parent,
-                             os.path.join(RESULTS_FOLDER_NAME, get_group_from_path(folder_path)))
+    folder_path = create_dir(find_project_root(), os.path.join(RESULTS_FOLDER_NAME, get_group_from_path(folder_path)))
     scores_df.to_csv(os.path.join(folder_path, f"rosa_scores{CSV}"))
 
 
@@ -53,8 +52,8 @@ def calculate_biomechanical_scores(folder_path, pure_rosa: bool):
     # list for holding the scores_df for all questionnaires
     list_dfs: List[pd.DataFrame] = []
 
-    # load results for all domain questionnaires into a dictionary
-    # (keys: questionnaire id, values: dataframe with the results)
+    # load results_questionnaires for all domain questionnaires into a dictionary
+    # (keys: questionnaire id, values: dataframe with the results_questionnaires)
     results_dict = load_questionnaire_answers(folder_path, domain="biomecanico")
 
     # load config json file
@@ -87,6 +86,9 @@ def calculate_biomechanical_scores(folder_path, pure_rosa: bool):
         results_df['id.1'] = pd.to_numeric(results_df['id.1'], errors='coerce')
         results_df = results_df.set_index('id.1').sort_index()
 
+        # drop submit date columns
+        results_df = results_df.drop(columns=results_df.filter(regex='(?i)^submitdate$').columns)
+
         # add dataframe to list
         list_dfs.append(results_df)
 
@@ -94,8 +96,7 @@ def calculate_biomechanical_scores(folder_path, pure_rosa: bool):
     final_df = pd.concat(list_dfs, axis=1)
 
     # save dataframe into a csv file
-    folder_path = create_dir(Path(__file__).parent,
-                             os.path.join(RESULTS_FOLDER_NAME, get_group_from_path(folder_path)))
+    folder_path = create_dir(find_project_root(), os.path.join(RESULTS_FOLDER_NAME, get_group_from_path(folder_path)))
     final_df.to_csv(os.path.join(folder_path, f"results_biomecanico{CSV}"))
 
 

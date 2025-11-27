@@ -99,7 +99,7 @@ def load_daily_acquisitions(folder_path: str, load_devices: Dict[str, List[str]]
             # inform user
             print(f"\nLoading data from device: {device}.")
 
-            # add entry to the results dictionary
+            # add entry to the results_questionnaires dictionary
             if device not in dataframes_dict:
                 dataframes_dict[device] = {}
 

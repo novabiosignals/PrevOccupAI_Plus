@@ -8,9 +8,9 @@ import pandas as pd
 import glob
 
 # internal imports
-from utils import load_json_file, create_dir, get_group_from_path
-from .questionnaire_loader import load_questionnaire_answers
-from .json_parser import get_questionnaire_name_from_json
+from utils import load_json_file, create_dir, get_group_from_path, find_project_root
+from questionnaires.load.questionnaire_loader import load_questionnaire_answers
+from questionnaires.process.json_parser import get_questionnaire_name_from_json
 from constants import CONFIG_FOLDER_NAME, RESULTS_FOLDER_NAME, CSV, AMBIENTE, PSICOSSOCIAL
 
 # ------------------------------------------------------------------------------------------------------------------- #
@@ -36,19 +36,19 @@ ATENDIMENTO = 'atendimento'
 
 def calculate_copsoq_mean_scores(folder_path, average_method: str) -> None:
     """
-    Calculate pure copsoq scores. This function assumes that the psicossocial results have already been obtained for
+    Calculate pure copsoq scores. This function assumes that the psicossocial results_questionnaires have already been obtained for
     all groups. There are two averaging methods available.
     - 'all': obtains the copsoq scores by calculating the mean scores over all subjects
     - 'atendimento': obtains the copsoq scores by calculating the mean scores over front and back office subjects
 
-    Saves the results in a csv file.
+    Saves the results_questionnaires in a csv file.
 
-    :param folder_path: Path to the folder containing the questionnaire results for all groups.
+    :param folder_path: Path to the folder containing the questionnaire results_questionnaires for all groups.
     :param average_method: Average method to be used for calculating the copsoq scores. Supported methods: 'all' and 'mean'
     :return: None
     """
 
-    # get dataframe with the psicossocial results for all subjects
+    # get dataframe with the psicossocial results_questionnaires for all subjects
     all_results_df = _get_all_psicossocial_results(folder_path)
 
     # drop non-copsoq columns
@@ -65,7 +65,7 @@ def calculate_copsoq_mean_scores(folder_path, average_method: str) -> None:
     elif average_method == ATENDIMENTO:
 
         # load subject info
-        subjects_info_df = pd.read_csv((os.path.join(Path(__file__).parent.parent, 'participants_info.csv')), sep=';')
+        subjects_info_df = pd.read_csv((os.path.join(find_project_root(), 'participants_info.csv')), sep=';')
 
         # get list with subject ids for Front/Back office
         fo_subjects = subjects_info_df.loc[subjects_info_df['atendimento'] == 'FO', 'subject_id'].tolist()
@@ -85,7 +85,7 @@ def calculate_copsoq_mean_scores(folder_path, average_method: str) -> None:
     else:
         raise ValueError(f"The following average method is not supported. \nSupported methods are 'all' and 'atendimento'")
     # save dataframe into a csv file
-    folder_path = create_dir(Path(__file__).parent,COPSOQ_RESULTS_FOLDER)
+    folder_path = create_dir(find_project_root(),COPSOQ_RESULTS_FOLDER)
     copsoq_df.to_csv(os.path.join(folder_path, f"results_copsoq_{average_method}{CSV}"))
 
 
@@ -144,7 +144,7 @@ def calculate_copsoq_scores(folder_path: str) -> pd.DataFrame:
 
 def calculate_linear_scores(folder_path: str, domain: str) -> None:
     """
-    Calculates the scores for the Psicossocial and Ambiente questionnaires and saves the results into a csv file
+    Calculates the scores for the Psicossocial and Ambiente questionnaires and saves the results_questionnaires into a csv file
     :param folder_path: Path to the folder containing the several questionnaire domains (subfolders)
     :param domain: The domain of the questionnaires, which should be the name of the folder that contains the csv files.
                     For this function, only Psicosocial and Ambiente are available #todo check this
@@ -153,17 +153,17 @@ def calculate_linear_scores(folder_path: str, domain: str) -> None:
     # list for holding the scores_df for all questionnaires
     list_dfs: List[pd.DataFrame] = []
 
-    # load results for all domain questionnaires into a dictionary
-    # (keys: questionnaire id, values: dataframe with the results)
+    # load results_questionnaires for all domain questionnaires into a dictionary
+    # (keys: questionnaire id, values: dataframe with the results_questionnaires)
     results_dict = load_questionnaire_answers(folder_path, domain)
 
     # load json file with the info for the given domain
-    config_dict = load_json_file(os.path.join(Path(__file__).parent, CONFIG_FOLDER_NAME, f"cfg_{domain.lower()}.json"))
+    config_dict = load_json_file(os.path.join(find_project_root(), 'questionnaires', 'process', CONFIG_FOLDER_NAME, f"cfg_{domain.lower()}.json"))
 
     # load json file with the scores info
-    scores_dict = load_json_file(os.path.join(Path(__file__).parent, CONFIG_FOLDER_NAME, JSON_SCORES_FILENAME))
+    scores_dict = load_json_file(os.path.join(find_project_root(), 'questionnaires', 'process', CONFIG_FOLDER_NAME, JSON_SCORES_FILENAME))
 
-    # iterate through the results of the psicossocial questionnaires
+    # iterate through the results_questionnaires of the psicossocial questionnaires
     for questionnaire_id, results_df in results_dict.items():
 
         # create a scores dataframe for this questionnaire
@@ -207,7 +207,7 @@ def calculate_linear_scores(folder_path: str, domain: str) -> None:
                 # add subject id column and scores
                 if not 'id' in questionnaire_scores_df.columns:
 
-                    # get the id column from the results df - column name starts with id
+                    # get the id column from the results_questionnaires df - column name starts with id
                     id_col = results_df.filter(regex='id', axis=1).iloc[:, 0]
 
                     # add id column to the scores df
@@ -219,6 +219,9 @@ def calculate_linear_scores(folder_path: str, domain: str) -> None:
         questionnaire_scores_df['id.1'] = questionnaire_scores_df['id.1'].apply(pd.to_numeric, errors='coerce')
         questionnaire_scores_df = questionnaire_scores_df.set_index('id.1').sort_index()
 
+        # drop submit date columns
+        questionnaire_scores_df = questionnaire_scores_df.drop(columns=questionnaire_scores_df.filter(regex='(?i)^submitdate$').columns)
+
         # add dataframe to list
         list_dfs.append(questionnaire_scores_df)
 
@@ -227,7 +230,7 @@ def calculate_linear_scores(folder_path: str, domain: str) -> None:
     final_df = pd.concat(list_dfs, axis=1)
 
     # save dataframe into a csv file
-    folder_path = create_dir(Path(__file__).parent, os.path.join(RESULTS_FOLDER_NAME, get_group_from_path(folder_path)))
+    folder_path = create_dir(find_project_root(), os.path.join(RESULTS_FOLDER_NAME, get_group_from_path(folder_path)))
     final_df.to_csv(os.path.join(folder_path, f"results_{domain}{CSV}"))
 
 # ------------------------------------------------------------------------------------------------------------------- #
@@ -308,7 +311,7 @@ def _assign_answer_values(results_df: pd.DataFrame, scale: List[int], values: Li
         # if the column index matches the ones in inverted
         if column_index in inverted:
 
-            # assign values and invert results
+            # assign values and invert results_questionnaires
             results_df[results_df.columns[column_index]] = results_df[results_df.columns[column_index]].replace(scale, values[::-1])
 
         else:
@@ -387,11 +390,11 @@ def _create_df_from_lists(column_names_list: List[List[str]], list_sums_total: L
 
 def _get_all_psicossocial_results(folder_path: str) -> pd.DataFrame:
     """
-    Load and aggregate all psicossocial questionnaire results into one single dataframe.
+    Load and aggregate all psicossocial questionnaire results_questionnaires into one single dataframe.
 
     This function navigates through a directory where each group has its own folder,
     and within each group folder exists a `PSICOSSOCIAL` subfolder containing exactly
-    one CSV file with questionnaire results. It loads each of these CSV files into a
+    one CSV file with questionnaire results_questionnaires. It loads each of these CSV files into a
     DataFrame and concatenates them vertically into a single DataFrame.
 
     Directory structure example
@@ -399,14 +402,14 @@ def _get_all_psicossocial_results(folder_path: str) -> pd.DataFrame:
     folder_path/
         group_1/
             PSICOSSOCIAL/
-                results.csv
+                results_questionnaires.csv
         group_2/
             PSICOSSOCIAL/
-                results.csv
+                results_questionnaires.csv
         ...
     :param folder_path: The root directory containing group folders. Each group folder must contain
             a subfolder named `PSICOSSOCIAL` with exactly one CSV file.
-    :return: A DataFrame containing all psicossocial questionnaire results stacked vertically,
+    :return: A DataFrame containing all psicossocial questionnaire results_questionnaires stacked vertically,
             with original indices preserved. Each row corresponds to a subject, and each
             column represents a questionnaire item.
     """
@@ -418,15 +421,13 @@ def _get_all_psicossocial_results(folder_path: str) -> pd.DataFrame:
     for group_folder in os.listdir(folder_path):
 
         # cycle over the questionnaire folders
-        for questionnaire_folder in os.listdir(os.path.join(folder_path, group_folder)):
+        for questionnaire_file in os.listdir(os.path.join(folder_path, group_folder)):
 
             # filter only the psicossocial questionnaires
-            if questionnaire_folder == PSICOSSOCIAL:
-                # get list of csv file paths of all psicossocial questionnaires - should only have 1
-                csv_files = os.listdir(os.path.join(folder_path, group_folder, questionnaire_folder))
+            if PSICOSSOCIAL in questionnaire_file:
 
                 # get full path to the csv file
-                file_path = os.path.join(folder_path, group_folder, questionnaire_folder, csv_files[0])
+                file_path = os.path.join(folder_path, group_folder, questionnaire_file)
 
                 # load df
                 results_df = pd.read_csv(file_path)
@@ -434,7 +435,7 @@ def _get_all_psicossocial_results(folder_path: str) -> pd.DataFrame:
                 # add df to the list
                 list_group_dfs.append(results_df)
 
-    # concat vertically to have the results of all subjects keeping original index (which are the subject ids)
+    # concat vertically to have the results_questionnaires of all subjects keeping original index (which are the subject ids)
     final_df = pd.concat(list_group_dfs, axis=0)
 
     return final_df

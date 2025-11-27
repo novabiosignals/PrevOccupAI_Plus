@@ -14,6 +14,7 @@
       <change afterPath="$PROJECT_DIR$/signals/load/__init__.py" afterDir="false" />
       <change afterPath="$PROJECT_DIR$/signals/visualize/__init__.py" afterDir="false" />
     <list default="true" id="d6637f5a-b481-472e-9cbc-1b523cdb0fbc" name="Changes" comment="changed loading function to handle the new dba scale for the noise recorder">
+    <list default="true" id="d6637f5a-b481-472e-9cbc-1b523cdb0fbc" name="Changes" comment="code refactoring">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/main_signals.py" beforeDir="false" afterPath="$PROJECT_DIR$/main_signals.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/signal_processing/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/signals/process/__init__.py" afterDir="false" />
@@ -342,7 +343,15 @@
       <option name="project" value="LOCAL" />
       <updated>1763982708754</updated>
     </task>
-    <option name="localTasksCounter" value="28" />
+    <task id="LOCAL-00028" summary="code refactoring">
+      <option name="closed" value="true" />
+      <created>1764242739961</created>
+      <option name="number" value="00028" />
+      <option name="presentableId" value="LOCAL-00028" />
+      <option name="project" value="LOCAL" />
+      <updated>1764242739961</updated>
+    </task>
+    <option name="localTasksCounter" value="29" />
     <servers />
   </component>
   <component name="VcsManagerConfiguration">
@@ -354,7 +363,6 @@
     <MESSAGE value="implemented classification pipeline and added missing documentation and init files" />
     <MESSAGE value="implemented the synchronisation of the predictions" />
     <MESSAGE value="added missing documentation" />
-    <MESSAGE value="code refactoring" />
     <MESSAGE value="added requirements.txt" />
     <MESSAGE value="fixed a bug in the synchronisation of the predictions" />
     <MESSAGE value="minor code refactoring and started implementing questionnaire processing" />

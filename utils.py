@@ -5,6 +5,7 @@ import json
 from typing import Dict, Any
 import os
 import re
+from pathlib import Path
 
 # ------------------------------------------------------------------------------------------------------------------- #
 # public functions
@@ -56,3 +57,26 @@ def get_group_from_path(folder_path: str) -> str:
         return match.group()
 
     return 'no_group'
+
+
+def find_project_root(path: Path = Path(__file__)) -> Path:
+    """
+    Attempt to detect the root directory of the project by looking
+    for common root markers such as a `.git` folder or `pyproject.toml`.
+
+    :param path: Path to start searching from (defaults to current file).
+    :return: The directory determined to be the project root.
+    :raises RuntimeError: If no project root marker is found.
+    """
+
+    # Loop through the current path and all its parent directories
+    # Example: file.py -> src -> project_root
+    for parent in [path, *path.parents]:
+
+        # Check for Git repository marker or Python project configuration file
+        if (parent / ".git").exists() or (parent / "pyproject.toml").exists():
+            # Found a likely project root — return it
+            return parent
+
+    # If we reach here, no marker was found → raise an error
+    raise RuntimeError("Project root not found")

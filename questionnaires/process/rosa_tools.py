@@ -8,8 +8,8 @@ The functions found here do have some minor deviations because for PrevOccupAI s
 However, the ROSA scales are kept the same. The points from the new questions are inserted into the rosa scale and then
 the scale is re-scaled to its original range.
 """
-import questionnaire_processing.rosa.rosa_question_mappings as rosa_qm
-import questionnaire_processing.rosa.rosa_score_cards as rosa_sc
+import questionnaires.process.mappings.rosa_question_mappings as rosa_qm
+import questionnaires.process.mappings.rosa_score_cards as rosa_sc
 import numpy as np
 import pandas as pd
 
@@ -207,7 +207,7 @@ def calc_a_score(df: pd.DataFrame, pure_rosa: bool) -> pd.DataFrame:
     # keep only the relevant columns
     df = df[['id.1', 'score_a_rosa']]
 
-    # if it's not pure rosa, normalize the results
+    # if it's not pure rosa, normalize the results_questionnaires
     if not pure_rosa:
 
         chair_score_min = rosa_sc.card_a['min']

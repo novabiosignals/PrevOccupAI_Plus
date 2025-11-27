@@ -60,7 +60,7 @@ def classify_human_activities(phone_data_dict: Dict[str, pd.DataFrame], w_size: 
     :return: Dictionary with the acquisition times as keys and the sensor dataframes with the added prediction column
             as values.
     """
-    # create copy of the dictionary to avoid overwriting any results
+    # create copy of the dictionary to avoid overwriting any results_questionnaires
     classified_dict = copy.deepcopy(phone_data_dict)
 
     # cycle over the dictionary with the daily acquisitions for the phone
@@ -194,12 +194,12 @@ def _expand_classification(clf_result: np.ndarray, w_size: float, fs: int) -> Li
     :param clf_result: list with the classifier prediction where each entry is the prediction made for a window.
     :param w_size: the window size in samples that was used to make the classification.
     :param fs: the sampling frequency of the signal that was classified.
-    :return: the expanded classification results.
+    :return: the expanded classification results_questionnaires.
     """
 
     expanded_clf_result = []
 
-    # cycle over the classification results list
+    # cycle over the classification results_questionnaires list
     for i, p in enumerate(clf_result):
         expanded_clf_result += [p] * int(w_size * fs)
 
