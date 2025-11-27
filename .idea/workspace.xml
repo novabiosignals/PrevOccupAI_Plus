@@ -4,8 +4,22 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
+    <list default="true" id="d6637f5a-b481-472e-9cbc-1b523cdb0fbc" name="Changes" comment="merged all questionnaire results from the same domain into one single csv file">
+      <change afterPath="$PROJECT_DIR$/oh_profile/__init__.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/oh_profile/utils.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/questionnaires/__init__.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/questionnaires/process/__init__.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/questionnaires/visualize/__init__.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/signals/__init__.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/signals/load/__init__.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/signals/visualize/__init__.py" afterDir="false" />
     <list default="true" id="d6637f5a-b481-472e-9cbc-1b523cdb0fbc" name="Changes" comment="changed loading function to handle the new dba scale for the noise recorder">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/main_signals.py" beforeDir="false" afterPath="$PROJECT_DIR$/main_signals.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/signal_processing/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/signals/process/__init__.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/signal_processing/filters.py" beforeDir="false" afterPath="$PROJECT_DIR$/signals/process/filters.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/signal_processing/pre_process_android.py" beforeDir="false" afterPath="$PROJECT_DIR$/signals/process/pre_process_android.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/signal_processing/pre_process_muscleban.py" beforeDir="false" afterPath="$PROJECT_DIR$/signals/process/pre_process_muscleban.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/questionnaire_processing/questionnaire_mappings.py" beforeDir="false" afterPath="$PROJECT_DIR$/questionnaire_processing/questionnaire_mappings.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -62,6 +76,7 @@
       <recent name="C:\Users\srale\PycharmProjects\PrevOccupAI_Plus\questionnaire_processing\config_files" />
     </key>
     <key name="MoveFile.RECENT_KEYS">
+      <recent name="C:\Users\phill\PycharmProjects\PrevOccupAI_Plus\signals" />
       <recent name="C:\Users\srale\PycharmProjects\PrevOccupAI_Plus" />
       <recent name="C:\Users\srale\PycharmProjects\PrevOccupAI_Plus\questionnaire_processing\rosa" />
       <recent name="C:\Users\srale\PycharmProjects\PrevOccupAI_Plus\HAR" />
