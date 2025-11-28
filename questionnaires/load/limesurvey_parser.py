@@ -52,7 +52,7 @@ def generate_questionnaires_dataset(file_paths_dir: str, output_folder_path: str
                 # find id in the list with paths
                 survey_filename = _find_survey_path(file_paths_list, str(survey_id))
 
-                # load, clean results df, and save in appropriate folders
+                # load, clean results_questionnaires df, and save in appropriate folders
                 group_survey_df = _load_and_clean_limesurvey_results(os.path.join(file_paths_dir, survey_filename), group_df['subject_id'])
 
                 # generate path to folder with domain name
@@ -105,7 +105,7 @@ def _clean_limesurvey_files(df: pd.DataFrame):
     df = df.dropna(subset=['submitdate'])
 
     # sort by submitdate, then keep only the most recent submission per participant
-    df = (df.sort_values('submitdate').drop_duplicates(subset=['id'], keep='last').reset_index(drop=True))
+    df = (df.sort_values('submitdate').drop_duplicates(subset=['id.1'], keep='last').reset_index(drop=True))
 
     return df
 

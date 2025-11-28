@@ -4,13 +4,13 @@
 import os
 from pathlib import Path
 import pandas as pd
-from typing import Tuple
+from typing import Tuple, List
 
 # internal imports
-from .questionnaire_loader import load_questionnaire_answers
-from utils import load_json_file, create_dir, get_group_from_path
+from questionnaires.load.questionnaire_loader import load_questionnaire_answers
+from utils import load_json_file, create_dir, get_group_from_path, find_project_root
 from constants import CONFIG_FOLDER_NAME, RESULTS_FOLDER_NAME, CSV
-from .questionnaire_mappings import EV_COLUMN_NAMES_MAP, EV_ANSWERS_MAP, AF_NEW_COLUMNS, AF_OLD_COLUMNS, DD_ANSWERS_MAP, \
+from questionnaires.process.mappings.questionnaire_mappings import EV_COLUMN_NAMES_MAP, EV_ANSWERS_MAP, AF_NEW_COLUMNS, AF_OLD_COLUMNS, DD_ANSWERS_MAP, \
     AF_TIME_PAIRS, DD_COLUMN_NAMES_MAP
 
 # -------------------------------------------------------------------------------------------------------------------- #
@@ -24,10 +24,13 @@ ATIVIDADE_FISICA = "Atividade Física"
 # public functions
 # -------------------------------------------------------------------------------------------------------------------- #
 
-def calculate_personal_scores(folder_path):
+def calculate_personal_scores(folder_path: str) -> None:
 
-    # load results for all domain questionnaires into a dictionary
-    # (keys: questionnaire id, values: dataframe with the results)
+    # list for holding the scores_df for all questionnaires
+    list_dfs: List[pd.DataFrame] = []
+
+    # load results_questionnaires for all domain questionnaires into a dictionary
+    # (keys: questionnaire id, values: dataframe with the results_questionnaires)
     results_dict = load_questionnaire_answers(folder_path, domain="pessoais")
 
     # load config json file
@@ -60,9 +63,18 @@ def calculate_personal_scores(folder_path):
         results_df['id.1'] = pd.to_numeric(results_df['id.1'], errors='coerce')
         results_df = results_df.set_index('id.1').sort_index()
 
-        # save dataframe into a csv file
-        folder_path = create_dir(Path(__file__).parent, os.path.join(RESULTS_FOLDER_NAME, get_group_from_path(folder_path),'pessoais'))
-        results_df.to_csv(os.path.join(folder_path, f"{questionnaire_name}{CSV}"))
+        # drop submit date columns
+        results_df = results_df.drop(columns=results_df.filter(regex='(?i)^submitdate$').columns)
+
+        # add dataframe to list
+        list_dfs.append(results_df)
+
+    # concat dataframes horizontally to have all personal questionnaires
+    final_df = pd.concat(list_dfs, axis=1)
+
+    # save dataframe into a csv file
+    folder_path = create_dir(find_project_root(), os.path.join(RESULTS_FOLDER_NAME, get_group_from_path(folder_path)))
+    final_df.to_csv(os.path.join(folder_path, f"results_pessoais{CSV}"))
 
 
 # -------------------------------------------------------------------------------------------------------------------- #
@@ -263,8 +275,8 @@ def _compute_sitting_times(df: pd.DataFrame) -> pd.DataFrame:
     :param df:
     :return:
     """
-    df["sentado_semana_t"] = df["sentada_semana_horas"] * 60 + df["sentada_semana_minutos"]
-    df["sentado_fds_t"] = df["sentada_fds_horas"] * 60 + df["sentada_fds_minutos"]
+    df["sentado_semana_total_min"] = df["sentada_semana_horas"] * 60 + df["sentada_semana_minutos"]
+    df["sentado_fds_total_min"] = df["sentada_fds_horas"] * 60 + df["sentada_fds_minutos"]
     return df
 
 def _correct_false_input(hours, minutes):

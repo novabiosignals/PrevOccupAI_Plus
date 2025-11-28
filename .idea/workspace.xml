@@ -4,11 +4,24 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="d6637f5a-b481-472e-9cbc-1b523cdb0fbc" name="Changes" comment="started working on rosa adaptations">
+    <list default="true" id="d6637f5a-b481-472e-9cbc-1b523cdb0fbc" name="Changes" comment="merged all questionnaire results from the same domain into one single csv file">
+      <change afterPath="$PROJECT_DIR$/oh_profile/__init__.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/oh_profile/utils.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/questionnaires/__init__.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/questionnaires/process/__init__.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/questionnaires/visualize/__init__.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/signals/__init__.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/signals/load/__init__.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/signals/visualize/__init__.py" afterDir="false" />
+    <list default="true" id="d6637f5a-b481-472e-9cbc-1b523cdb0fbc" name="Changes" comment="changed loading function to handle the new dba scale for the noise recorder">
+    <list default="true" id="d6637f5a-b481-472e-9cbc-1b523cdb0fbc" name="Changes" comment="code refactoring">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/main_signals.py" beforeDir="false" afterPath="$PROJECT_DIR$/main_signals.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/participants_info.csv" beforeDir="false" afterPath="$PROJECT_DIR$/participants_info.csv" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/questionnaire_processing/rosa/rosa_question_mappings.py" beforeDir="false" afterPath="$PROJECT_DIR$/questionnaire_processing/rosa/rosa_question_mappings.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/signal_processing/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/signals/process/__init__.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/signal_processing/filters.py" beforeDir="false" afterPath="$PROJECT_DIR$/signals/process/filters.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/signal_processing/pre_process_android.py" beforeDir="false" afterPath="$PROJECT_DIR$/signals/process/pre_process_android.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/signal_processing/pre_process_muscleban.py" beforeDir="false" afterPath="$PROJECT_DIR$/signals/process/pre_process_muscleban.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/questionnaire_processing/questionnaire_mappings.py" beforeDir="false" afterPath="$PROJECT_DIR$/questionnaire_processing/questionnaire_mappings.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -45,25 +58,26 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent"><![CDATA[{
-  "keyToString": {
-    "ModuleVcsDetector.initialDetectionPerformed": "true",
-    "Python.main.executor": "Run",
-    "Python.main_quest.executor": "Run",
-    "Python.main_questionnaires.executor": "Run",
-    "Python.main_signals.executor": "Run",
-    "Python.personal_score_calculator.executor": "Run",
-    "RunOnceActivity.ShowReadmeOnStart": "true",
-    "RunOnceActivity.git.unshallow": "true",
-    "git-widget-placeholder": "master",
-    "last_opened_file_path": "C:/Users/srale/PycharmProjects/PrevOccupAI_Plus/questionnaire_processing/config_files"
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;ModuleVcsDetector.initialDetectionPerformed&quot;: &quot;true&quot;,
+    &quot;Python.main.executor&quot;: &quot;Run&quot;,
+    &quot;Python.main_quest.executor&quot;: &quot;Run&quot;,
+    &quot;Python.main_questionnaires.executor&quot;: &quot;Run&quot;,
+    &quot;Python.main_signals.executor&quot;: &quot;Run&quot;,
+    &quot;Python.personal_score_calculator.executor&quot;: &quot;Run&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;master&quot;,
+    &quot;last_opened_file_path&quot;: &quot;C:/Users/srale/PycharmProjects/PrevOccupAI_Plus/questionnaire_processing/config_files&quot;
   }
-}]]></component>
+}</component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
       <recent name="C:\Users\srale\PycharmProjects\PrevOccupAI_Plus\questionnaire_processing\config_files" />
     </key>
     <key name="MoveFile.RECENT_KEYS">
+      <recent name="C:\Users\phill\PycharmProjects\PrevOccupAI_Plus\signals" />
       <recent name="C:\Users\srale\PycharmProjects\PrevOccupAI_Plus" />
       <recent name="C:\Users\srale\PycharmProjects\PrevOccupAI_Plus\questionnaire_processing\rosa" />
       <recent name="C:\Users\srale\PycharmProjects\PrevOccupAI_Plus\HAR" />
@@ -289,11 +303,58 @@
       <option name="project" value="LOCAL" />
       <updated>1763481178679</updated>
     </task>
-    <option name="localTasksCounter" value="23" />
+    <task id="LOCAL-00023" summary="corrected subject info file">
+      <option name="closed" value="true" />
+      <created>1763484057827</created>
+      <option name="number" value="00023" />
+      <option name="presentableId" value="LOCAL-00023" />
+      <option name="project" value="LOCAL" />
+      <updated>1763484057827</updated>
+    </task>
+    <task id="LOCAL-00024" summary="implemented pure COPSOQ and ROSA scores">
+      <option name="closed" value="true" />
+      <created>1763736621732</created>
+      <option name="number" value="00024" />
+      <option name="presentableId" value="LOCAL-00024" />
+      <option name="project" value="LOCAL" />
+      <updated>1763736621732</updated>
+    </task>
+    <task id="LOCAL-00025" summary="minor bug fixing">
+      <option name="closed" value="true" />
+      <created>1763747762526</created>
+      <option name="number" value="00025" />
+      <option name="presentableId" value="LOCAL-00025" />
+      <option name="project" value="LOCAL" />
+      <updated>1763747762526</updated>
+    </task>
+    <task id="LOCAL-00026" summary="merged all questionnaire results from the same domain into one single csv file">
+      <option name="closed" value="true" />
+      <created>1763750529341</created>
+      <option name="number" value="00026" />
+      <option name="presentableId" value="LOCAL-00026" />
+      <option name="project" value="LOCAL" />
+      <updated>1763750529341</updated>
+    </task>
+    <task id="LOCAL-00027" summary="changed loading function to handle the new dba scale for the noise recorder">
+      <option name="closed" value="true" />
+      <created>1763982708754</created>
+      <option name="number" value="00027" />
+      <option name="presentableId" value="LOCAL-00027" />
+      <option name="project" value="LOCAL" />
+      <updated>1763982708754</updated>
+    </task>
+    <task id="LOCAL-00028" summary="code refactoring">
+      <option name="closed" value="true" />
+      <created>1764242739961</created>
+      <option name="number" value="00028" />
+      <option name="presentableId" value="LOCAL-00028" />
+      <option name="project" value="LOCAL" />
+      <updated>1764242739961</updated>
+    </task>
+    <option name="localTasksCounter" value="29" />
     <servers />
   </component>
   <component name="VcsManagerConfiguration">
-    <MESSAGE value="implemented logic to handle the input sensor paths" />
     <MESSAGE value="added checks for the loaded sensors and file paths - finishes path_handler" />
     <MESSAGE value="fixed multiple bugs: logic to get only the sensor files selected by the user; pop acquisition times from the dictionary when the muscleBAN file size is too small; and fixed rounding error." />
     <MESSAGE value="minor changes and added missing documentation" />
@@ -302,7 +363,6 @@
     <MESSAGE value="implemented classification pipeline and added missing documentation and init files" />
     <MESSAGE value="implemented the synchronisation of the predictions" />
     <MESSAGE value="added missing documentation" />
-    <MESSAGE value="code refactoring" />
     <MESSAGE value="added requirements.txt" />
     <MESSAGE value="fixed a bug in the synchronisation of the predictions" />
     <MESSAGE value="minor code refactoring and started implementing questionnaire processing" />
@@ -314,7 +374,12 @@
     <MESSAGE value="added dataset generator and some other changes" />
     <MESSAGE value="removed multiple submissions from csv files. Corrected some column names and a bug in Bem-estar geral scores. Changed participants info to have type of atendimento" />
     <MESSAGE value="started working on rosa adaptations" />
-    <option name="LAST_COMMIT_MESSAGE" value="started working on rosa adaptations" />
+    <MESSAGE value="corrected subject info file" />
+    <MESSAGE value="implemented pure COPSOQ and ROSA scores" />
+    <MESSAGE value="minor bug fixing" />
+    <MESSAGE value="merged all questionnaire results from the same domain into one single csv file" />
+    <MESSAGE value="changed loading function to handle the new dba scale for the noise recorder" />
+    <option name="LAST_COMMIT_MESSAGE" value="changed loading function to handle the new dba scale for the noise recorder" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
@@ -323,11 +388,6 @@
           <url>file://$PROJECT_DIR$/HAR/synchonise_predictions.py</url>
           <line>71</line>
           <option name="timeStamp" value="2" />
-        </line-breakpoint>
-        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
-          <url>file://$PROJECT_DIR$/questionnaire_processing/personal_score_calculator.py</url>
-          <line>55</line>
-          <option name="timeStamp" value="9" />
         </line-breakpoint>
       </breakpoints>
     </breakpoint-manager>
