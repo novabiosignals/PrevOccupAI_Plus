@@ -24,6 +24,7 @@ _fix_rounding_error(...): Corrects rounding errors in the time column of the sen
 # -------------------------------------------------------------------------------------------------------------------- #
 import pandas as pd
 import numpy as np
+from pandas import errors as pd_errors
 from pathlib import Path
 from typing import List, Tuple, Dict, Any, Union
 from tqdm import tqdm
@@ -31,6 +32,14 @@ import math
 
 # internal imports
 from constants import PHONE, WATCH, VALID_MBAN_DATA, NSEQ, IMU_SENSORS, TIME_COLUMN_NAME, ROT, NOISE, HEART, MBAN
+from .data_quality import (
+    DataQualityError,
+    FileQualityReport,
+    QualityIssue,
+    assess_muscleban_dataframe,
+    MIN_MUSCLEBAN_SAMPLES,
+    MIN_MVC_OSCOMPATIBLE_SAMPLES,
+)
 from .path_handler import get_sensor_paths_per_device
 from .parser import extract_sensor_from_filename
 from .interpolate import cubic_spline_interpolation, slerp_interpolation, zero_order_hold_interpolation, \
@@ -53,36 +62,21 @@ ROUNDING_FACTOR = 1000 # sampling rate  times 10
 # -------------------------------------------------------------------------------------------------------------------- #
 # public functions
 # -------------------------------------------------------------------------------------------------------------------- #
-def load_daily_acquisitions(folder_path: str, load_devices: Dict[str, List[str]], fs_android: int = 100,
-                            padding_type: str = PADDING_SAME) -> Dict[str, Dict[str, pd.DataFrame]]:
-    """
-    Load sensor data of an entire day.
+def load_daily_acquisitions(
+    folder_path: str,
+    load_devices: Dict[str, List[str]],
+    fs_android: int = 100,
+    padding_type: str = PADDING_SAME,
+    quality_log: List[FileQualityReport] | None = None,
+) -> Dict[str, Dict[str, pd.DataFrame]]:
+    """Load every acquisition for the requested devices/sensors within a single day folder.
 
-    This function loads sensor data, defined in load_sensors, that is inside folder_path. This function assumes that
-    folder_path pertains to the date of the acquisition and that inside there are subfolders regarding the scheduled
-    acquisition times, with the correspondent sensor files. This function loads all the data from the devices and sensors
-    defined in load_sensors, into a nested dictionary with the following format:
-
-    {
-    'phone': {'9-45-00': df},
-    'watch': {'10-00-00': df, '11-20-00': df, '12-00-00': df, '15-40-00': df},
-    'mBAN_left: {'10-00-00': df, '11-20-00': df, '12-00-00': df, '15-40-00': df},
-    'mBAN_right: {'10-00-00': df, '11-20-00': df, '12-00-00': df, '15-40-00': df}
-    }
-
-    For the time column is set as the index for all dataframes.
-    Prints a report for the user to which devices and sensors were loaded to be informed of any missing data/acquisitions.
-
-    :param folder_path: Path to the folder containing the data of an entire day of acquisitions.
-    :param load_devices: Dictionary with the devices and sensors to be loaded. (e.g.: {phone: [ACC, GYR, MAG], watch: [ACC]}
-                        Supported devices/sensors:
-                        {phone: [ACC, GYR, MAG, ROT, NOISE],
-                         watch: [ACC, GYR, MAG, ROT, HR],
-                         mban: [ACC, EMG]}
-    :param fs_android: the sampling rate to which all android sensors should be re-sampled to. Default: 100 (Hz)
-    :param padding_type: padding which should be used to ensure that all sensors start and stop at the same time. The
-                         following padding types are supported: 'same', 'zero'. Default: 'same'
-    :return: a nested dictionary containing the sensor data from the devices and sensors in load_sensors
+    :param folder_path: Path to the directory that contains acquisition subfolders (``09-30-00`` etc.).
+    :param load_devices: Mapping of device names to sensors (same structure as :func:`get_sensor_paths_per_device`).
+    :param fs_android: Target sampling frequency for Android devices after resampling.
+    :param padding_type: Either ``"same"`` or ``"zero"`` to control how overlapping windows are padded.
+    :param quality_log: Optional mutable list that collects :class:`FileQualityReport` objects for skipped files.
+    :returns: Nested dict ``device -> acquisition_label -> DataFrame`` ready for downstream processing.
     """
     # innit dictionary to hold the dataframes
     dataframes_dict: Dict[str, Dict[str, pd.DataFrame]] = {}
@@ -114,7 +108,16 @@ def load_daily_acquisitions(folder_path: str, load_devices: Dict[str, List[str]]
 
                     # muscleBAN only has one file per acquisition
                     # load_signals muscleBAN data - only the sensors defined in load_devices
-                    muscleban_sensor_data = _load_muscleban_data(paths_list[0], sensor_list_mban)
+                    try:
+                        muscleban_sensor_data = _load_muscleban_data(paths_list[0], sensor_list_mban)
+                    except DataQualityError as exc:
+                        report = exc.report.with_context(device, acquisition_time)
+                        if quality_log is not None:
+                            quality_log.append(report)
+                        print(
+                            f"[data_quality] Skipping {device} acquisition {acquisition_time}: {exc.report.describe()}"
+                        )
+                        continue
 
                     # add to dictionary
                     dataframes_dict[device][acquisition_time] = muscleban_sensor_data
@@ -151,19 +154,10 @@ def load_daily_acquisitions(folder_path: str, load_devices: Dict[str, List[str]]
 # -------------------------------------------------------------------------------------------------------------------- #
 
 def _load_raw_data(sensor_paths_list: List[Path]) -> Tuple[List[pd.DataFrame], Dict[str, Any]]:
-    """
-    Loads sensor data contained in 'folder_path' into a list of pandas DataFrames. Each element in the list corresponds
-    to a sensor's data.A dictionary is also returned containing the loaded sensors and the timestamps when each sensor
-    started and stopped recording.
+    """Read each Android sensor file, clean it, and log timing metadata.
 
-    General data cleaning includes:
-    (1) Removal of NaN values
-    (2) Removal of duplicates
-    (3) Resetting of DataFrame index
-
-    :param sensor_paths_list: List with the signal paths (pathlib.Path) to be loaded
-    :return: A tuple where the first element is a list of pandas DataFrames for each sensor's data, and the second
-             element is a dictionary containing sensor start/stop timestamps and order information.
+    :param sensor_paths_list: Ordered list of files to load for a device (phone/watch).
+    :returns: Tuple ``(dataframes, report)`` where ``report`` stores sensor names and their time spans.
     """
 
     # list for holding the loaded DataFrames
@@ -211,17 +205,11 @@ def _load_raw_data(sensor_paths_list: List[Path]) -> Tuple[List[pd.DataFrame], D
 
 
 def _load_sensor_file(file_path: Path, sensor_name: str) -> pd.DataFrame:
-    """
-    Load a sensor file into a pandas DataFrame and cleans it.
+    """Load a single Android sensor TSV file while performing sensor-specific cleanup.
 
-    This function reads a sensor data file located in the specified folder, performs initial cleanup
-    by removing unnecessary columns, and assigns appropriate column names. For rotation vector data,
-    additional steps are taken to ensure that only valid unit quaternions are kept.
-
-    :param file_path: Path of the signal to be loaded
-    :param sensor_name: The name of the sensor, used to define appropriate column names and handle
-                        sensor-specific preprocessing.
-    :return: A cleaned pandas DataFrame containing the sensor data with appropriate column names.
+    :param file_path: Path pointing to the TSV file on disk.
+    :param sensor_name: Short sensor code (ACC, ROT, etc.) used to choose column naming.
+    :returns: Cleaned dataframe with timestamps, axis columns, and no duplicates.
     """
 
     # read the file
@@ -265,16 +253,11 @@ def _load_sensor_file(file_path: Path, sensor_name: str) -> pd.DataFrame:
 
 
 def _remove_non_unit_quaternion(rotvec_df: pd.DataFrame, tol: float = 0.5) -> pd.DataFrame:
-    """
-    Remove corrupted samples from a DataFrame containing Android rotation vector data.
-    Android rotation vector data are expected to be unit quaternions (i.e., their norm should be close to 1).
-    This function removes samples where the quaternion norm deviates from 1 beyond a given tolerance.
+    """Remove corrupted quaternion samples whose norm strays too far from unity.
 
-    :param rotvec_df: A DataFrame where the first column represents timestamps, and the remaining columns
-                      contain quaternion components (x, y, z, w).
-    :param tol: optional (default=0.1). The tolerance for deviation from a unit quaternion. Samples
-                with a norm less than `1 - tol` are considered corrupted and removed.
-    :return: The cleaned DataFrame containing only valid unit quaternions.
+    :param rotvec_df: DataFrame containing timestamps plus quaternion components.
+    :param tol: Allowed deviation from ``1.0`` before samples are dropped.
+    :returns: Filtered DataFrame with suspect samples removed.
     """
 
     # get number of samples before removal
@@ -296,16 +279,7 @@ def _remove_non_unit_quaternion(rotvec_df: pd.DataFrame, tol: float = 0.5) -> pd
 
 
 def _clean_df(sensor_df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Performs general cleaning of the data frame.
-    (1) remove nan values
-    (2) remove duplicates
-    (3) reset index
-    Parameters
-
-    :param sensor_df: The data frame that was loaded from the sensor file.
-    :return: pandas.DataFrame containing the cleaned data.
-    """
+    """Remove NaNs/duplicates and enforce a fresh, sequential index on the dataframe."""
 
     # remove any nan values and duplicates
     sensor_df = sensor_df.dropna()
@@ -491,23 +465,55 @@ def _load_muscleban_data(file_path: Path, sensor_list: List[str]) -> pd.DataFram
     # inform user
     print(f"\nLoading muscleBAN data from file: {file_path.name}.")
 
-    # load_signals data into a csv file
-    sensor_df = pd.read_csv(file_path, delimiter = '\t', header=None, skiprows=3)
+    def _raise_quality_error(code: str, message: str, rows: int = 0, cols: int = 0) -> None:
+        report = FileQualityReport(
+            file_path=file_path,
+            issues=[QualityIssue(code=code, message=message)],
+            rows=rows,
+            columns=cols,
+        )
+        raise DataQualityError(report)
 
-    # remove Nan column that is generated when using pd.read_csv
+    # load data into a dataframe
+    try:
+        sensor_df = pd.read_csv(file_path, delimiter='\t', header=None, skiprows=3)
+    except pd_errors.EmptyDataError:
+        _raise_quality_error("empty-file", "File does not contain tabular data")
+    except OSError as exc:
+        _raise_quality_error("io-error", f"Unable to read file: {exc}")
+
+    # remove NaN-only columns that may appear when reading the TSV
     sensor_df = sensor_df.dropna(axis=1, how="all")
 
-    # if there are 9 column then the second column is only zeros (happens in some firmware versions)
-    if len(sensor_df.columns) > 8:
+    if sensor_df.empty:
+        _raise_quality_error("empty-file", "File only contains headers", rows=0, cols=0)
 
-        # remove zero column
+    # if there are 9 columns the second column is only zeros (happens in some firmware versions)
+    if len(sensor_df.columns) > 8:
         sensor_df = sensor_df.drop(sensor_df.columns[1], axis=1)
 
-    # remove MAG which are the last three channels
-    sensor_df = sensor_df.drop(sensor_df.columns[-3:], axis=1)
+    # remove MAG channels (last three columns) when available
+    if len(sensor_df.columns) >= 3:
+        sensor_df = sensor_df.drop(sensor_df.columns[-3:], axis=1)
 
-    # add column names - nseq, emg and acc columns
-    sensor_df.columns = VALID_MBAN_DATA
+    available_cols = len(sensor_df.columns)
+    if available_cols == 0:
+        _raise_quality_error("no-columns", "No usable channels remained after cleaning")
+
+    # align the column names with the expected order (nSeq, EMG, ACCx/y/z)
+    keep = min(available_cols, len(VALID_MBAN_DATA))
+    sensor_df = sensor_df.iloc[:, :keep]
+    sensor_df.columns = VALID_MBAN_DATA[:keep]
+
+    # run data-quality checks before filtering specific sensors
+    acquisition_label = file_path.parent.name.strip().upper()
+    stem_upper = file_path.stem.upper()
+    is_oscompatible_mvc = acquisition_label == "MVC" and "OSCOMPATIBLE" in stem_upper
+    min_samples = MIN_MVC_OSCOMPATIBLE_SAMPLES if is_oscompatible_mvc else MIN_MUSCLEBAN_SAMPLES
+
+    report = assess_muscleban_dataframe(sensor_df, file_path, min_samples=min_samples)
+    if not report.is_valid:
+        raise DataQualityError(report)
 
     # keep only the sensors in sensor list (plus nSeq)
     cols_to_keep = [col for col in sensor_df.columns

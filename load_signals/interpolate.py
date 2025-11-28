@@ -299,10 +299,16 @@ def _convert_android_timestamp_to_seconds(time_column: pd.Series) -> pd.Series:
 
     return time_column
 
-def _generate_time_column_from_samples(signal_size:int, fs: int):
+def _generate_time_column_from_samples(signal_size: int, fs: int) -> np.ndarray:
+    """Create a monotonically increasing time axis from sample count and target frequency.
+
+    :param signal_size: Number of samples to represent.
+    :param fs: Sampling frequency in Hz.
+    :returns: NumPy array of timestamps in seconds.
+    """
 
     # get time (seconds) between each sample
-    delta_t = 1/fs
+    delta_t = 1 / fs
 
     # generate time column in seconds
     time_column = np.arange(signal_size) * delta_t

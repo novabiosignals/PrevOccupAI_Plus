@@ -34,12 +34,11 @@ from constants import SENSOR_MAP, AVAILABLE_ANDROID_PREFIXES, AVAILABLE_ANDROID_
 
 
 def extract_sensor_from_filename(filename: str) -> str:
-    """
-    Extracts the sensor name based on the filename. Works only for sensor data acquired  using the OpenSignals
-    application.
+    """Map an OpenSignals filename to its canonical sensor abbreviation.
 
-    :param filename: A str with the filename
-    :return: The sensor prefix based on the sensor name found on the filename
+    :param filename: Raw filename including prefix (e.g. ``ACCELEROMETER``) emitted by OpenSignals.
+    :returns: Sensor abbreviation ("ACC", "GYR", etc.) suitable for downstream processing.
+    :raises ValueError: When the filename does not contain any known sensor prefix.
     """
 
     # iterate through the sensor file prefixes and sensor names

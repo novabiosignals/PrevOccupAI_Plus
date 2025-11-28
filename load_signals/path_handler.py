@@ -39,35 +39,16 @@ MIN_BYTES = 1500
 # -------------------------------------------------------------------------------------------------------------------- #
 
 def get_sensor_paths_per_device(folder_path: str, load_devices: Dict[str, List[str]]):
-    """
-    Load, filter, and organize sensor file paths for multiple devices into a nested dictionary.
+    """Resolve every acquisition file per device so loaders can open them later.
 
-    This function does the following:
-      (1). Load all file paths from the input `folder_path`, grouped by device type.
+        The helper performs several steps: validate inputs, gather raw paths, split MuscleBAN files into
+        individual sides, group everything by acquisition folder, and finally keep the preferred file
+        (largest/OSCompatible) per slot.
 
-         - For phone and watch devices, loads only the sensors defined in load_devices.
-         - For MBAN devices, load_signals all MBAN files (from both left and right mbans).
-
-      (1.1). If MBAN is to be loaded, split its files into separate sides ('mban_left', 'mban_right').
-
-      (2). Group the collected file paths by acquisition time (folder names with the format hh-mm-ss).
-
-      (2.1). For the MBAN, keep only the largest file for each acquisition.
-
-    Final Output:
-      Returns a nested dictionary in the form:
-      {device_name: {
-            acquisition_time: [Path, Path, ...], ...},
-          ...}
-    :param folder_path: Root folder containing all device acquisition data.
-    :param load_devices: Dictionary with the devices and sensors to be loaded. (e.g.: {phone: [ACC, GYR, MAG], watch: [ACC]}
-            Supported devices/sensors:
-            {phone: [ACC, GYR, MAG, ROT, NOISE],
-             watch: [ACC, GYR, MAG, ROT, HR],
-             mban: [ACC, EMG]}
-
-    :return: Nested dictionary mapping each device to its acquisition times and corresponding file paths.
-    """
+        :param folder_path: Absolute or relative path pointing at a single day folder (e.g. ``.../2025-09-24``).
+        :param load_devices: Mapping of device names to sensor lists, mirroring ``SELECTED_SENSORS`` in ``main_emg``.
+        :returns: Nested dict ``device -> acquisition_label -> [Path, ...]`` ready for :func:`load_daily_acquisitions`.
+        """
     # innit dict for holding the unsorted paths
     paths_dict: Dict[str, List[Path]] = {}
 
@@ -126,13 +107,10 @@ def _get_device_files(device: str, sensor_list: List[str], folder_path: str) -> 
     Note: for the mban, this function does not handle keeping only the selected sensors (EMG or ACC), since all data is
     in the same file. This is handled when loading the data into pandas dataframes
 
-    :param device: str pertaining to the device name. Supported devices: 'phone', 'watch', 'mban'
-    :param sensor_list: list of sensors to load_signals for each device. Supported sensors per device:
-                        phone: [ACC, GYR, MAG, ROT, NOISE]
-                        watch: [ACC, GYR, MAG, ROT, HR]
-                        mban: [ACC, EMG]
+    :param device: Device key such as ``phone`` or ``mban``.
+    :param sensor_list: Sensors requested for that device.
     :param folder_path: Root folder containing all device acquisition data.
-    :return: list with paths
+    :return: List of :class:`Path` objects prior to acquisition grouping.
     """
     if device in (PHONE, WATCH):
 
@@ -146,13 +124,10 @@ def _get_device_files(device: str, sensor_list: List[str], folder_path: str) -> 
 
 
 def _keep_largest_file_per_acquisition(grouped_acquisitions_dict: Dict[str, List[Path]]) -> Dict[str, List[Path]]:
-    """
-    Keeps only the largest file for each acquisition time in the dictionary.
-    If the largest file is smaller than 1.5 KB, the acquisition is removed.
+    """Keep a single high-quality file per acquisition slot.
 
-    :param grouped_acquisitions_dict: Dict mapping acquisition time -> list of Paths
-    :return: The same dict, with only the largest file kept per acquisition,
-             or no entry if the largest file is too small.
+    :param grouped_acquisitions_dict: Dict mapping acquisition label → list of candidate paths.
+    :returns: Same dict but with each value containing either one preferred file or nothing.
     """
 
     # Store acquisition times to delete later (to avoid modifying dict while iterating)
@@ -161,20 +136,16 @@ def _keep_largest_file_per_acquisition(grouped_acquisitions_dict: Dict[str, List
     # Loop through each acquisition time and its associated list of file paths
     for acq_time, paths in grouped_acquisitions_dict.items():
 
-        # Ensure the list is not empty
-        if paths:
+        if not paths:
+            to_delete.append(acq_time)
+            continue
 
-            # Find the file with the largest size
-            largest = max(paths, key=lambda p: p.stat().st_size)
+        preferred = _select_preferred_mban_file(acq_time, paths)
+        if preferred is None or preferred.stat().st_size < MIN_BYTES:
+            to_delete.append(acq_time)
+            continue
 
-            # Check if the largest file is >= MIN_BYTES
-            if largest.stat().st_size >= MIN_BYTES:
-
-                # Keep only the largest file
-                grouped_acquisitions_dict[acq_time] = [largest]
-            else:
-                # Mark acquisition for deletion if largest file is too small
-                to_delete.append(acq_time)
+        grouped_acquisitions_dict[acq_time] = [preferred]
 
     # Remove acquisitions where the biggest file in < MIN_BYTES
     for acq_time in to_delete:
@@ -183,13 +154,35 @@ def _keep_largest_file_per_acquisition(grouped_acquisitions_dict: Dict[str, List
     return grouped_acquisitions_dict
 
 
+def _select_preferred_mban_file(acq_time: str, paths: List[Path]) -> Path | None:
+    """Return the preferred file for an acquisition, favoring OSCompatible MVC recordings.
+
+    :param acq_time: Acquisition label such as ``09-30-00`` or ``MVC``.
+    :param paths: Candidate file paths for that slot.
+    :returns: Chosen :class:`Path` or ``None`` when no acceptable file exists.
+    """
+
+    acq_upper = acq_time.strip().upper()
+    candidates = paths
+    if acq_upper == "MVC":
+        os_compatible = [p for p in paths if "OSCOMPATIBLE" in p.stem.upper()]
+        if not os_compatible:
+            return None
+        candidates = os_compatible
+
+    if not candidates:
+        return None
+
+    return max(candidates, key=lambda p: p.stat().st_size)
+
+
 def _filter_mban_files(paths_dict: Dict[str, List[Path]]) -> Dict[str, List[Path]]:
     """
     Separates the mucleban by mac address and gets the side. Then gets, per acquisition (folder with the time) only
     the biggest file. Assumes that this dictionary has a key 'mban' and correspondent list of Paths.
 
     :param paths_dict:  Dictionary with the device names as keys and list of Paths as values. One of these keys is 'mban'.
-    :return: The same dictionary, but no with the mBAN_right and mBAN_left entries and correspondent list of Paths.
+    :return: The same dictionary, but now with the mBAN_right and mBAN_left entries and correspondent list of Paths.
     """
 
     # group muscleban file by side
