@@ -1,7 +1,7 @@
 from OH_profile.load import get_OH_profile
 from OH_profile.write import save_OH_profile
 from OH_profile.load.oh_profile_loader import METADATA_KEY
-from sensors.load import load_meta_data
+from sensors.load import load_participants_info
 
 # ------------------------------------------------------------------------------------------------------------------- #
 # constants
@@ -27,7 +27,7 @@ test_path = r"C:\Users\srale\Desktop\OH_profiles"
 
 
 # load the subject_info (in the wrapper function we will use this to cycle over the subjects)
-subject_info = load_meta_data()
+subject_info = load_participants_info()
 
 
 # example of subject ID. This is just an example, we should not hard code it. Whatever function you write should be able
