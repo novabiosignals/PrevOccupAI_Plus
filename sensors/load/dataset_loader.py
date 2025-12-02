@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Optional, Sequence
 
@@ -12,37 +11,13 @@ from .raw_data_loader import load_daily_acquisitions
 from .data_quality import FileQualityReport
 
 
-@dataclass(slots=True)
-class DayAcquisition:
-    """Lightweight container describing where a subject/day dataset lives.
-
-    The dataclass intentionally mirrors the directory hierarchy on disk so the rest of the
-    pipeline can remain agnostic of how acquisitions are stored.
-    """
-
-    subject_id: str
-    group: int
-    device_num: str
-    day_path: Path
-    left_mac: str
-    right_mac: str
-
-    @property
-    def date_label(self) -> str:
-        return self.day_path.name
-
-    @property
-    def subject_root(self) -> Path:
-        return self.day_path.parent
-
-
 def discover_daily_acquisitions(
     data_root: str | Path,
     participants_csv: str | Path = "participants_info.csv",
     subject_filter: Optional[Sequence[str]] = None,
     max_subjects: Optional[int] = None,
     max_days_per_subject: Optional[int] = None,
-) -> List[DayAcquisition]:
+) -> List[dict]:
     """Walk the acquisition tree and list every available subject/day folder.
 
     :param data_root: Base folder containing the ``groupX`` directories.
@@ -50,7 +25,7 @@ def discover_daily_acquisitions(
     :param subject_filter: Optional whitelist of subject identifiers.
     :param max_subjects: Limit the number of unique subjects to include; useful for smoke tests.
     :param max_days_per_subject: Cap the number of day folders per subject.
-    :returns: List of :class:`DayAcquisition` objects pointing to each selected day folder.
+    :returns: List of dicts with keys: subject_id, group, device_num, day_path, left_mac, right_mac, date_label, subject_root.
     """
 
     base_path = Path(data_root)
@@ -58,9 +33,9 @@ def discover_daily_acquisitions(
 
     allowed_subjects = None
     if subject_filter:
-        allowed_subjects = {str(item).strip() for item in subject_filter if str(item).strip()}
+        allowed_subjects = {str(item).strip() for item in subject_filter if str(item).strip()} 
 
-    day_descriptors: List[DayAcquisition] = []
+    day_descriptors: List[dict] = []
     subjects_seen: set[str] = set()
 
     for subject_id, row in meta_df.iterrows():
@@ -92,28 +67,28 @@ def discover_daily_acquisitions(
         subjects_seen.add(subject_key)
 
         for day_path in day_dirs:
-            day_descriptors.append(
-                DayAcquisition(
-                    subject_id=subject_key,
-                    group=group,
-                    device_num=device_num,
-                    day_path=day_path,
-                    left_mac=left_mac,
-                    right_mac=right_mac,
-                )
-            )
+            day_descriptors.append({
+                "subject_id": subject_key,
+                "group": group,
+                "device_num": device_num,
+                "day_path": day_path,
+                "left_mac": left_mac,
+                "right_mac": right_mac,
+                "date_label": day_path.name,
+                "subject_root": day_path.parent,
+            })
 
     return day_descriptors
 
 
 def load_day_acquisitions(
-    day_descriptor: DayAcquisition,
+    day_descriptor: dict,
     selected_sensors: Optional[Dict[str, List[str]]] = None,
     quality_log: Optional[List[FileQualityReport]] = None,
 ):
     """Wrapper around :func:`load_daily_acquisitions` that keeps metadata alongside the data.
 
-    :param day_descriptor: :class:`DayAcquisition` describing which folder to read.
+    :param day_descriptor: Dict with keys: subject_id, group, device_num, day_path, left_mac, right_mac, date_label.
     :param selected_sensors: Optional mapping of devices to sensor names to load.
     :param quality_log: Optional list that will be extended with :class:`FileQualityReport` entries.
     :returns: Nested dict structured ``device -> acquisition_label -> DataFrame``.
@@ -122,7 +97,7 @@ def load_day_acquisitions(
     if selected_sensors is None:
         selected_sensors = {MBAN: ["EMG"]}
     return load_daily_acquisitions(
-        str(day_descriptor.day_path),
+        str(day_descriptor["day_path"]),
         selected_sensors,
         quality_log=quality_log,
     )

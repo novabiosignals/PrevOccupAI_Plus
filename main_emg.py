@@ -6,8 +6,8 @@ from pathlib import Path
 from typing import Sequence
 
 from constants import MBAN
-from load_signals.data_quality import FileQualityReport
-from load_signals.dataset_loader import DayAcquisition, discover_daily_acquisitions
+from sensors.load.data_quality import FileQualityReport
+from sensors.load.dataset_loader import discover_daily_acquisitions
 from signal_processing import PreprocessConfig, run_emg_pipeline
 
 # ------------------------------------------------------------------------------------------------------------------- #
@@ -35,13 +35,13 @@ def build_day_index(
     subject_filter: Sequence[str] | None = None,
     max_subjects: int | None = None,
     max_days_per_subject: int | None = None,
-) -> list[DayAcquisition]:
+) -> list[dict]:
     """Gather candidate acquisitions that satisfy the user-selected filters.
 
     :param subject_filter: Optional iterable with explicit subject identifiers to include.
     :param max_subjects: Hard upper bound for the number of subjects to enumerate.
     :param max_days_per_subject: Maximum number of day folders per subject to process.
-    :returns: List of :class:`DayAcquisition` descriptors describing subject, day, and device routing.
+    :returns: List of dicts describing subject, day, and device routing.
     """
 
     _ensure_data_root()
@@ -53,7 +53,7 @@ def build_day_index(
         max_days_per_subject=max_days_per_subject,
     )
 
-    unique_subjects = {descriptor.subject_id for descriptor in descriptors}
+    unique_subjects = {descriptor["subject_id"] for descriptor in descriptors}
     print(
         f"[main_emg] Discovered {len(descriptors)} day folders across {len(unique_subjects)} subjects."
     )
@@ -87,7 +87,7 @@ def main(
     if run_all:
         load_data = preprocess = visualize = True
 
-    descriptors: list[DayAcquisition] = []
+    descriptors: list[dict] = []
 
     # The underlying data loader is relatively heavy, so only run it when a later stage needs the result.
     if load_data or preprocess:

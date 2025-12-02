@@ -1,7 +1,7 @@
 from OH_profile.load import get_OH_profile
 from OH_profile.write import save_OH_profile
 from OH_profile.load.oh_profile_loader import METADATA_KEY
-from sensors.load import load_participants_info
+from sensors.load.subject_info import load_participants_info
 
 # ------------------------------------------------------------------------------------------------------------------- #
 # constants
@@ -23,7 +23,7 @@ METADATA_SUBJECT_ID_KEY = 'subject_id'
 
 # set the path. !IMPORTANT!: we should store all OH profiles (one for each subject) into a folder called "OH_profiles"
 # the naming convention for the individual file is "{subjectID}_OH_profile.json". The functions will handle this for you
-test_path = r"C:\Users\srale\Desktop\OH_profiles"
+test_path = r"C:\Users\gonba\OneDrive\Treino\projects\OH_profiles"
 
 
 # load the subject_info (in the wrapper function we will use this to cycle over the subjects)

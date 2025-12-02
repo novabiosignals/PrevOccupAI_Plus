@@ -6,7 +6,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from load_signals.meta_data import load_meta_data
+from sensors.load.meta_data import load_meta_data
 from utils import create_dir
 
 from .filesystem import SessionBundle, discover_session_bundles

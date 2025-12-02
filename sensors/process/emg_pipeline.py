@@ -13,10 +13,10 @@ from emg_analysis.metrics import (APDFResult, aggregate_daily_metrics,
 from emg_analysis.preprocessing import preprocess_emg, transfer_emg
 from emg_analysis.visuals import (EFFORT_BANDS, plot_apdf, plot_histogram, plot_metric_series,
                                   plot_session_effort_grid, plot_session_effort_session_stacks)
-from load_signals.data_quality import FileQualityReport, write_quality_report
+from sensors.load.data_quality import FileQualityReport, write_quality_report
 from visualize.processing import plot_envelope
 
-from load_signals.dataset_loader import DayAcquisition, load_day_acquisitions
+from sensors.load.dataset_loader import load_day_acquisitions
 
 
 @dataclass(slots=True)
@@ -36,7 +36,7 @@ class PreprocessConfig:
 
 
 def run_emg_pipeline(
-    day_descriptors: Sequence[DayAcquisition],
+    day_descriptors: Sequence[dict],
     selected_sensors: Dict[str, List[str]],
     results_root: Path,
     plots_root: Path,
@@ -71,7 +71,7 @@ def run_emg_pipeline(
     for day in day_descriptors:
         day_data = load_day_acquisitions(day, selected_sensors, quality_log=quality_records)
         if not day_data:
-            print(f"[emg_pipeline] No data found for {day.subject_id} on {day.date_label}")
+            print(f"[emg_pipeline] No data found for {day['subject_id']} on {day['date_label']}")
             continue
         session_metrics.extend(
             _process_day(
@@ -116,7 +116,7 @@ def run_emg_pipeline(
 
 
 def _process_day(
-    day: DayAcquisition,
+    day: dict,
     day_data: Dict[str, Dict[str, pd.DataFrame]],
     config: PreprocessConfig,
     percentiles: Sequence[int],
@@ -140,18 +140,18 @@ def _process_day(
     for device_label, acquisitions in day_data.items():
         mvc_label, mvc_df = _pick_mvc(acquisitions)
         if mvc_df is None:
-            print(f"[emg_pipeline] Missing MVC for {day.subject_id} {device_label} on {day.date_label}")
+            print(f"[emg_pipeline] Missing MVC for {day['subject_id']} {device_label} on {day['date_label']}")
             continue
 
         try:
             mvc_env = _compute_envelope(mvc_df, config)
         except ValueError as exc:
-            print(f"[emg_pipeline] MVC preprocessing error ({day.subject_id} {device_label}): {exc}")
+            print(f"[emg_pipeline] MVC preprocessing error ({day['subject_id']} {device_label}): {exc}")
             continue
 
         mvc_peak = float(np.max(mvc_env))
         if mvc_peak <= 0:
-            print(f"[emg_pipeline] MVC peak <= 0 for {day.subject_id} {device_label}")
+            print(f"[emg_pipeline] MVC peak <= 0 for {day['subject_id']} {device_label}")
             continue
 
         for session_label, session_df in acquisitions.items():
@@ -160,7 +160,7 @@ def _process_day(
             try:
                 envelope_mv, raw_mv = _compute_envelope(session_df, config, return_raw=True)
             except ValueError as exc:
-                print(f"[emg_pipeline] Session preprocessing error ({day.subject_id} {session_label}): {exc}")
+                print(f"[emg_pipeline] Session preprocessing error ({day['subject_id']} {session_label}): {exc}")
                 continue
 
             # Normalize against the MVC peak so that downstream plots and metrics work in %MVC space.
@@ -275,7 +275,7 @@ def _pick_mvc(acquisitions: Dict[str, pd.DataFrame]) -> tuple[Optional[str], Opt
     return None, None
 
 
-def _build_metadata(day: DayAcquisition, device_label: str, session_label: str, fs: float) -> dict:
+def _build_metadata(day: dict, device_label: str, session_label: str, fs: float) -> dict:
     """Compose a metadata dictionary that tags every metric row/plot with context.
 
     The payload is intentionally flat and JSON-friendly so that both pandas and logging sinks
@@ -291,22 +291,22 @@ def _build_metadata(day: DayAcquisition, device_label: str, session_label: str, 
     device_lower = device_label.lower()
     if MBAN_LEFT.lower() in device_lower:
         side = "left"
-        mac = day.left_mac
+        mac = day["left_mac"]
     elif MBAN_RIGHT.lower() in device_lower:
         side = "right"
-        mac = day.right_mac
+        mac = day["right_mac"]
     else:
         side = device_label
         mac = ""
 
     return {
-        "subject_id": day.subject_id,
-        "group": day.group,
-        "device_num": day.device_num,
+        "subject_id": day["subject_id"],
+        "group": day["group"],
+        "device_num": day["device_num"],
         "side": side,
         "device_label": device_label,
         "mac_address": mac,
-        "date": day.date_label,
+        "date": day["date_label"],
         "session_label": session_label,
         "fs_hz": fs,
     }
@@ -314,7 +314,7 @@ def _build_metadata(day: DayAcquisition, device_label: str, session_label: str, 
 
 def _save_session_visuals(
     plots_root: Path,
-    day: DayAcquisition,
+    day: dict,
     device_label: str,
     session_label: str,
     raw_mv: np.ndarray,
@@ -339,9 +339,9 @@ def _save_session_visuals(
     """
 
     side = metadata.get("side", device_label)
-    session_dir = plots_root / day.subject_id / day.date_label / side / session_label
+    session_dir = plots_root / day["subject_id"] / day["date_label"] / side / session_label
     session_dir.mkdir(parents=True, exist_ok=True)
-    title = f"{day.subject_id} | {side} | {day.date_label} {session_label}"
+    title = f"{day['subject_id']} | {side} | {day['date_label']} {session_label}"
     plot_apdf(apdf, session_dir / f"{session_label}_apdf.png", title)
     plot_histogram(apdf.amplitudes, session_dir / f"{session_label}_hist.png", f"Histogram – {title}")
 
@@ -354,7 +354,7 @@ def _save_session_visuals(
 
 def _save_day_visuals(
     plots_root: Path,
-    day: DayAcquisition,
+    day: dict,
     payloads: Dict[tuple[str, str], tuple[np.ndarray, float]],
 ) -> None:
     """Generate day-level effort distribution plots summarizing left/right activity.
@@ -365,18 +365,18 @@ def _save_day_visuals(
     """
 
     session_labels = sorted({label for (_, label) in payloads.keys()})
-    day_dir = plots_root / day.subject_id / day.date_label / "summary"
+    day_dir = plots_root / day["subject_id"] / day["date_label"] / "summary"
     plot_session_effort_grid(
         payloads,
         session_labels,
         day_dir / "effort_distribution.png",
-        f"{day.subject_id} – {day.date_label}",
+        f"{day['subject_id']} – {day['date_label']}",
     )
     plot_session_effort_session_stacks(
         payloads,
         session_labels,
         day_dir / "effort_sessions.png",
-        f"{day.subject_id} – {day.date_label} session progression",
+        f"{day['subject_id']} – {day['date_label']} session progression",
     )
 
 
