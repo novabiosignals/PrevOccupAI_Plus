@@ -1,6 +1,7 @@
 from OH_profile.load import get_OH_profile
 from OH_profile.write import save_OH_profile
 from OH_profile.load.oh_profile_loader import METADATA_KEY
+from sensors.load import load_meta_data
 
 # ------------------------------------------------------------------------------------------------------------------- #
 # constants
@@ -24,16 +25,21 @@ METADATA_SUBJECT_ID_KEY = 'subject_id'
 # the naming convention for the individual file is "{subjectID}_OH_profile.json". The functions will handle this for you
 test_path = r"C:\Users\srale\Desktop\OH_profiles"
 
+
+# load the subject_info (in the wrapper function we will use this to cycle over the subjects)
+subject_info = load_meta_data()
+
+
 # example of subject ID. This is just an example, we should not hard code it. Whatever function you write should be able
 # to receive the subject ID as parameter
-subject_ID = '34'
+subject_ID = str(subject_info.index[0])
 
 # load the OH profile. If the profile does not exist, then the skeleton will be loaded
 oh_profile = get_OH_profile(test_path, subject_ID)
 
 # example of changing a field in the OH profile. Please use the main-keys as defined in "oh_profile_loader.py"
 # Do NOT create new main-keys without discussing it first
-oh_profile[METADATA_KEY] = {METADATA_SUBJECT_ID_KEY:subject_ID}
+oh_profile[METADATA_KEY] = {METADATA_SUBJECT_ID_KEY: subject_ID}
 
 # save the updated OH profile
 save_OH_profile(test_path, subject_ID, oh_profile)
