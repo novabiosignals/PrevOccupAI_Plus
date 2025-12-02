@@ -1,5 +1,5 @@
 from OH_profile.load import get_OH_profile
-from OH_profile.utils import save_OH_profile
+from OH_profile.write import save_OH_profile
 from OH_profile.load.oh_profile_loader import METADATA_KEY
 
 # ------------------------------------------------------------------------------------------------------------------- #
@@ -22,7 +22,7 @@ METADATA_SUBJECT_ID_KEY = 'subject_id'
 
 # set the path. !IMPORTANT!: we should store all OH profiles (one for each subject) into a folder called "OH_profiles"
 # the naming convention for the individual file is "{subjectID}_OH_profile.json". The functions will handle this for you
-test_path = r"C:\Users\phill\Desktop\OH_profiles"
+test_path = r"C:\Users\srale\Desktop\OH_profiles"
 
 # example of subject ID. This is just an example, we should not hard code it. Whatever function you write should be able
 # to receive the subject ID as parameter

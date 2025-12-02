@@ -1,5 +1,5 @@
 """
-Utility functions for Occupational Health (OH) Profiles
+Functions for writing to Occupational Health (OH) Profiles
 
 Available Functions
 -------------------
