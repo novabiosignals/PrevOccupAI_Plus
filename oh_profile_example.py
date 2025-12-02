@@ -7,7 +7,7 @@ from OH_profile.load.oh_profile_loader import METADATA_KEY
 # ------------------------------------------------------------------------------------------------------------------- #
 # definition of sub-key. You can define new sub-keys as necessary. Always define them as constants so that others can
 # use them in the future. NO HARD CODING of keys.
-# as per "good programming practices" your constants should be defined at the top of your file
+# as per "good programming practices" add your constants to OH_profile.constants in the corresponding section
 # the naming convention for the sub-key constant should be "{MAIN-KEY-NAME}_{SUB-KEY-NAME}_KEY"
 METADATA_SUBJECT_ID_KEY = 'subject_id'
 
@@ -35,5 +35,5 @@ oh_profile = get_OH_profile(test_path, subject_ID)
 # Do NOT create new main-keys without discussing it first
 oh_profile[METADATA_KEY] = {METADATA_SUBJECT_ID_KEY:subject_ID}
 
-# save the
+# save the updated OH profile
 save_OH_profile(test_path, subject_ID, oh_profile)
