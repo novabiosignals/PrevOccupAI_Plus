@@ -1,9 +1,6 @@
 # ------------------------------------------------------------------------------------------------------------------- #
 # imports
 # ------------------------------------------------------------------------------------------------------------------- #
-from pathlib import Path
-import os
-
 # internal imports
 import questionnaires
 from utils import find_project_root
@@ -11,11 +8,11 @@ from utils import find_project_root
 # ------------------------------------------------------------------------------------------------------------------- #
 # constants
 # ------------------------------------------------------------------------------------------------------------------- #
-PROCESS_PSICOSSOCIAL = True
+PROCESS_PSICOSSOCIAL = False
 PROCESS_PESSOAIS = True
-PROCESS_AMBIENTE = True
-PROCESS_BIOMECANICO = True
-CALCULATE_COPSOQ = True
+PROCESS_AMBIENTE = False
+PROCESS_BIOMECANICO = False
+CALCULATE_COPSOQ = False
 GENERATE_QUESTIONNAIRES_DATASET = False
 
 quest_path = r"E:\Backup PrevOccupAI_PLUS Data\data\group1\questionnaires"

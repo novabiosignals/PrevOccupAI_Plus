@@ -1,37 +1,39 @@
+"""
+Functions to parse the filenames and extract relevant information (i.e.: device name, sensor data, ext)
+
+Available Functions
+-------------------
+[Public]
+get_file_paths_by_device(...): Function to group raw data file paths according to the device
+extract_sensor_from_filename(...): Extracts the sensor name from the filename of the sensor data
+extract_device_from_filename(...): Extracts the device name from the raw data filename
+get_device_filename_timestamp(...): Scan a folder of raw data files, extract device names and their start times from filenames, and return them as a dictionary.
+-------------------
+
+[Private]
+_extract_timestamp_from_filename(...): Parse the timestamp from an OpenSignals-style filename and convert it to 'hh:mm:ss.000' format.
+-------------------
+"""
+
 # -------------------------------------------------------------------------------------------------------------------- #
 # imports
 # -------------------------------------------------------------------------------------------------------------------- #
-from pathlib import Path
-from typing import List, Optional, Union
+import os
+import re
+from typing import Dict, List, Optional, Union
 
-from constants import SENSOR_MAP, AVAILABLE_ANDROID_PREFIXES, AVAILABLE_ANDROID_SENSORS
+# internal imports
+from constants import AVAILABLE_ANDROID_PREFIXES, AVAILABLE_ANDROID_SENSORS, WATCH, PHONE, ANDROID, ANDROID_WEAR
 
+# ------------------------------------------------------------------------------------------------------------------- #
+# file specific constants
+# ------------------------------------------------------------------------------------------------------------------- #
+MIN_BYTES = 1500
+STUDIO_DATA = 'StudioData'
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # public functions
 # -------------------------------------------------------------------------------------------------------------------- #
-
-# def get_file_by_sensor(sensor_name: str, files: Union[List[Path], List[str]]) -> Optional[Union[Path, str]]:
-#     """
-#     Returns the file name corresponding to the sensor name provided.
-#
-#     :param sensor_name: Sensor name abbreviation ('ACC', 'GYR', 'MAG', 'ROT', 'NOISE', 'HR')
-#     :param files: List of files in the folder
-#     :return: File name if found, otherwise None
-#     """
-#
-#     # Extract the corresponding identifier
-#     file_identifier = SENSOR_MAP[sensor_name]
-#
-#     # Search for the file in the list
-#     for file in files:
-#         if file_identifier in str(file):
-#             return file
-#
-#     # If no file is found
-#     print(f"No file found for sensor: {sensor_name}.")
-#     return None
-
 
 def extract_sensor_from_filename(filename: str) -> str:
     """
@@ -52,48 +54,159 @@ def extract_sensor_from_filename(filename: str) -> str:
             return sensor_name
 
     raise ValueError(f"No valid sensor found in filename: {filename}")
-# def filter_files_by_folder(folder_name: str, files: List[Path]) -> List[Path]:
-#     """
-#     Filters a list of file paths, keeping only those that contain a given folder name.
-#
-#     :param folder_name: The folder name to search for (e.g. "10-20-00", "2022-06-21")
-#     :param files: List of Path objects
-#     :return: List of Path objects that contain the folder name in their parents
-#     """
-#     # innit list to hold only the wanted paths
-#     filtered: List[Path] = []
-#
-#     # cycle though the paths in the list
-#     for file in files:
-#
-#         # if the path has a folder like folder_name, add to list
-#         if folder_name in [p.name for p in file.parents]:
-#             filtered.append(file)
-#
-#     return filtered
-#
-#
-# def _get_unique_acquisition_times_from_paths(paths_dict):
-#
-#     acquisition_times: List[str] = []
-#
-#     # get cycle over the list with the paths for all devices
-#     for paths_list in paths_dict.values():
-#
-#         # cycle over the paths in the list of paths
-#         for path in paths_list:
-#
-#             # get time pattern to find in the folder names
-#             acquisition_pattern = re.compile(ACQUISITION_PATTERN)
-#
-#             # find folders that have the pattern hh-mm-ss
-#             match = acquisition_pattern.search(str(path.parent))
-#
-#             # add to list if it's not there already
-#             if match.group(0) not in acquisition_times:
-#                 acquisition_times.append(match.group(0))
-#
-#     return acquisition_times
+
+
+def get_file_paths_by_device(folder_path: Union[str, os.PathLike]) -> Dict[str, List[str]]:
+    """
+    Scans a folder and groups raw sensor data file paths by the device.
+
+    This function iterates through all sensor data files in the specified folder and organizes them by device.
+    Each file typically represents data from a specific sensor (e.g., accelerometer, gyroscope) on a particular device.
+    Files that do not match a known device (e.g., logger files) are ignored.
+
+    This function ignores the sensor files that are either empty or only have the header.
+
+    The result is a dictionary where:
+    - Keys are device identifiers (e.g., "phone", "watch", or a MuscleBan MAC address).
+    - Values are lists of full file paths corresponding to sensor data from that device.
+
+    :param folder_path: Path to the folder containing the sensor data files
+    :return: A dictionary mapping each device to a list of its corresponding sensor data file paths.
+    """
+
+    # innit dictionary to store the paths
+    paths_dict = {}
+
+    try:
+        # list the files in folder_path
+        files = os.listdir(folder_path)
+    except FileNotFoundError:
+
+        # raise error in case the folder path is invalid
+        raise ValueError(f"The folder at path {folder_path} was not found.")
+
+    # iterate through the files inside the folder
+    for filename in files:
+
+        # ignore mvc
+        if STUDIO_DATA in filename:
+            continue
+
+        # If less than 1 kb than it's either empty or only has the header - ignore
+        if os.path.getsize(os.path.join(folder_path, filename)) <= MIN_BYTES:
+            continue
+
+        # check the device based on the filename
+        device = extract_device_from_filename(filename)
+
+        # found logger file
+        if device is None:
+            continue
+
+        # add device to dictionary
+        if device not in paths_dict.keys():
+
+            # add dict entry
+            paths_dict[device] = [filename]
+
+        else:
+            # if device is already on the dictionary, add filepath
+            paths_dict[device].append(filename)
+
+    return paths_dict
+
+
+def extract_device_from_filename(filename: str) -> Optional[str]:
+    """
+    Extracts the device name from a sensor data filename.
+
+    This function identifies the device used to collect the data based on the filename format used by OpenSignals.
+    It can detect files from a smartphone, smartwatch, or MuscleBan device.
+
+    - Returns "phone" if the filename indicates a smartphone.
+    - Returns "watch" if the filename indicates a smartwatch.
+    - Returns the MAC address string if a MuscleBan device is detected (identified the mac address).
+
+    :param filename: str corresponding to the filename
+    :return: str containing the device name or None if no device is found
+    """
+
+    # check for smartwatch file
+    if ANDROID_WEAR in filename:
+
+        return WATCH
+
+    # check for smartphone file
+    elif ANDROID in filename:
+
+        return PHONE
+
+    # check for MBan file by mac address - exactly 12 uppercase letters or digits
+    elif match := re.search(r'[A-Z0-9]{12}', filename):
+
+        # return the mac address string
+        return match.group()
+
+    else:
+
+        # found the logger file
+        return None
+
+
+def get_device_filename_timestamp(folder_path: str) -> Dict[str, str]:
+    """
+    Extracts the start time for each device based on the timestamps in the filenames within a folder.
+
+    This function scans the specified folder, identifies files corresponding to devices, and parses each filename
+    to extract the device name and its associated timestamp. The extracted time (formatted as 'hh:mm:ss.000')
+    is assumed to represent the start time of data collection for that device.
+
+    :param folder_path: Path to the folder containing the raw data files.
+    :return: A dictionary mapping each device name to its extracted start time.
+             Example: {"watch": "11:00:01.000", "F0A55C68B2E1": "11:05:34.000"}
+    """
+
+    # innit dictionary to store the results
+    start_times_dict: Dict[str, str] = {}
+
+    for filename in os.listdir(folder_path):
+
+        # ignore mvc
+        if STUDIO_DATA in filename:
+            continue
+
+        # extract device from filename
+        device_name = extract_device_from_filename(filename)
+
+        # extract timestamp from filename
+        device_timestamp = _extract_timestamp_from_filename(filename)
+
+        # update dictionary
+        start_times_dict[device_name] = device_timestamp
+
+    return start_times_dict
 # -------------------------------------------------------------------------------------------------------------------- #
 # private functions
 # -------------------------------------------------------------------------------------------------------------------- #
+
+def _extract_timestamp_from_filename(filename: str) -> str:
+    """
+    Extracts the time portion from an OpenSignals filename and converts it to 'hh:mm:ss.000' format.
+
+    Example:
+        Input:  "opensignals_ANDROID_ROTATION_VECTOR_2022-05-02_11-00-01"
+        Output: "11:00:01.000"
+
+    :param filename: The filename string containing a timestamp
+    :return: The timestamp in the 'hh:mm:ss.000' format
+    """
+    # Regex to extract the timestamp from filename - format is hh-mm-ss
+    match = re.search(r'_(\d{2}-\d{2}-\d{2})(?:\.\w+)?$', filename)
+
+    if not match:
+        raise ValueError(f"No valid time found in filename: {filename}")
+
+    # Change format to hh:mm:ss.000
+    time_str = match.group(1)
+
+    return time_str
