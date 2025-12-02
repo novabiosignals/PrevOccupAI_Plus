@@ -2,7 +2,7 @@
 # imports
 # ------------------------------------------------------------------------------------------------------------------- #
 import json
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 import os
 import re
 from pathlib import Path
@@ -80,3 +80,46 @@ def find_project_root(path: Path = Path(__file__)) -> Path:
 
     # If we reach here, no marker was found → raise an error
     raise RuntimeError("Project root not found")
+
+
+def extract_device_num_from_path(folder_path: str) -> Optional[str]:
+    # returns #001
+    # folder name starts with 'group' (i.e.: group1, group2, group3...)
+    if match := re.search(r'LIBPhys (#\d+)', folder_path):
+
+        return match.group(1)
+
+    else:
+        return None
+
+
+def extract_group_from_path(folder_path: str) -> Optional[str]:
+    """
+
+    :param folder_path:
+    :return:
+    """
+
+    # find the group in the folder path (group1, group2, group3 ...)
+    if match := re.search(r'group(\d+)', folder_path):
+
+        return match.group(1)
+
+    else:
+        return None
+
+
+def extract_date_from_path(folder_path: str) -> Optional[str]:
+    """
+
+    :param folder_path:
+    :return:
+    """
+
+    # find the group in the folder path (group1, group2, group3 ...)
+    if match := re.search(r'\b(\d{4}-\d{2}-\d{2})\b', folder_path):
+
+        return match.group(1)
+
+    else:
+        return None
