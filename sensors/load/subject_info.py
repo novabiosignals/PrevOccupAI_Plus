@@ -52,7 +52,7 @@ def get_muscleban_side(meta_data_df, mac_address):
     return None
 
 
-def get_expected_devices(meta_data_df, group: str, device_num: str) -> List[str]:
+def get_expected_devices(meta_data_df: pd.DataFrame, group: str, device_num: str) -> List[str]:
 
     # list with expected device - phone and watch are added manually as they are not on the metadata df
     expected_devices = [PHONE, WATCH]
@@ -68,3 +68,20 @@ def get_expected_devices(meta_data_df, group: str, device_num: str) -> List[str]
     expected_devices.extend([mban_left, mban_right])
 
     return expected_devices
+
+
+def get_id(meta_data_df: pd.DataFrame, device_num: str, group: str) -> str:
+    """
+    Gets the subject id based on the device number and group
+
+    :param meta_data_df: DataFrame containing the participants info
+    :param device_num: device number to search for in the df
+    :param group: group number to search for in the df
+    :return: a string with the subject id
+    """
+
+    # Filter the DataFrame for the given group and device number
+    row = meta_data_df[(meta_data_df['group'] == int(group)) & (meta_data_df['device_num'] == device_num)]
+
+    # get the id which corresponds to the index of the row
+    return str(row.index[0])
