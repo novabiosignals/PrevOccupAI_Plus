@@ -26,7 +26,7 @@ _validate_load_devices(...): check if input sensors and devices are valid
 import re
 from pathlib import Path
 from typing import List, Dict
-from .meta_data import load_meta_data, get_muscleban_side
+from .subject_info import load_participants_info, get_muscleban_side
 from constants import PHONE, WATCH, MBAN, MAC_ADDRESS_PATTERN, PHONE_SENSORS, WATCH_SENSORS, MBAN_SENSORS
 
 # ------------------------------------------------------------------------------------------------------------------- #
@@ -241,7 +241,7 @@ def _group_mban_files(paths_dict: Dict[str, List[Path]]) -> Dict[str, List[Path]
         match = pattern.search(str(file))
 
         # load_signals metadata
-        meta_data_df = load_meta_data()
+        meta_data_df = load_participants_info()
 
         # (3) get muscleban side based on the unique mac address
         mban_side = get_muscleban_side(meta_data_df, match.group(0))
