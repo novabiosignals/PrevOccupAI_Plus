@@ -23,7 +23,7 @@ METADATA_SUBJECT_ID_KEY = 'subject_id'
 
 # set the path. !IMPORTANT!: we should store all OH profiles (one for each subject) into a folder called "OH_profiles"
 # the naming convention for the individual file is "{subjectID}_OH_profile.json". The functions will handle this for you
-test_path = r"C:\Users\gonba\OneDrive\Treino\projects\OH_profiles"
+test_path = r'/Volumes/USB DISK/PrevOccupAI_plus_Data/OH_profiles'
 
 
 # load the subject_info (in the wrapper function we will use this to cycle over the subjects)
