@@ -3,10 +3,15 @@
 # ------------------------------------------------------------------------------------------------------------------- #
 import pandas as pd
 import os
-from pathlib import Path
 
-from constants import CSV, QUESTIONNAIRE_DOMAINS, AMBIENTE, PSICOSSOCIAL, CONFIG_FOLDER_NAME
-from utils import create_dir, load_json_file
+from constants import CSV, QUESTIONNAIRE_DOMAINS, AMBIENTE, PSICOSSOCIAL, CONFIG_FOLDER_NAME, WORKLOAD
+from utils import create_dir, load_json_file, find_project_root
+import sensors.load as sl
+
+# ------------------------------------------------------------------------------------------------------------------- #
+# constants
+# ------------------------------------------------------------------------------------------------------------------- #
+OUTPUT_FOLDER_NAME = 'questionnaires'
 
 # ------------------------------------------------------------------------------------------------------------------- #
 # public functions
@@ -15,7 +20,7 @@ from utils import create_dir, load_json_file
 
 def generate_questionnaires_dataset(file_paths_dir: str, output_folder_path: str) -> None:
     # load metadata
-    meta_data_df = pd.read_csv('participants_info.csv', sep=';', encoding='utf-8')
+    meta_data_df = sl.load_participants_info()
 
     # cycle over unique groups
     for group_num in meta_data_df['group'].unique():
@@ -24,13 +29,13 @@ def generate_questionnaires_dataset(file_paths_dir: str, output_folder_path: str
         group_df = meta_data_df[meta_data_df['group'] == group_num]
 
         # output folder
-        group_output_folder_path = create_dir(os.path.join(output_folder_path, f"group{str(group_num)}"),'questionnaires')
+        group_output_folder_path = create_dir(os.path.join(output_folder_path, f"group{str(group_num)}"),OUTPUT_FOLDER_NAME)
 
         # cycle over questionnaire domains
         for domain in QUESTIONNAIRE_DOMAINS:
 
             # load json file with the info for the given domain
-            config_dict = load_json_file(os.path.join(Path(__file__).parent, CONFIG_FOLDER_NAME, f"cfg_{domain.lower()}.json"))
+            config_dict = load_json_file(os.path.join(find_project_root(), 'questionnaires', 'process', CONFIG_FOLDER_NAME, f"cfg_{domain.lower()}.json"))
 
             # if domain is psicossocial or ambiente json is configured slightly different
             if domain == PSICOSSOCIAL or domain == AMBIENTE:
@@ -53,7 +58,7 @@ def generate_questionnaires_dataset(file_paths_dir: str, output_folder_path: str
                 survey_filename = _find_survey_path(file_paths_list, str(survey_id))
 
                 # load, clean results_questionnaires df, and save in appropriate folders
-                group_survey_df = _load_and_clean_limesurvey_results(os.path.join(file_paths_dir, survey_filename), group_df['subject_id'])
+                group_survey_df = _load_and_clean_limesurvey_results(os.path.join(file_paths_dir, survey_filename), group_df.index, domain)
 
                 # generate path to folder with domain name
                 domain_path = create_dir(group_output_folder_path, domain)
@@ -66,7 +71,7 @@ def generate_questionnaires_dataset(file_paths_dir: str, output_folder_path: str
 # private functions
 # ------------------------------------------------------------------------------------------------------------------- #
 
-def _load_and_clean_limesurvey_results(limesurvey_csv_path: str, subject_ids: pd.Series):
+def _load_and_clean_limesurvey_results(limesurvey_csv_path: str, subject_ids: pd.Series, domain: str):
 
     # load raw limesurvey csv
     limesurvey_df = pd.read_csv(limesurvey_csv_path)
@@ -78,13 +83,12 @@ def _load_and_clean_limesurvey_results(limesurvey_csv_path: str, subject_ids: pd
     group_df = group_df.reset_index(drop=True)
 
     # clean df
-    group_df = _clean_limesurvey_files(group_df)
-
+    group_df = _clean_limesurvey_files(group_df, domain)
 
     return group_df
 
 
-def _clean_limesurvey_files(df: pd.DataFrame):
+def _clean_limesurvey_files(df: pd.DataFrame, domain: str):
 
     # rename hiddenid column to just id
     df = df.rename(columns={'hiddenid': 'id.1'})
@@ -92,20 +96,16 @@ def _clean_limesurvey_files(df: pd.DataFrame):
     # drop all irrelevant initial columns except submitdate and the hidden ids
     df = df.drop(df.columns[[0, *range(2, 9)]], axis=1)
 
-    # define columns to drop which have irrelevant info in between pages
-    cols_to_drop = df.filter(regex='(?i)(interviewtime|groupTime|hiddenTime)').columns
-
-    # drop those columns
-    df = df.drop(columns=cols_to_drop)
-
     # convert submitdate to real datetime
     df['submitdate'] = pd.to_datetime(df['submitdate'], errors='coerce')
 
     # drop submissions with no submitdate
     df = df.dropna(subset=['submitdate'])
 
-    # sort by submitdate, then keep only the most recent submission per participant
-    df = (df.sort_values('submitdate').drop_duplicates(subset=['id.1'], keep='last').reset_index(drop=True))
+    if domain != WORKLOAD:
+
+        # sort by submitdate, then keep only the most recent submission per participant
+        df = (df.sort_values('submitdate').drop_duplicates(subset=['id.1'], keep='last').reset_index(drop=True))
 
     return df
 

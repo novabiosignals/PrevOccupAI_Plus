@@ -1,7 +1,6 @@
 # ------------------------------------------------------------------------------------------------------------------- #
 # imports
 # ------------------------------------------------------------------------------------------------------------------- #
-from pathlib import Path
 import os
 from typing import List, Optional
 import pandas as pd
@@ -34,7 +33,7 @@ ATENDIMENTO = 'atendimento'
 # public functions
 # ------------------------------------------------------------------------------------------------------------------- #
 
-def calculate_copsoq_mean_scores(folder_path, average_method: str) -> None:
+def calculate_copsoq_mean_scores(folder_path, average_method: str, output_folder_path: str) -> None:
     """
     Calculate pure copsoq scores. This function assumes that the psicossocial results_questionnaires have already been obtained for
     all groups. There are two averaging methods available.
@@ -85,7 +84,7 @@ def calculate_copsoq_mean_scores(folder_path, average_method: str) -> None:
     else:
         raise ValueError(f"The following average method is not supported. \nSupported methods are 'all' and 'atendimento'")
     # save dataframe into a csv file
-    folder_path = create_dir(find_project_root(),COPSOQ_RESULTS_FOLDER)
+    folder_path = create_dir(output_folder_path,COPSOQ_RESULTS_FOLDER)
     copsoq_df.to_csv(os.path.join(folder_path, f"results_copsoq_{average_method}{CSV}"))
 
 
@@ -142,7 +141,7 @@ def calculate_copsoq_scores(folder_path: str) -> pd.DataFrame:
     return final_df
 
 
-def calculate_linear_scores(folder_path: str, domain: str) -> None:
+def calculate_linear_scores(folder_path: str, domain: str, output_folder_path: str) -> None:
     """
     Calculates the scores for the Psicossocial and Ambiente questionnaires and saves the results_questionnaires into a csv file
     :param folder_path: Path to the folder containing the several questionnaire domains (subfolders)
@@ -230,7 +229,7 @@ def calculate_linear_scores(folder_path: str, domain: str) -> None:
     final_df = pd.concat(list_dfs, axis=1)
 
     # save dataframe into a csv file
-    folder_path = create_dir(find_project_root(), os.path.join(RESULTS_FOLDER_NAME, get_group_from_path(folder_path)))
+    folder_path = create_dir(find_project_root(), os.path.join(output_folder_path, get_group_from_path(folder_path)))
     final_df.to_csv(os.path.join(folder_path, f"results_{domain}{CSV}"))
 
 # ------------------------------------------------------------------------------------------------------------------- #

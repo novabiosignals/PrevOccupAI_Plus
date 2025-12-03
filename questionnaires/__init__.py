@@ -2,6 +2,7 @@ from questionnaires.process.personal_score_calculator import calculate_personal_
 from questionnaires.process.linear_score_calculator import calculate_linear_scores, calculate_copsoq_mean_scores
 from questionnaires.process.biomechanical_score_calculator import calculate_biomechanical_scores, calculate_rosa_scores
 from questionnaires.load.limesurvey_parser import generate_questionnaires_dataset
+from questionnaires.process.daily_workload import clean_daily_workload
 
 
 __all__ = [
@@ -10,5 +11,6 @@ __all__ = [
     'calculate_biomechanical_scores',
     'calculate_rosa_scores',
     'calculate_copsoq_mean_scores',
-    'generate_questionnaires_dataset'
+    'generate_questionnaires_dataset',
+    'clean_daily_workload',
 ]

@@ -3,6 +3,17 @@ File containing a dictionaries and lists to map the column names from limesurvey
 the code responses to readable text
 """
 
+# ------------------------------------------------------------------------------------------------------------------- #
+# Workload  mappings
+# ------------------------------------------------------------------------------------------------------------------- #
+WORKLOAD_COLUMN_NAMES_MAP = {
+    'diario[SQ001]': 'focus_and_mental_strain',
+    'diario[SQ002]': 'rushed_and_under_pressure',
+    'diario[SQ003]': 'frequent_interruptions',
+    'diario[SQ004]': 'more_effort_than_resources',
+    'diario[SQ005]': 'heavy_workload',
+    'questAberta': 'open_question'
+}
 
 # ------------------------------------------------------------------------------------------------------------------- #
 # Estilo de Vida mappings

@@ -25,7 +25,7 @@ INCAPACIDADE_DOR = "Incapacidade e Sofrimento associados a Dor"
 # -------------------------------------------------------------------------------------------------------------------- #
 # public functions
 # -------------------------------------------------------------------------------------------------------------------- #
-def calculate_rosa_scores(folder_path: str):
+def calculate_rosa_scores(folder_path: str, output_folder_path: str):
 
     # load results_questionnaires for all domain questionnaires into a dictionary
     # (keys: questionnaire id, values: dataframe with the results_questionnaires)
@@ -43,11 +43,11 @@ def calculate_rosa_scores(folder_path: str):
     scores_df = rt.calc_final_rosa_score(df_a_scores, df_b_c_scores)
 
     # save dataframe into a csv file
-    folder_path = create_dir(find_project_root(), os.path.join(RESULTS_FOLDER_NAME, get_group_from_path(folder_path)))
+    folder_path = create_dir(find_project_root(), os.path.join(output_folder_path, get_group_from_path(folder_path)))
     scores_df.to_csv(os.path.join(folder_path, f"rosa_scores{CSV}"))
 
 
-def calculate_biomechanical_scores(folder_path, pure_rosa: bool):
+def calculate_biomechanical_scores(folder_path, pure_rosa: bool, output_folder_path: str):
 
     # list for holding the scores_df for all questionnaires
     list_dfs: List[pd.DataFrame] = []
@@ -96,7 +96,7 @@ def calculate_biomechanical_scores(folder_path, pure_rosa: bool):
     final_df = pd.concat(list_dfs, axis=1)
 
     # save dataframe into a csv file
-    folder_path = create_dir(find_project_root(), os.path.join(RESULTS_FOLDER_NAME, get_group_from_path(folder_path)))
+    folder_path = create_dir(find_project_root(), os.path.join(output_folder_path, get_group_from_path(folder_path)))
     final_df.to_csv(os.path.join(folder_path, f"results_biomecanico{CSV}"))
 
 
