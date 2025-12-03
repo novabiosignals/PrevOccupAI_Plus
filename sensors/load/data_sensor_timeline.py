@@ -43,7 +43,7 @@ LOADED_SENSORS = 'loaded sensors'
 STARTING_TIMES = 'starting times'
 STOPPING_TIMES = 'stopping times'
 
-ROUNDING_FACTOR = 1000 # sampling rate  times 10
+ROUNDING_FACTOR = 1000 # sampling rate times 10
 MIN_BYTES = 1000000 # 1mb
 # ------------------------------------------------------------------------------------------------------------------- #
 # public functions

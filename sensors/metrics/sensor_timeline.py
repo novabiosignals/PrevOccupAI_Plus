@@ -1,6 +1,22 @@
+"""
+Function to get sensor timeline metrics
+
+Available Functions
+-------------------
+[Public]
+get_sensor_timeline_metrics(...): Gets the metrics needed for the sensor timeline plot for one day.
+-------------------
+
+[Private]
+-------------------
+"""
+# ------------------------------------------------------------------------------------------------------------------- #
+# imports
+# ------------------------------------------------------------------------------------------------------------------- #
 import os
 from typing import Dict
 
+# internal imports
 import sensors.visualize as sv
 import sensors.impute as si
 from OH_profile.constants import SENSOR_TIMELINE_MISSING_TIMES_KEY, SENSOR_TIMELINE_TIMES_KEY
@@ -20,26 +36,16 @@ def get_sensor_timeline_metrics(day_folder_path: str, fs: int) -> Dict:
     {'25-09-2025': {
             'metadata': {
                 'phone': {
-                    'start_times': ['09-30-00'],
-                    'end_times': ['17-30-00']
-                },
+                    'start_times': ['09-30-00'], 'end_times': ['17-30-00']},
                 'watch': {
-                    'start_times': ['09-30-00', '10-00-00', '11-00-00', '12-00-00'],
-                    'end_times':   ['09-50-00', '10-20-00', '11-20-00', '12-20-00']
-                },
+                    'start_times': ['09-30-00', '10-00-00', '11-00-00', '12-00-00'], 'end_times':   ['09-50-00', '10-20-00', '11-20-00', '12-20-00']},
                 'mban_right': {
-                    'start_times': ['09-30-00', '10-00-00', '11-00-00', '12-00-00'],
-                    'end_times':   ['09-50-00', '10-20-00', '11-20-00', '12-20-00']
-                },
+                    'start_times': ['09-30-00', '10-00-00', '11-00-00', '12-00-00'], 'end_times':   ['09-50-00', '10-20-00', '11-20-00', '12-20-00']},
                 'mban_left': {
-                    'start_times': ['09-30-00', '10-00-00', '11-00-00'],
-                    'end_times':   ['09-50-00', '10-20-00', '11-20-00']
-                },
+                    'start_times': ['09-30-00', '10-00-00', '11-00-00'], 'end_times':   ['09-50-00', '10-20-00', '11-20-00']},
             'missing_data': {
                 'mban_left': {
-                    'start_times': ['12-00-00'],
-                    'end_times':   ['12-20-00']
-                }
+                    'start_times': ['12-00-00'],'end_times':   ['12-20-00']}
             }
         }
     }

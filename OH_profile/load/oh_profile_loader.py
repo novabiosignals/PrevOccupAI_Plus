@@ -4,7 +4,7 @@ Functions for loading Occupational Health (OH) Profiles
 Available Functions
 -------------------
 [Public]
-
+get_OH_profile(...): gets the OH profile or creates the OH profile skeleton if the file does not exist.
 -------------------
 
 [Private]
@@ -15,11 +15,10 @@ _generate_OH_profile_json_skeleton(): generates the basic json skeleton for the 
 # -------------------------------------------------------------------------------------------------------------------- #
 # imports
 # -------------------------------------------------------------------------------------------------------------------- #
-import os
 import json
 from pathlib import Path
-
 from typing import Dict
+
 # -------------------------------------------------------------------------------------------------------------------- #
 # constants
 # -------------------------------------------------------------------------------------------------------------------- #

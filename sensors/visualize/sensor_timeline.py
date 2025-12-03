@@ -1,16 +1,16 @@
 # -*- coding: utf-8 -*-
 """
-Functions to visualize daily and group-level sensor acquisitions.
+Functions to generate the sensor timeline plot.
 
 Available Functions
 -------------------
 [Public]
 visualize_group_acquisitions(...): Generate daily acquisition plots for each subject in a group.
-visualize_daily_acquisitions(...): Plot acquisitions for a subject on a given day, including missing data, and save the visualization as a PNG file.
+get_daily_acquisitions_metadata(...): Aggregate acquisition lengths and start times for all devices on a given day.
 -------------------
 
 [Private]
-_get_daily_acquisitions_metadata(...): Aggregate acquisition lengths and start times for all devices on a given day.
+_visualize_daily_acquisitions(...): Plot acquisitions for a subject on a given day, including missing data, and save the visualization as a PNG file.
 _calculate_df_length(...): Compute the number of rows in each DataFrame of signals.
 _normalize_device_names(...): Translate raw device names into human-readable labels (Portuguese).
 _add_missing_device(...): Add a device missing for the entire day into the missing-data dictionary using a reference device.
@@ -26,7 +26,7 @@ _plot_device_labels_and_guides(...): Plot device labels and dashed guidelines fo
 # ------------------------------------------------------------------------------------------------------------------- #
 import os
 import pandas as pd
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Tuple, Callable, Union
 from datetime import datetime, timedelta
 import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
@@ -66,19 +66,34 @@ ACQUISITION_TIME_MINUTES = 20
 # public functions
 # ------------------------------------------------------------------------------------------------------------------- #
 
-def generate_sensor_timeline_plot(week_meta_data_dict: Dict[str, Dict[str, Dict[str, Dict[str, list]]]], output_folder_path: str, filename: str) -> None:
+def generate_sensor_timeline_plot(week_metadata_dict: Dict[str, Dict[str, Dict[str, Dict[str, list]]]],
+                                  output_folder_path: str, filename: str) -> None:
     """
-    Generates a figure with daily acquisitions for all days in a week folder.
+    Generates a figure with the sensor timeline plots for all available days of the week for one subject.
     Each day is plotted in its own subplot with an independent x-axis.
     One shared legend is shown for the entire figure.
 
-    :param output_folder:
-    :param week_meta_data_dict:
-
+    week_metadata_dict must have the following format:
+    {
+        date: {
+                SENSOR_TIMELINE_TIMES_KEY: {
+                                            "phone": {"end_times": ["18:20:20"], "start_times": ["11:20:20"]},
+                                            "watch": {"end_times": ["10:20:00", "12:20:00"], "start_times": ["10:00:00", "12:00:00"]}
+                                            },
+                SENSOR_TIMELINE_MISSING_TIMES_KEY: {
+                                            "mban_right": {"end_time": ["10:20:00", "12:20:00"], "start_times": ["10:00:00", "12:00:00"]},
+                                            "mban_left": {"end_time": ["10:20:00", "12:20:00"], "start_times": ["10:00:00", "12:00:00"]}
+                                            }
+                }
+    }
+    :param week_metadata_dict: Dictionary with the necessary metrics for the plot.
+    :param output_folder_path: path to the folder where the results should be stored
+    :param filename: plot filename
+    :return: None
     """
 
     # get number of days that have data
-    n_days = len(week_meta_data_dict)
+    n_days = len(week_metadata_dict)
 
     # Figure with one subplot per day, independent x-axes
     fig, axs = plt.subplots(nrows=n_days, ncols=1, figsize=(12, 2 * n_days), sharex=False)
@@ -90,7 +105,7 @@ def generate_sensor_timeline_plot(week_meta_data_dict: Dict[str, Dict[str, Dict[
         axs = axs.ravel()
 
     # Plot each day in its own subplot
-    for ax, (acquisition_date, day_meta_data_dict) in zip(axs, week_meta_data_dict.items()):
+    for ax, (acquisition_date, day_meta_data_dict) in zip(axs, week_metadata_dict.items()):
         _visualize_daily_acquisitions(day_meta_data_dict[SENSOR_TIMELINE_TIMES_KEY],
                                       day_meta_data_dict[SENSOR_TIMELINE_MISSING_TIMES_KEY], acquisition_date, ax)
 
@@ -113,10 +128,7 @@ def generate_sensor_timeline_plot(week_meta_data_dict: Dict[str, Dict[str, Dict[
         handler_map={RefLine: HandlerRefLine()},
         loc='upper right',
         bbox_to_anchor=(1, 0.95),  # outside
-        frameon=False,
-        borderaxespad=0.0,
-        handleheight=1,
-        handlelength=2,
+        frameon=False, borderaxespad=0.0, handleheight=1, handlelength=2,
     )
 
     # Save figure
@@ -127,24 +139,25 @@ def generate_sensor_timeline_plot(week_meta_data_dict: Dict[str, Dict[str, Dict[
 
 def get_daily_acquisitions_metadata(daily_folder_path: str, fs: int) -> Dict[str, Dict[str, list]]:
     """
-    Aggregates signal metadata (length and start time) for each device across multiple acquisitions recorded in a single day.
+    Aggregates signal metadata (end time and start time) for each device across multiple acquisitions recorded in a single day.
     This function is intended for data collected from a smartwatch, smartphone, or MuscleBans (Plux Wireless Biosignals),
     using the OpenSignals application.
 
     This function scans a daily folder containing multiple acquisition subfolders. For each acquisition:
         - Loads the raw signals and calculates the number of rows (length) per device.
         - Determines the start timestamp for each device (using the logger file if available, if not use the filenames).
+        - Calculates the end times based on the start time and the length of the signals
         - Accumulates these values into a dictionary grouped by device.
 
-    :param fs:
+    :param fs: The sampling frequency in Hz
     :param daily_folder_path: Path to the folder containing the data from one day
     :return: A dictionary where keys are device names, and values are dictionaries with two lists:
-             - 'length': List of signal lengths.
+             - 'end_times': List of signal end times.
              - 'start_times': List of corresponding start timestamps.
              Example:
              {
-                 "phone": {"length": [10000], "start_times": ["11:20:20"]},
-                 "watch": {"length": [500, 950], "start_times": ["10:20:50", "12:00:00"]}
+                "phone": {"end_times": ["18:20:20"], "start_times": ["11:20:20"]},
+                "watch": {"end_times": ["10:20:00", "12:20:00"], "start_times": ["10:00:00", "12:00:00"]}
              }
     """
     final_dict = {}
@@ -209,10 +222,18 @@ def _visualize_daily_acquisitions(acquisitions_dict: Dict[str, Dict[str, list]],
     plotting is done on that Axes and NO legend is added (so the group
     plot can have a single shared legend).
 
-    :param subject_folder_path: Path to the subject's / week's folder.
-    :param date: Name of the daily subfolder (e.g. '2025-01-01').
-    :param fs: Sampling frequency.
+    :param acquisitions_dict: A dictionary where keys are device names, and values are dictionaries with two lists:
+             - 'end_times': List of signal end times.
+             - 'start_times': List of corresponding start timestamps.
+             Example:
+             {
+                "phone": {"end_times": ["18:20:20"], "start_times": ["11:20:20"]},
+                "watch": {"end_times": ["10:20:00", "12:20:00"], "start_times": ["10:00:00", "12:00:00"]}
+             }
+    :param missing_data_dict: same format as acquisitions_dict, but wth information regarding missing acquisitions. Can be empty.
+    :param acquisition_date: str corresponding to the date of the acquisition (for plot title only).
     :param ax: Optional matplotlib Axes to plot on.
+    :param show_dates: flag to add the date to the title pot
     :return: The matplotlib Axes used for plotting.
     """
 
@@ -365,19 +386,19 @@ def _add_missing_device(data_dict: Dict[str, Dict[str, list]], missing_data_dict
     timestamps from the missing_data_dict.
 
     (3) all timestamps found will be used for the missing device, therefore these are added to the missing_data_dict,
-    as well as, for each added timestamp, a length of 20 minutes (20*60*fs) is added.
+    as well as, for each added timestamp, a end time is computed by adding 20 minutes to the start time
 
     :param data_dict: A dictionary where keys are device names, and values are dictionaries with two lists:
-             - 'length': List of signal lengths.
+             - 'end_times': List of signal end times.
              - 'start_times': List of corresponding start timestamps.
              Example:
              {
-                 "phone": {"length": [10000], "start_times": ["11:20:20.000"]},
-                 "watch": {"length": [500, 950], "start_times": ["10:20:50.000", "12:00:00.000"]}
+                "phone": {"end_times": ["18:20:20"], "start_times": ["11:20:20"]},
+                "watch": {"end_times": ["10:20:00", "12:20:00"], "start_times": ["10:00:00", "12:00:00"]}
              }
-    :param missing_data_dict: A dictionary where keys are device names, and values are dictionaries with two lists: length and start times
+    :param missing_data_dict: A dictionary where keys are device names, and values are dictionaries with two lists: end times and start times
                                 Same format as data_dict.
-    :return: the missing_data_dict with the missing device (and correspondent start times and length) added.
+    :return: the missing_data_dict with the missing device (and correspondent start times and end times) added.
     """
 
     # variable for holding the device to be used as reference for getting the start times
@@ -426,10 +447,23 @@ def _add_missing_device(data_dict: Dict[str, Dict[str, list]], missing_data_dict
     return missing_data_dict
 
 
-def _get_acquisition_time_range(acquisitions_dict, missing_data_dict):
+def _get_acquisition_time_range(acquisitions_dict: Dict[str, Dict[str, list]],
+                                missing_data_dict: Dict[str, Dict[str, list]]) -> Tuple[datetime, datetime]:
     """
-    Compute earliest start time and latest end time across all devices.
+    Compute the earliest start time and latest end time across all devices.
     Assumes data_dict contains 'start_times' and 'end_times' as HH-MM-SS strings.
+
+    :param acquisitions_dict: A dictionary where keys are device names, and values are dictionaries with two lists:
+             - 'end_times': List of signal end times.
+             - 'start_times': List of corresponding start timestamps.
+             Example:
+             {
+                "phone": {"end_times": ["18:20:20"], "start_times": ["11:20:20"]},
+                "watch": {"end_times": ["10:20:00", "12:20:00"], "start_times": ["10:00:00", "12:00:00"]}
+             }
+    :param missing_data_dict: A dictionary where keys are device names, and values are dictionaries with two lists: end times and start times
+                                Same format as data_dict.
+    :return: Tuple with the start time of the first device and the end tie of the last device
     """
     all_start_times = []
     all_end_times = []
@@ -445,9 +479,28 @@ def _get_acquisition_time_range(acquisitions_dict, missing_data_dict):
     return min_start_time, max_end_time
 
 
-def _plot_device_bars(ax, data_dict, device_to_index, color_map, edgecolor=None, linestyle='solid', linewidth=1.0):
+def _plot_device_bars(ax: Axes, data_dict: Dict[str, Dict[str, list]], device_to_index:  Dict[str, int],
+                      color_map: Union[Callable[[int], str], Dict[str, str]], edgecolor: Optional[str] = None,
+                      linestyle: str ='solid', linewidth: float = 1.0) -> None:
     """
     Plot horizontal bars for each device using start_times and end_times.
+
+    :param ax: A Matplotlib Axes object to draw the horizontal bars on.
+    :param data_dict: A dictionary where keys are device names, and values are dictionaries with two lists:
+             - 'end_times': List of signal end times.
+             - 'start_times': List of corresponding start timestamps.
+             Example:
+             {
+                "phone": {"end_times": ["18:20:20"], "start_times": ["11:20:20"]},
+                "watch": {"end_times": ["10:20:00", "12:20:00"], "start_times": ["10:00:00", "12:00:00"]}
+             }
+    :param device_to_index: A mapping assigning each device a vertical index (integer).
+                            This is used to space devices evenly along the y-axis.
+    :param color_map: Used to determine the fill color of each bar.
+    :param edgecolor: Color for the bar edges. Defaults to ``None``.
+    :param linestyle: Style of bar edges (e.g., "solid", "dashed"). Defaults to "solid".
+    :param linewidth:  Width of bar edge lines. Defaults to 1.0.
+    :return: None
     """
     for device, data in data_dict.items():
         i = device_to_index[device]

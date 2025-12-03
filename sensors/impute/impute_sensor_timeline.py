@@ -4,13 +4,22 @@ Functions to detect and reconstruct missing sensor acquisitions.
 Available Functions
 -------------------
 [Public]
-get_missing_data(...): Identify missing acquisition times and durations for each device (except the phone), based on expected daily acquisition patterns.
+get_missing_data(...): Identify missing acquisition times and durations for each device.
+compute_end_times(...): Compute end times by adding durations (in seconds) to corresponding start times.
 -------------------
 
 [Private]
+_convert_str_to_datetime(...): convert string to datetime object
+_convert_datetime_to_str(...): convert datetime object to string
+_get_most_common_acquisition_times(...): Find the four most common acquisition times for a subject by scanning folder names and filtering device data.
+_get_most_common_times(...): Compute the most common acquisition times from a list, with optional adjustment to merge times closer than 20 minutes.
 _has_close_time(...): Check whether a given timestamp is within the tolerance window of another timestamp in a list.
 _get_missing_timestamps(...): Compare expected acquisition times with actual ones to determine which are missing.
 _find_unique_timestamps(...): Extract unique acquisition timestamps across devices (excluding phone), accounting for tolerance in start times.
+_remove_dates(...): Remove date folder names from a folder list, keeping only acquisition time folders.
+_adjust_most_common_times(...): Filter out acquisition times that are too close (< 20 minutes apart), keeping the most frequent ones.
+_get_shift_from_phone_time(...): Gets the shift of the subject based on the start time of the smartphone.
+_filter_shift_times(...): Filter acquisition times to keep only those that fall within the same shift as the provided phone start time.
 -------------------
 """
 
@@ -44,7 +53,7 @@ SHIFTS_END_TIMES = {
     "SECOND": '17-00-00',
     "THIRD":  '20-00-00'
 }
-
+TOLERANCE_CONSECUTIVE_ACQUISITIONS = 2000 # seconds (30 min)
 # ------------------------------------------------------------------------------------------------------------------- #
 # public functions
 # ------------------------------------------------------------------------------------------------------------------- #
@@ -132,7 +141,7 @@ def get_missing_data(subject_folder_path: str, acquisitions_dict: Dict[str, Dict
                         # calculated missing time for it to be
                         if _has_close_time(datetime.strptime(missing_time, TIME_FORMAT),
                                            [datetime.strptime(time, TIME_FORMAT) for time in data[START_TIMES]],
-                                           2000):
+                                           TOLERANCE_CONSECUTIVE_ACQUISITIONS):
 
                             # remove 'fake' missing time from list
                             missing_times_list.remove(missing_time)
@@ -160,7 +169,11 @@ def get_missing_data(subject_folder_path: str, acquisitions_dict: Dict[str, Dict
 
 def compute_end_times(start_times: List[Optional[str]], lengths_seconds: List[float]) -> List[Optional[str]]:
     """
-    Computes end times given start_times and durations in seconds.
+    Compute end times by adding durations (in seconds) to corresponding start times.
+
+    :param start_times: A list of start times as strings
+    :param lengths_seconds: A list of durations in seconds to add to each corresponding start time.
+    :return: A list with the end times.
 
     """
     end_times = []
@@ -180,15 +193,30 @@ def compute_end_times(start_times: List[Optional[str]], lengths_seconds: List[fl
         end_times.append(t_end.strftime(TIME_FORMAT))
 
     return end_times
+
 # ------------------------------------------------------------------------------------------------------------------- #
 # private functions
 # ------------------------------------------------------------------------------------------------------------------- #
 
-def convert_str_to_datetime(time_str: str, time_format: str) -> datetime.time:
+def _convert_str_to_datetime(time_str: str, time_format: str) -> datetime.time:
+    """
+    Convert a time string into a datetime.time object.
+
+    :param time_str: A time value represented as a string.
+    :param time_format: The format pattern used to parse the string.
+    :return: datetime.time object
+    """
     return datetime.strptime(time_str, time_format).time()
 
 
-def convert_datetime_to_str(time: datetime.time, time_format: str):
+def _convert_datetime_to_str(time: datetime, time_format: str) -> str:
+    """
+    Convert a datetime or datetime.time object into a formatted time string.
+
+    :param time: datetime object to be converted.
+    :param time_format: The format string used for conversion.
+    :return: The formatted time string.
+    """
     return time.strftime(time_format)
 
 
@@ -268,6 +296,7 @@ def get_most_common_times(acquisition_times_list, adjust_close_times=False):
 
     return most_common_times
 
+
 def _has_close_time(time: datetime, time_list_dt: List[datetime], tolerance_seconds: int) -> bool:
     """
     Check whether a given timestamp is within the tolerance window of any timestamp in a list.
@@ -293,7 +322,7 @@ def _get_missing_timestamps(unique_timestamps_list: List[datetime], acquisitions
 
     :param unique_timestamps_list: List of datetime objects representing all expected acquisitions.
     :param acquisitions_times_list: List of acquisition start times (string format) for the device.
-    :param tolerance_seconds: Allowed deviation (in seconds) for considering times as equal. Default = 600.
+    :param tolerance_seconds: Allowed deviation (in seconds) for considering times as equal. Default = 600 seconds (10 min).
     :return: List of missing acquisition times (string format, TIME_FORMAT).
     """
 
@@ -361,7 +390,7 @@ def _find_unique_timestamps(acquisitions_dict: Dict[str, Dict[str, list]], toler
     return filtered_timestamps
 
 
-def _remove_dates(folder_list):
+def _remove_dates(folder_list: List[str]) -> List[str]:
     """
     removes date folder names from the folder_list, thus only time folder names are kept.
     :param folder_list: a list containing all sub-folder names for a subject in the database
@@ -376,9 +405,9 @@ def _remove_dates(folder_list):
     return result
 
 
-def _adjust_most_common_times(counter):
+def _adjust_most_common_times(counter: Counter) -> Counter:
     """
-    Filter times that are too close to each other, keeping only those at least 20 minutes apart.
+    Filter times that are too close to each other, keeping only those at least ACQUISITION_TIME_SECONDS apart.
     :param counter: Counter object with times as keys and occurrences as values.
     :return: Counter object with filtered times.
     """
@@ -412,16 +441,21 @@ def _adjust_most_common_times(counter):
     return result_counter
 
 
-def _get_shift_from_phone_time(phone_start_time: str):
+def _get_shift_from_phone_time(phone_start_time: str) -> str:
+    """
+    Identify the shift of a particular subject based on the start time of the smartphone
+    :param phone_start_time: string with the phone start time
+    :return: string with the shift name
+    """
 
-    phone_start_time = convert_str_to_datetime(phone_start_time, TIME_FORMAT)
+    phone_start_time = _convert_str_to_datetime(phone_start_time, TIME_FORMAT)
 
     # iterate through the shift times
     for shift_name, (start_time, end_time) in SHIFTS_START_TIMES.items():
 
         # convert to datetime
-        start_time = convert_str_to_datetime(start_time, TIME_FORMAT)
-        end_time = convert_str_to_datetime(end_time, TIME_FORMAT)
+        start_time = _convert_str_to_datetime(start_time, TIME_FORMAT)
+        end_time = _convert_str_to_datetime(end_time, TIME_FORMAT)
 
         # check if the phone start time is in the shift interval
         if start_time <= phone_start_time <= end_time:
@@ -432,6 +466,16 @@ def _get_shift_from_phone_time(phone_start_time: str):
 
 
 def _filter_shift_times(times_list: List[str], phone_start_time: str) -> List[str]:
+    """
+    Filter acquisition times to keep only those that fall within the same shift as the provided phone start time.
+
+    The function identifies which shift the phone start time belongs to, then obtains the corresponding shift end time.
+    It returns a list of acquisition times (as strings) that lie between the phone start time and that shift's end time.
+
+    :param times_list: A list of acquisition times as strings
+    :param phone_start_time:
+    :return:
+    """
     # init list to store the acquisition times to keep
     valid_times = []
 
@@ -439,23 +483,23 @@ def _filter_shift_times(times_list: List[str], phone_start_time: str) -> List[st
     shift = _get_shift_from_phone_time(phone_start_time)
 
     # convert to dt
-    phone_start_time = convert_str_to_datetime(phone_start_time, TIME_FORMAT)
+    phone_start_time = _convert_str_to_datetime(phone_start_time, TIME_FORMAT)
 
     # get end time from shift
     end_time = SHIFTS_END_TIMES[shift]
-    end_time = convert_str_to_datetime(end_time, TIME_FORMAT)
+    end_time = _convert_str_to_datetime(end_time, TIME_FORMAT)
 
     # iterate through all acquisition times of the week
     for acquisition_time in times_list:
 
         # convert to datetime
-        acquisition_time = convert_str_to_datetime(acquisition_time, TIME_FORMAT)
+        acquisition_time = _convert_str_to_datetime(acquisition_time, TIME_FORMAT)
 
         # check if it's in the interval
         if phone_start_time <= acquisition_time <= end_time:
 
             # convert back to string - fits the remaining functions better
-            acquisition_time = convert_datetime_to_str(acquisition_time, TIME_FORMAT)
+            acquisition_time = _convert_datetime_to_str(acquisition_time, TIME_FORMAT)
 
             # add to valid times
             valid_times.append(acquisition_time)

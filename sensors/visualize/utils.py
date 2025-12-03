@@ -1,3 +1,20 @@
+"""
+Utils for the visualizations functions
+
+Available Functions
+-------------------
+[Class]
+HandlerRefLine(HandlerBase): overrides method in HandleBase for drawing horizontal lines with vertical ticks
+
+-------------------
+[Public]
+get_day_string(...): Gets the day as a string (i.e. Mon, Tue, Wednesday, etc.) from a date string in the language of the defined locale
+
+-------------------
+[Private]
+
+-------------------
+"""
 # ------------------------------------------------------------------------------------------------------------------- #
 # imports
 # ------------------------------------------------------------------------------------------------------------------- #
@@ -44,6 +61,7 @@ class HandlerRefLine(HandlerBase):
 def get_day_string(date_string: str, locale_string: str = "Portuguese_Portugal.1252") -> Tuple[str, str]:
     """
     Gets the day as a string (i.e. Mon, Tue, Wednesday, etc.) from a date string in the language of the defined locale
+
     :param date_string: the date as string. The date should be in the format (year-month-day)
     :param locale_string: string indicating the local for returning the day string in a specific language
     :return: the day of the week as a string
