@@ -9,6 +9,8 @@ CSV = ".csv"
 PHONE = 'phone'
 WATCH = 'watch'
 MBAN = 'mban'
+ANDROID = "ANDROID"
+ANDROID_WEAR = "ANDROID_WEAR"
 
 # ------------------------------------------------------------------------------------------------------------------- #
 # device constants
@@ -57,6 +59,10 @@ AVAILABLE_ANDROID_SENSORS = [ACC, GYR, MAG, HEART, ROT, NOISE]
 
 # definition of time column
 TIME_COLUMN_NAME = 't'
+
+ACQUISITION_TIME_SECONDS = 20*60 # 20 minute acquisitions
+
+TIME_FORMAT = '%H-%M-%S'
 # ------------------------------------------------------------------------------------------------------------------- #
 # MuscleBan constants
 # ------------------------------------------------------------------------------------------------------------------- #

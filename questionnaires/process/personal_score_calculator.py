@@ -11,7 +11,7 @@ from questionnaires.load.questionnaire_loader import load_questionnaire_answers
 from utils import load_json_file, create_dir, get_group_from_path, find_project_root
 from constants import CONFIG_FOLDER_NAME, RESULTS_FOLDER_NAME, CSV
 from questionnaires.process.mappings.questionnaire_mappings import EV_COLUMN_NAMES_MAP, EV_ANSWERS_MAP, AF_NEW_COLUMNS, AF_OLD_COLUMNS, DD_ANSWERS_MAP, \
-    AF_TIME_PAIRS, DD_COLUMN_NAMES_MAP
+    AF_TIME_PAIRS, DD_COLUMN_NAMES_MAP, AF_FINAL_RESULTS_COLUMNS
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # constants
@@ -57,6 +57,9 @@ def calculate_personal_scores(folder_path: str) -> None:
         # it's atividade fisica
         else:
             results_df = _get_atividade_fisica_results(answers_df)
+
+            # keep only the relevant columns
+            results_df = results_df[AF_FINAL_RESULTS_COLUMNS]
 
 
         # set id column to int, set as index of the dataframe, and order

@@ -73,6 +73,9 @@ AF_TIME_PAIRS = [
         ('sentada_fds_horas', 'sentada_fds_minutos'),
     ]
 
+AF_FINAL_RESULTS_COLUMNS = ['id.1', 'horas_trabalho_semana', 'dias_trabalho_semana', 'percentagem_sentado', 'percentagem_pe',
+                            'percentagem_caminhar', 'percentagem_trab_pesado', 'ipaq', 'total_met']
+
 # ------------------------------------------------------------------------------------------------------------------- #
 # Dados Demográficos mappings
 # ------------------------------------------------------------------------------------------------------------------- #

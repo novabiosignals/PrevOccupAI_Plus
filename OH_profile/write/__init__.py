@@ -1,5 +1,6 @@
-from .profile_writer import save_OH_profile
+from .profile_writer import save_OH_profile, write_to_OH_profile
 
 __all__ = [
-    save_OH_profile
+    'save_OH_profile',
+    'write_to_OH_profile'
 ]
