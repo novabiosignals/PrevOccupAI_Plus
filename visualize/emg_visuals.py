@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Sequence
 
 import matplotlib.pyplot as plt
+from matplotlib.axes import Axes
 import numpy as np
 import pandas as pd
 
@@ -154,7 +155,7 @@ def plot_session_effort_grid(
     ensure_parent(output_path)
 
     # Preserve order but limit/pad to the requested number of rows
-    ordered_labels = list(dict.fromkeys(session_labels))
+    ordered_labels: list[str | None] = list(dict.fromkeys(session_labels))
     ordered_labels = ordered_labels[:max_rows]
     while len(ordered_labels) < max_rows:
         ordered_labels.append(None)
@@ -279,7 +280,7 @@ def plot_session_effort_stacks(
             if values is None or sum(values) == 0:
                 text_x = -1 if side == "left" else 101
                 halign = "right" if side == "left" else "left"
-                ax.text(text_x, y_pos, "no data", va="center", ha=halign,
+                ax.text(text_x, float(y_pos), "no data", va="center", ha=halign,
                         fontsize=8, color="#555555")
 
         ax.set_yticks(y_positions)
@@ -300,7 +301,7 @@ def plot_session_effort_stacks(
         label_ax.set_xlim(0, 1)
         label_ax.invert_yaxis()
         for y_pos, label_text in zip(y_positions, ordered_labels):
-            label_ax.text(0.5, y_pos, label_text, ha="center", va="center", fontweight="bold")
+            label_ax.text(0.5, float(y_pos), label_text, ha="center", va="center", fontweight="bold")
     else:
         label_ax.set_xlim(0, 1)
         label_ax.set_ylim(0, 1)
@@ -314,8 +315,7 @@ def plot_session_effort_stacks(
 # -------------------------------------------------------------------------------------------------------------------- #
 # Private Helper Functions
 # -------------------------------------------------------------------------------------------------------------------- #
-
-def _plot_effort_bars(ax: plt.Axes, percentages: list) -> None:
+def _plot_effort_bars(ax: Axes, percentages: list) -> None:
     """
     Render a colored bar chart showing how time is distributed across effort bands.
 
@@ -344,8 +344,7 @@ def _plot_effort_bars(ax: plt.Axes, percentages: list) -> None:
         ax.text(bar.get_x() + bar.get_width() / 2, text_y,
                 label, ha="center", va="bottom", fontsize=8)
 
-
-def _annotate_missing(ax: plt.Axes, message: str) -> None:
+def _annotate_missing(ax: Axes, message: str) -> None:
     """
     Display a neutral message in place of a plot when data is unavailable.
 

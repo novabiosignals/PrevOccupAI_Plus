@@ -30,18 +30,18 @@ def load_opensignals_txt(path: str) -> Tuple[pd.DataFrame, dict, float]:
     :param path: Path to the OpenSignals .txt file.
     :return: Tuple of (dataframe, metadata_dict, sampling_rate).
     """
-    path = Path(path)
+    path_obj = Path(path)
 
     # Find the JSON metadata line (starts with "# {")
     json_line = None
-    with path.open("r", encoding="utf-8", errors="ignore") as handle:
+    with path_obj.open("r", encoding="utf-8", errors="ignore") as handle:
         for line in handle:
             if line.startswith("# {"):
                 json_line = line[1:].strip()
                 break
 
     if json_line is None:
-        raise ValueError(f"Missing metadata header in {path}")
+        raise ValueError(f"Missing metadata header in {path_obj}")
 
     # Parse metadata
     meta_all = json.loads(json_line)
@@ -54,7 +54,7 @@ def load_opensignals_txt(path: str) -> Tuple[pd.DataFrame, dict, float]:
     try:
         fs = float(fs_raw)
     except (TypeError, ValueError):
-        raise ValueError(f"Invalid sampling rate '{fs_raw}' in file {path}")
+        raise ValueError(f"Invalid sampling rate '{fs_raw}' in file {path_obj}")
 
     # Find EMG columns
     emg_indices = [i for i, col in enumerate(columns) if "emg" in str(col).lower()]
@@ -67,7 +67,7 @@ def load_opensignals_txt(path: str) -> Tuple[pd.DataFrame, dict, float]:
 
     # Load data
     df = pd.read_csv(
-        path,
+        path_obj,
         sep="\t",
         comment="#",
         header=None,
@@ -129,7 +129,7 @@ def bandpass_filter(signal: np.ndarray, fs: float, lowcut: float = 10.0,
     nyquist = 0.5 * fs
     low = max(lowcut / nyquist, 0.001)
     high = min(highcut / nyquist, 0.999)
-    b, a = butter(order, [low, high], btype="band")
+    b, a = butter(order, [low, high], btype="band", output="ba")
     return filtfilt(b, a, signal)
 
 
