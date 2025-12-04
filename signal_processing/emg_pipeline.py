@@ -2,22 +2,200 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional, Sequence
+from typing import Dict, List, Optional, Sequence
 
 import numpy as np
 import pandas as pd
 
 from constants import FS_MBAN, MBAN_LEFT, MBAN_RIGHT
-from emg_analysis.metrics import (APDFResult, aggregate_daily_metrics,
-                                  compute_percentage_changes, compute_session_metrics)
-from emg_analysis.preprocessing import preprocess_emg, transfer_emg
-from emg_analysis.visuals import (EFFORT_BANDS, plot_apdf, plot_histogram, plot_metric_series,
-                                  plot_session_effort_grid, plot_session_effort_session_stacks)
+from sensors.metrics.emg_metrics import (EFFORT_BANDS, aggregate_daily_metrics,
+                                         aggregate_weekly_metrics, compute_effort_bins,
+                                         compute_percentage_changes, compute_session_metrics)
+from signal_processing.emg_preprocessing import preprocess_emg, transfer_emg
+from visualize.emg_visuals import (plot_apdf, plot_histogram, plot_metric_series,
+                                   plot_session_effort_grid, plot_session_effort_stacks)
 from sensors.load.data_quality import FileQualityReport, write_quality_report
 from visualize.processing import plot_envelope
 
 from sensors.load.dataset_loader import load_day_acquisitions
 
+# OH profile imports
+from OH_profile.load import get_OH_profile
+from OH_profile.write import save_OH_profile, write_to_OH_profile
+from OH_profile.constants import (
+    SENSOR_METRICS_KEY, EMG_KEY,
+    EMG_DURATION_S_KEY, EMG_MEAN_PERCENT_MVC_KEY, EMG_MAX_PERCENT_MVC_KEY,
+    EMG_MIN_PERCENT_MVC_KEY, EMG_IEMG_PERCENT_SECONDS_KEY, EMG_MVC_PEAK_KEY,
+    EMG_APDF_P10_KEY, EMG_APDF_P50_KEY, EMG_APDF_P90_KEY,
+    EMG_EFFORT_LOW_PCT_KEY, EMG_EFFORT_MODERATE_PCT_KEY, EMG_EFFORT_HIGH_PCT_KEY,
+    EMG_EFFORT_OVER100_PCT_KEY, EMG_EFFORT_LOW_MIN_KEY, EMG_EFFORT_MODERATE_MIN_KEY,
+    EMG_EFFORT_HIGH_MIN_KEY, EMG_EFFORT_OVER100_MIN_KEY,
+    EMG_DAILY_AGGREGATE_KEY, EMG_WEEKLY_AGGREGATE_KEY,
+    EMG_SESSION_COUNT_KEY, EMG_DAY_COUNT_KEY,
+)
+
+
+# -------------------------------------------------------------------------------------------------------------------- #
+# OH Profile Helper Functions
+# -------------------------------------------------------------------------------------------------------------------- #
+
+def _build_session_metrics_dict(row: pd.Series) -> Dict[str, any]:
+    """Build a dictionary of EMG metrics for a single session using OH profile constants."""
+    return {
+        EMG_DURATION_S_KEY: row["duration_s"],
+        EMG_MEAN_PERCENT_MVC_KEY: row["mean_percent_mvc"],
+        EMG_MAX_PERCENT_MVC_KEY: row["max_percent_mvc"],
+        EMG_MIN_PERCENT_MVC_KEY: row["min_percent_mvc"],
+        EMG_IEMG_PERCENT_SECONDS_KEY: row["iemg_percent_seconds"],
+        EMG_MVC_PEAK_KEY: row.get("mvc_peak", 0.0),
+        EMG_APDF_P10_KEY: row["apdf_p10"],
+        EMG_APDF_P50_KEY: row["apdf_p50"],
+        EMG_APDF_P90_KEY: row["apdf_p90"],
+        EMG_EFFORT_LOW_PCT_KEY: row.get("effort_low_pct", 0.0),
+        EMG_EFFORT_MODERATE_PCT_KEY: row.get("effort_moderate_pct", 0.0),
+        EMG_EFFORT_HIGH_PCT_KEY: row.get("effort_high_pct", 0.0),
+        EMG_EFFORT_OVER100_PCT_KEY: row.get("effort_over100_pct", 0.0),
+        EMG_EFFORT_LOW_MIN_KEY: row.get("effort_low_min", 0.0),
+        EMG_EFFORT_MODERATE_MIN_KEY: row.get("effort_moderate_min", 0.0),
+        EMG_EFFORT_HIGH_MIN_KEY: row.get("effort_high_min", 0.0),
+        EMG_EFFORT_OVER100_MIN_KEY: row.get("effort_over100_min", 0.0),
+    }
+
+
+def _build_daily_aggregate_dict(row: pd.Series) -> Dict[str, any]:
+    """Build a dictionary of aggregated daily EMG metrics using OH profile constants."""
+    return {
+        EMG_SESSION_COUNT_KEY: int(row.get("session_count", 0)),
+        EMG_DURATION_S_KEY: row.get("duration_s", 0.0),
+        EMG_MEAN_PERCENT_MVC_KEY: row["mean_percent_mvc"],
+        EMG_MAX_PERCENT_MVC_KEY: row["max_percent_mvc"],
+        EMG_MIN_PERCENT_MVC_KEY: row["min_percent_mvc"],
+        EMG_IEMG_PERCENT_SECONDS_KEY: row["iemg_percent_seconds"],
+        EMG_APDF_P10_KEY: row["apdf_p10"],
+        EMG_APDF_P50_KEY: row["apdf_p50"],
+        EMG_APDF_P90_KEY: row["apdf_p90"],
+        EMG_EFFORT_LOW_PCT_KEY: row.get("effort_low_pct", 0.0),
+        EMG_EFFORT_MODERATE_PCT_KEY: row.get("effort_moderate_pct", 0.0),
+        EMG_EFFORT_HIGH_PCT_KEY: row.get("effort_high_pct", 0.0),
+        EMG_EFFORT_OVER100_PCT_KEY: row.get("effort_over100_pct", 0.0),
+        EMG_EFFORT_LOW_MIN_KEY: row.get("effort_low_min", 0.0),
+        EMG_EFFORT_MODERATE_MIN_KEY: row.get("effort_moderate_min", 0.0),
+        EMG_EFFORT_HIGH_MIN_KEY: row.get("effort_high_min", 0.0),
+        EMG_EFFORT_OVER100_MIN_KEY: row.get("effort_over100_min", 0.0),
+    }
+
+
+def _build_weekly_aggregate_dict(row: pd.Series) -> Dict[str, any]:
+    """Build a dictionary of aggregated weekly EMG metrics using OH profile constants."""
+    return {
+        EMG_DAY_COUNT_KEY: int(row.get("day_count", 0)),
+        EMG_DURATION_S_KEY: row.get("duration_s", 0.0),
+        EMG_MEAN_PERCENT_MVC_KEY: row["mean_percent_mvc"],
+        EMG_MAX_PERCENT_MVC_KEY: row["max_percent_mvc"],
+        EMG_MIN_PERCENT_MVC_KEY: row["min_percent_mvc"],
+        EMG_IEMG_PERCENT_SECONDS_KEY: row["iemg_percent_seconds"],
+        EMG_APDF_P10_KEY: row["apdf_p10"],
+        EMG_APDF_P50_KEY: row["apdf_p50"],
+        EMG_APDF_P90_KEY: row["apdf_p90"],
+        EMG_EFFORT_LOW_PCT_KEY: row.get("effort_low_pct", 0.0),
+        EMG_EFFORT_MODERATE_PCT_KEY: row.get("effort_moderate_pct", 0.0),
+        EMG_EFFORT_HIGH_PCT_KEY: row.get("effort_high_pct", 0.0),
+        EMG_EFFORT_OVER100_PCT_KEY: row.get("effort_over100_pct", 0.0),
+        EMG_EFFORT_LOW_MIN_KEY: row.get("effort_low_min", 0.0),
+        EMG_EFFORT_MODERATE_MIN_KEY: row.get("effort_moderate_min", 0.0),
+        EMG_EFFORT_HIGH_MIN_KEY: row.get("effort_high_min", 0.0),
+        EMG_EFFORT_OVER100_MIN_KEY: row.get("effort_over100_min", 0.0),
+    }
+
+
+def _build_emg_profile_structure(
+    session_df: pd.DataFrame,
+    daily_df: pd.DataFrame,
+    weekly_df: pd.DataFrame,
+) -> Dict[str, any]:
+    """Build the nested EMG structure for a subject's OH profile.
+
+    Structure: date → session → side → metrics
+               date → daily_aggregate → side → metrics
+               weekly_aggregate → week_N → side → metrics
+    """
+    emg_structure: Dict[str, any] = {}
+
+    # Build session-level data: date → session → side → metrics
+    for _, row in session_df.iterrows():
+        date = str(row["date"])
+        session = str(row["session_label"])
+        side = str(row["side"])
+
+        if date not in emg_structure:
+            emg_structure[date] = {}
+        if session not in emg_structure[date]:
+            emg_structure[date][session] = {}
+
+        emg_structure[date][session][side] = _build_session_metrics_dict(row)
+
+    # Build daily aggregates: date → daily_aggregate → side → metrics
+    for _, row in daily_df.iterrows():
+        date = str(row["date"])
+        side = str(row["side"])
+
+        if date not in emg_structure:
+            emg_structure[date] = {}
+        if EMG_DAILY_AGGREGATE_KEY not in emg_structure[date]:
+            emg_structure[date][EMG_DAILY_AGGREGATE_KEY] = {}
+
+        emg_structure[date][EMG_DAILY_AGGREGATE_KEY][side] = _build_daily_aggregate_dict(row)
+
+    # Build weekly aggregates: weekly_aggregate → week_N → side → metrics
+    if not weekly_df.empty:
+        emg_structure[EMG_WEEKLY_AGGREGATE_KEY] = {}
+        for _, row in weekly_df.iterrows():
+            week = str(row["week"])
+            side = str(row["side"])
+
+            if week not in emg_structure[EMG_WEEKLY_AGGREGATE_KEY]:
+                emg_structure[EMG_WEEKLY_AGGREGATE_KEY][week] = {}
+
+            emg_structure[EMG_WEEKLY_AGGREGATE_KEY][week][side] = _build_weekly_aggregate_dict(row)
+
+    return emg_structure
+
+
+def _save_emg_to_oh_profiles(
+    session_df: pd.DataFrame,
+    daily_df: pd.DataFrame,
+    weekly_df: pd.DataFrame,
+    oh_profiles_path: str,
+) -> None:
+    """Save EMG metrics to OH profiles for each subject.
+
+    :param session_df: DataFrame with per-session metrics.
+    :param daily_df: DataFrame with daily aggregated metrics.
+    :param weekly_df: DataFrame with weekly aggregated metrics.
+    :param oh_profiles_path: Path to OH profiles folder.
+    """
+    subjects = session_df["subject_id"].unique()
+    for subject_id in subjects:
+        subject_id_str = str(subject_id)
+
+        # Filter data for this subject
+        subj_session_df = session_df[session_df["subject_id"] == subject_id]
+        subj_daily_df = daily_df[daily_df["subject_id"] == subject_id]
+        subj_weekly_df = weekly_df[weekly_df["subject_id"] == subject_id] if not weekly_df.empty else pd.DataFrame()
+
+        # Build the nested EMG structure
+        emg_structure = _build_emg_profile_structure(subj_session_df, subj_daily_df, subj_weekly_df)
+
+        # Load, update, and save OH profile
+        oh_profile = get_OH_profile(oh_profiles_path, subject_id_str)
+        oh_profile = write_to_OH_profile(oh_profile, SENSOR_METRICS_KEY, EMG_KEY, emg_structure)
+        save_OH_profile(oh_profiles_path, subject_id_str, oh_profile)
+        print(f"[emg_pipeline] Saved OH profile for subject {subject_id_str}")
+
+
+# -------------------------------------------------------------------------------------------------------------------- #
+# Pipeline Configuration and Main Functions
+# -------------------------------------------------------------------------------------------------------------------- #
 
 @dataclass(slots=True)
 class PreprocessConfig:
@@ -44,6 +222,7 @@ def run_emg_pipeline(
     percentiles: Sequence[int] = (10, 50, 90),
     generate_visuals: bool = True,
     quality_log: Optional[List[FileQualityReport]] = None,
+    oh_profiles_path: str | None = None,
 ) -> Dict[str, Path]:
     """Process every subject/day descriptor and persist metrics + visuals.
 
@@ -55,6 +234,8 @@ def run_emg_pipeline(
     :param percentiles: Amplitude percentiles to compute for the APDF summary table.
     :param generate_visuals: Skip plot rendering when ``False`` to shorten quick test cycles.
     :param quality_log: Optional list that is populated with :class:`FileQualityReport` objects for bad files.
+    :param oh_profiles_path: Optional path to OH profiles folder. If provided, EMG metrics
+                             will be saved to each subject's OH profile JSON.
     :returns: Dict that names each artifact (e.g. ``session_metrics``) and where it lives on disk.
     """
 
@@ -98,6 +279,13 @@ def run_emg_pipeline(
 
     tables = _build_tables(session_metrics)
     _write_tables(tables, results_root)
+
+    # Save to OH profiles if path is provided
+    if oh_profiles_path:
+        session_df = tables["session_metrics"]
+        daily_df = tables["daily_metrics"]
+        weekly_df = tables.get("weekly_metrics", pd.DataFrame())
+        _save_emg_to_oh_profiles(session_df, daily_df, weekly_df, oh_profiles_path)
 
     if generate_visuals:
         _plot_metric_trends(tables, plots_root)
@@ -320,7 +508,7 @@ def _save_session_visuals(
     raw_mv: np.ndarray,
     envelope_mv: np.ndarray,
     percent_signal: np.ndarray,
-    apdf: APDFResult,
+    apdf: dict,
     config: PreprocessConfig,
     metadata: dict,
 ) -> None:
@@ -333,7 +521,7 @@ def _save_session_visuals(
     :param raw_mv: Raw EMG trace sampled at :attr:`PreprocessConfig.fs`.
     :param envelope_mv: Smoothed/enveloped EMG amplitude in millivolts.
     :param percent_signal: Envelope normalized to MVC (used when plotting envelope preview).
-    :param apdf: Tuple containing APDF arrays + percentile lookups.
+    :param apdf: Dictionary containing APDF arrays + percentile lookups (keys: probs, amplitudes, percentiles).
     :param config: Preprocessing configuration (needed for preview duration).
     :param metadata: Extra context such as ``side`` used in folder naming.
     """
@@ -343,7 +531,7 @@ def _save_session_visuals(
     session_dir.mkdir(parents=True, exist_ok=True)
     title = f"{day['subject_id']} | {side} | {day['date_label']} {session_label}"
     plot_apdf(apdf, session_dir / f"{session_label}_apdf.png", title)
-    plot_histogram(apdf.amplitudes, session_dir / f"{session_label}_hist.png", f"Histogram – {title}")
+    plot_histogram(apdf["amplitudes"], session_dir / f"{session_label}_hist.png", f"Histogram – {title}")
 
     preview_samples = min(len(raw_mv), int(config.fs * config.envelope_preview_seconds))
     if preview_samples > 0:
@@ -372,7 +560,7 @@ def _save_day_visuals(
         day_dir / "effort_distribution.png",
         f"{day['subject_id']} – {day['date_label']}",
     )
-    plot_session_effort_session_stacks(
+    plot_session_effort_stacks(
         payloads,
         session_labels,
         day_dir / "effort_sessions.png",
@@ -384,11 +572,13 @@ def _build_tables(session_metrics: List[dict]) -> Dict[str, pd.DataFrame]:
     """Convert raw session dictionaries into tidy DataFrames with aggregates/deltas.
 
     :param session_metrics: List of per-session metric dicts returned by ``compute_session_metrics``.
-    :returns: Dict with four DataFrames (sessions, daily aggregates, and two change tables).
+    :returns: Dict with DataFrames (sessions, daily/weekly aggregates, and change tables).
     """
 
     session_df = pd.DataFrame(session_metrics)
-    value_cols = [
+
+    # Columns to average in daily aggregation
+    mean_value_cols = [
         "iemg_percent_seconds",
         "mean_percent_mvc",
         "max_percent_mvc",
@@ -396,9 +586,42 @@ def _build_tables(session_metrics: List[dict]) -> Dict[str, pd.DataFrame]:
         "apdf_p10",
         "apdf_p50",
         "apdf_p90",
+        "effort_low_pct",
+        "effort_moderate_pct",
+        "effort_high_pct",
+        "effort_over100_pct",
     ]
 
-    daily_df = aggregate_daily_metrics(session_df, value_cols)
+    # Columns to sum in daily aggregation
+    sum_value_cols = [
+        "duration_s",
+        "effort_low_min",
+        "effort_moderate_min",
+        "effort_high_min",
+        "effort_over100_min",
+    ]
+
+    # Filter to only columns that exist in session_df
+    all_daily_cols = [c for c in mean_value_cols + sum_value_cols if c in session_df.columns]
+    sum_cols_present = [c for c in sum_value_cols if c in session_df.columns]
+
+    daily_df = aggregate_daily_metrics(session_df, all_daily_cols, sum_columns=sum_cols_present)
+
+    # Weekly aggregation
+    weekly_sum_cols = ["duration_s", "iemg_percent_seconds",
+                       "effort_low_min", "effort_moderate_min",
+                       "effort_high_min", "effort_over100_min"]
+    weekly_mean_cols = ["mean_percent_mvc", "max_percent_mvc", "min_percent_mvc",
+                        "apdf_p10", "apdf_p50", "apdf_p90",
+                        "effort_low_pct", "effort_moderate_pct",
+                        "effort_high_pct", "effort_over100_pct"]
+
+    # Filter to columns that exist in daily_df
+    weekly_sum_cols = [c for c in weekly_sum_cols if c in daily_df.columns]
+    weekly_mean_cols = [c for c in weekly_mean_cols if c in daily_df.columns]
+
+    weekly_df = aggregate_weekly_metrics(daily_df, weekly_sum_cols, weekly_mean_cols)
+
     session_increments = compute_percentage_changes(
         session_df,
         group_cols=["subject_id", "side", "date"],
@@ -417,6 +640,7 @@ def _build_tables(session_metrics: List[dict]) -> Dict[str, pd.DataFrame]:
     return {
         "session_metrics": session_df,
         "daily_metrics": daily_df,
+        "weekly_metrics": weekly_df,
         "session_increments": session_increments,
         "daily_increments": daily_increments,
     }
@@ -495,7 +719,7 @@ def _record_effort_bins(
     :param fs: Sampling frequency so minutes can be derived from sample counts.
     """
 
-    minutes, percentages = _compute_effort_bins(percent_signal, fs)
+    minutes, percentages = compute_effort_bins(percent_signal, fs)
     labels = [band[2] for band in EFFORT_BANDS] + [">100%"]
     record = {
         "subject_id": metadata.get("subject_id"),
@@ -515,36 +739,6 @@ def _record_effort_bins(
         total_minutes += minutes_value
     record["total_minutes"] = total_minutes
     effort_records.append(record)
-
-
-def _compute_effort_bins(amplitudes: np.ndarray, fs: float | None) -> tuple[list[float], list[float]]:
-    """Return absolute time (minutes) and relative time (%) spent inside each effort band.
-
-    :param amplitudes: Percent-MVC signal covering a session.
-    :param fs: Sampling frequency (Hz) to convert counts to minutes; can be ``None`` for raw counts.
-    :returns: Tuple ``(minutes_per_band, percentages_per_band)`` with overflow bin appended.
-    """
-
-    arr = np.asarray(amplitudes).flatten()
-    counts: List[int] = []
-    for lower, upper, _label in EFFORT_BANDS:
-        mask = (arr >= lower) & (arr < upper)
-        if upper == EFFORT_BANDS[-1][1]:
-            mask = (arr >= lower) & (arr <= upper)
-        counts.append(int(np.count_nonzero(mask)))
-
-    overflow_mask = arr > EFFORT_BANDS[-1][1]
-    counts.append(int(np.count_nonzero(overflow_mask)))
-
-    total_samples = float(arr.size) if arr.size else 1.0
-
-    if fs and fs > 0:
-        minutes = [count / fs / 60 for count in counts]
-    else:
-        minutes = [float(count) for count in counts]
-
-    percentages = [(count / total_samples) * 100 for count in counts]
-    return minutes, percentages
 
 
 def _normalize_band_label(label: str) -> str:

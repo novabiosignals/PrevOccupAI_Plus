@@ -13,11 +13,12 @@ from signal_processing import PreprocessConfig, run_emg_pipeline
 # ------------------------------------------------------------------------------------------------------------------- #
 # Configuration
 # ------------------------------------------------------------------------------------------------------------------- #
-DATA_ROOT = Path(r"C:\Users\gonba\PrevOccupAI_plus_Data\data")
+DATA_ROOT = Path(r"/Volumes/USB DISK/PrevOccupAI_plus_Data/data")
 PARTICIPANTS_CSV = Path("participants_info.csv")
 SELECTED_SENSORS = {MBAN: ["EMG"]}
-RESULTS_ROOT = Path("results") / "emg_pipeline"
+RESULTS_ROOT = Path(r"/Volumes/USB DISK/PrevOccupAI_plus_Data/results") / "emg_pipeline"
 PLOTS_ROOT = RESULTS_ROOT / "plots"
+OH_PROFILES_ROOT = Path(r"/Volumes/USB DISK/PrevOccupAI_plus_Data/OH_profiles")  # Optional: set to None to disable OH profile saving
 DEFAULT_CONFIG = PreprocessConfig()
 
 
@@ -68,6 +69,7 @@ def main(
     subject_filter: Sequence[str] | None = None,
     max_subjects: int | None = None,
     max_days_per_subject: int | None = None,
+    save_oh_profiles: bool = True,
 ):
     """Coordinate dataset discovery, preprocessing, and visualization stages.
 
@@ -81,6 +83,7 @@ def main(
     :param subject_filter: Optional whitelist of subject identifiers to include.
     :param max_subjects: Upper bound for subject count, handy for quick subset checks.
     :param max_days_per_subject: Upper bound for day folders per subject.
+    :param save_oh_profiles: Whether to save EMG metrics to OH profile JSON files.
     :returns: Mapping of artifact labels to filesystem paths for anything produced by the run.
     """
 
@@ -102,6 +105,10 @@ def main(
 
     print("[main_emg] Starting EMG pipeline...")
     quality_reports: list[FileQualityReport] = []
+
+    # Determine OH profiles path
+    oh_profiles_path = str(OH_PROFILES_ROOT) if save_oh_profiles and OH_PROFILES_ROOT else None
+
     artifacts = run_emg_pipeline(
         descriptors,
         selected_sensors=SELECTED_SENSORS,
@@ -110,6 +117,7 @@ def main(
         config=DEFAULT_CONFIG,
         generate_visuals=visualize,
         quality_log=quality_reports,
+        oh_profiles_path=oh_profiles_path,
     )
 
     print("[main_emg] Pipeline finished. Artifacts:")

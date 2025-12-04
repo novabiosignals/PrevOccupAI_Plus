@@ -3,6 +3,7 @@ from .data_sensor_timeline import load_data_from_same_recording
 from .parser import get_device_filename_timestamp
 from .logger_file_loader import load_logger_file_info, check_logger_file
 from .subject_info import load_participants_info, get_muscleban_side, get_participant_id
+from .emg_filesystem import discover_session_bundles, get_session_key
 
 __all__ = ['load_daily_acquisitions',
            'load_data_from_same_recording',
@@ -11,4 +12,6 @@ __all__ = ['load_daily_acquisitions',
            'load_participants_info',
            'get_muscleban_side',
            'check_logger_file',
-           'get_participant_id']
+           'get_participant_id',
+           'discover_session_bundles',
+           'get_session_key']

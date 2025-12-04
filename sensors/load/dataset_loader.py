@@ -7,7 +7,7 @@ import pandas as pd
 
 from constants import MBAN
 from .meta_data import load_meta_data
-from .raw_data_loader import load_daily_acquisitions
+from .daily_data_loader import load_daily_acquisitions
 from .data_quality import FileQualityReport
 
 
