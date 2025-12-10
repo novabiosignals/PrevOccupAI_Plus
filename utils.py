@@ -5,6 +5,7 @@ import json
 from typing import Dict, Any, Optional
 import os
 import re
+import glob
 from pathlib import Path
 
 # ------------------------------------------------------------------------------------------------------------------- #
@@ -123,3 +124,21 @@ def extract_date_from_path(folder_path: str) -> Optional[str]:
 
     else:
         return None
+
+
+def has_matching_json(oh_profile_path: str, subject_id: str) -> bool:
+    """
+    Check whether a directory contains at least one JSON file whose name includes a given subject ID.
+
+    :param oh_profile_path: Path to the directory in which to search for JSON files.
+    :param subject_id: Substring to match within JSON filenames.
+    :return: True if at least one matching JSON file is found; False otherwise.
+    """
+
+    # Build a pattern like:  /path/to/dir/*subject_id*.json
+    pattern = os.path.join(oh_profile_path, f"*{subject_id}*.json")
+
+    # get a list of matching file paths
+    matches = glob.glob(pattern)
+
+    return len(matches) > 0

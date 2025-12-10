@@ -10,7 +10,7 @@ import glob
 from utils import load_json_file, create_dir, get_group_from_path, find_project_root
 from questionnaires.load.questionnaire_loader import load_questionnaire_answers
 from questionnaires.process.json_parser import get_questionnaire_name_from_json
-from constants import CONFIG_FOLDER_NAME, RESULTS_FOLDER_NAME, CSV, AMBIENTE, PSICOSSOCIAL
+from constants import CONFIG_FOLDER_NAME, RESULTS_FOLDER_NAME, CSV, ENVIRONMENT, PSYCHOSOCIAL
 
 # ------------------------------------------------------------------------------------------------------------------- #
 # constants
@@ -228,6 +228,9 @@ def calculate_linear_scores(folder_path: str, domain: str, output_folder_path: s
     # concat dataframes horizontally to have all psicossocial/ambiente questionnaires
     final_df = pd.concat(list_dfs, axis=1)
 
+    # fill NaN values with 0
+    final_df.fillna(0, inplace=True)
+
     # save dataframe into a csv file
     folder_path = create_dir(find_project_root(), os.path.join(output_folder_path, get_group_from_path(folder_path)))
     final_df.to_csv(os.path.join(folder_path, f"results_{domain}{CSV}"))
@@ -271,7 +274,7 @@ def _calculate_scores(domain:str, results_df: pd.DataFrame, calculation_method: 
         # calculate the mean of all values per row and normalize
         scores_series = results_df.mean(axis=1)
 
-        if domain == AMBIENTE:
+        if domain == ENVIRONMENT:
 
             # normalize
             scores_series_norm = ((scores_series - min(values)) / (max_value - min(values))).round(2)
@@ -423,7 +426,7 @@ def _get_all_psicossocial_results(folder_path: str) -> pd.DataFrame:
         for questionnaire_file in os.listdir(os.path.join(folder_path, group_folder)):
 
             # filter only the psicossocial questionnaires
-            if PSICOSSOCIAL in questionnaire_file:
+            if PSYCHOSOCIAL in questionnaire_file:
 
                 # get full path to the csv file
                 file_path = os.path.join(folder_path, group_folder, questionnaire_file)

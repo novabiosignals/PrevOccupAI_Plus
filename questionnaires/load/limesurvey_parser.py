@@ -4,7 +4,7 @@
 import pandas as pd
 import os
 
-from constants import CSV, QUESTIONNAIRE_DOMAINS, AMBIENTE, PSICOSSOCIAL, CONFIG_FOLDER_NAME, WORKLOAD
+from constants import CSV, QUESTIONNAIRE_DOMAINS, ENVIRONMENT, PSYCHOSOCIAL, CONFIG_FOLDER_NAME, WORKLOAD
 from utils import create_dir, load_json_file, find_project_root
 import sensors.load as sl
 
@@ -38,7 +38,7 @@ def generate_questionnaires_dataset(file_paths_dir: str, output_folder_path: str
             config_dict = load_json_file(os.path.join(find_project_root(), 'questionnaires', 'process', CONFIG_FOLDER_NAME, f"cfg_{domain.lower()}.json"))
 
             # if domain is psicossocial or ambiente json is configured slightly different
-            if domain == PSICOSSOCIAL or domain == AMBIENTE:
+            if domain == PSYCHOSOCIAL or domain == ENVIRONMENT:
 
                 # get list with ids
                 survey_ids_list = [questionnaire["id"] for questionnaire in config_dict.values()]

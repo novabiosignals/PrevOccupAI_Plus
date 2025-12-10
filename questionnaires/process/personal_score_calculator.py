@@ -31,10 +31,10 @@ def calculate_personal_scores(folder_path: str, output_folder_path: str) -> None
 
     # load results_questionnaires for all domain questionnaires into a dictionary
     # (keys: questionnaire id, values: dataframe with the results_questionnaires)
-    results_dict = load_questionnaire_answers(folder_path, domain="pessoais")
+    results_dict = load_questionnaire_answers(folder_path, domain="personal")
 
     # load config json file
-    config_dict = load_json_file(os.path.join(Path(__file__).parent, CONFIG_FOLDER_NAME, "cfg_pessoais.json"))
+    config_dict = load_json_file(os.path.join(Path(__file__).parent, CONFIG_FOLDER_NAME, "cfg_personal.json"))
 
     for questionnaire_id, answers_df in results_dict.items():
 
@@ -75,9 +75,12 @@ def calculate_personal_scores(folder_path: str, output_folder_path: str) -> None
     # concat dataframes horizontally to have all personal questionnaires
     final_df = pd.concat(list_dfs, axis=1)
 
+    # fill NaN values with 0
+    final_df.fillna(0, inplace=True)
+
     # save dataframe into a csv file
     folder_path = create_dir(find_project_root(), os.path.join(output_folder_path, get_group_from_path(folder_path)))
-    final_df.to_csv(os.path.join(folder_path, f"results_pessoais{CSV}"))
+    final_df.to_csv(os.path.join(folder_path, f"results_personal{CSV}"))
 
 
 # -------------------------------------------------------------------------------------------------------------------- #
