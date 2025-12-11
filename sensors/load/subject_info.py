@@ -82,5 +82,5 @@ def get_ids_per_group(participants_info_df: pd.DataFrame, group: str) -> List[st
     # Filter rows by group
     filtered = participants_info_df[participants_info_df["group"].astype(str) == str(group)]
 
-    # Extract subject_id column and convert each to string
-    return filtered["subject_id"].astype(str).tolist()
+    # Extract index values (subject_ids) and convert each to string
+    return filtered.index.astype(str).tolist()

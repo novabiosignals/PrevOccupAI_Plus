@@ -159,7 +159,7 @@ def _get_incapacidade_dor_results(results_df: pd.DataFrame) -> pd.DataFrame:
     for col in df.columns:
 
         # if column name has 'incapacidade' or 'sofrimento'
-        if 'incapacidade' in col or 'sofrimento' in col:
+        if 'incapacidade' in col.lower() or 'sofrimento' in col.lower() or 'intensidade' in col.lower():
 
             # clean answers
             df[col] = df[col].replace(ID_ANSWERS_MAP["incapacidade_sofrimento"])

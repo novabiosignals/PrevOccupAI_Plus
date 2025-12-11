@@ -37,7 +37,11 @@ WRIST_KEY = 'wrist_activities'
 # -------------------------------------------------------------------------------------------------------------------- #
 # SINGLE-INSTANCE QUESTIONNAIRES SUB-KEYS
 # -------------------------------------------------------------------------------------------------------------------- #
+PSYCHOSOCIAL_COPSOQ_WORK_TYPE_KEY = 'copsoq_work_type'
+PSYCHOSOCIAL_COPSOQ_POPULATION_KEY = 'copsoq_population'
 
+PSYCHOSOCIAL_MUEQ_WORK_TYPE_KEY = 'mueq_work_type'
+PSYCHOSOCIAL_MUEQ_POPULATION_KEY = 'mueq_population'
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # DAILY QUESTIONNAIRES SUB-KEYS

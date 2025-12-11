@@ -218,7 +218,7 @@ def calc_a_score(df: pd.DataFrame, pure_rosa: bool) -> pd.DataFrame:
         df = df[['id.1', 'score_a_normalized']]
 
         # rename scores column name
-        df.rename(columns={"score_a_normalized": "cadeira_adapted"})
+        df = df.rename(columns={"score_a_normalized": "cadeira_adapted"})
 
     return df
 

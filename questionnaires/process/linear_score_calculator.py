@@ -10,7 +10,7 @@ import glob
 from utils import load_json_file, create_dir, get_group_from_path, find_project_root
 from questionnaires.load.questionnaire_loader import load_questionnaire_answers
 from questionnaires.process.json_parser import get_questionnaire_name_from_json
-from constants import CONFIG_FOLDER_NAME, RESULTS_FOLDER_NAME, CSV, ENVIRONMENT, PSYCHOSOCIAL
+from constants import CONFIG_FOLDER_NAME, CSV, ENVIRONMENT, PSYCHOSOCIAL, WORK_TYPE, POPULATION
 
 # ------------------------------------------------------------------------------------------------------------------- #
 # constants
@@ -27,118 +27,35 @@ VALORES = 'Valores no Local de Trabalho.csv'
 PSICOSSOCIAL_QUESTIONNAIRES = [BEM_ESTAR, EXIGENCIAS, ORGANIZACAO, RELACOES, VALORES]
 
 NON_COPSOQ_COLUMNS = ['Autonomia', 'Qualidade das Pausas']
-ALL= 'all'
-ATENDIMENTO = 'atendimento'
+
 # ------------------------------------------------------------------------------------------------------------------- #
 # public functions
 # ------------------------------------------------------------------------------------------------------------------- #
 
-def calculate_copsoq_mean_scores(folder_path, average_method: str, output_folder_path: str) -> None:
+def get_psychosocial_scores(folder_path: str, average_method: str, output_folder_path: str) -> None:
     """
-    Calculate pure copsoq scores. This function assumes that the psicossocial results_questionnaires have already been obtained for
-    all groups. There are two averaging methods available.
-    - 'all': obtains the copsoq scores by calculating the mean scores over all subjects
-    - 'atendimento': obtains the copsoq scores by calculating the mean scores over front and back office subjects
+     Loads psychosocial questionnaire results for all subjects, separates COPSOQ and MUEQ
+    questionnaire data, computes their mean scores, and saves the results.
 
-    Saves the results_questionnaires in a csv file.
-
-    :param folder_path: Path to the folder containing the questionnaire results_questionnaires for all groups.
-    :param average_method: Average method to be used for calculating the copsoq scores. Supported methods: 'all' and 'mean'
+    :param folder_path: Path to the folder containing the raw psychosocial questionnaire result files for all subjects.
+    :param average_method: Average method to be used for calculating the copsoq scores. Supported methods: 'all', 'atendimento'
+    :param output_folder_path: Path to the folder where the scores will be saved.
     :return: None
     """
-
     # get dataframe with the psicossocial results_questionnaires for all subjects
     all_results_df = _get_all_psicossocial_results(folder_path)
 
-    # drop non-copsoq columns
-    all_results_df = all_results_df.drop(columns=NON_COPSOQ_COLUMNS, errors='ignore')
+    # get only COPSOQ dataframe
+    all_copsoq_df = all_results_df.drop(columns=NON_COPSOQ_COLUMNS, errors='ignore')
 
-    if average_method == ALL:
+    # get only MUEQ dataframe and id.1 column
+    all_mueq_df = all_results_df[NON_COPSOQ_COLUMNS + ["id.1"]]
 
-        # drop id column
-        all_results_df = all_results_df.drop(columns=['id.1'], errors='ignore')
+    # calculate COPSOQ scores
+    _calculate_mean_scores(all_copsoq_df, 'COPSOQ', average_method, output_folder_path)
 
-        copsoq_df = pd.DataFrame([all_results_df.mean().round(2)], index = ['mean'])
-
-    # it's average by atendimento
-    elif average_method == ATENDIMENTO:
-
-        # load subject info
-        subjects_info_df = pd.read_csv((os.path.join(find_project_root(), 'participants_info.csv')), sep=';')
-
-        # get list with subject ids for Front/Back office
-        fo_subjects = subjects_info_df.loc[subjects_info_df['atendimento'] == 'FO', 'subject_id'].tolist()
-        bo_subjects = subjects_info_df.loc[subjects_info_df['atendimento'] == 'BO', 'subject_id'].tolist()
-
-        # Filter all_results_df for FO/BO subjects
-        fo_df = all_results_df[all_results_df['id.1'].isin(fo_subjects)].copy()
-        bo_df = all_results_df[all_results_df['id.1'].isin(bo_subjects)].copy()
-
-        # drop id columns
-        fo_df = fo_df.drop(columns=['id.1'], errors='ignore')
-        bo_df = bo_df.drop(columns=['id.1'], errors='ignore')
-
-        # calculate statistics and save in a dataframe
-        copsoq_df = pd.DataFrame([fo_df.mean().round(2), bo_df.mean().round(2)], index=['mean_FO', 'mean_BO'])
-
-    else:
-        raise ValueError(f"The following average method is not supported. \nSupported methods are 'all' and 'atendimento'")
-    # save dataframe into a csv file
-    folder_path = create_dir(output_folder_path,COPSOQ_RESULTS_FOLDER)
-    copsoq_df.to_csv(os.path.join(folder_path, f"results_copsoq_{average_method}{CSV}"))
-
-
-def calculate_copsoq_scores(folder_path: str) -> pd.DataFrame:
-
-    # init lists to hold the column names of all questionnaires and the sums of the columns
-    column_names_list = []
-    list_sums_total = []
-
-    # init counter for the total nuber of subjects
-    total_subjects = 0
-
-    for q_index, questionnaire_name in enumerate(PSICOSSOCIAL_QUESTIONNAIRES):
-
-        files = glob.glob(os.path.join(folder_path, "**", questionnaire_name), recursive=True)
-
-        list_sums_questionnaire = []
-
-        for file_num, file in enumerate(files):
-
-            # load df
-            results_df = pd.read_csv(file)
-
-            # drop non copsoq questions from exigências questionnaire
-            if questionnaire_name == EXIGENCIAS:
-                results_df = results_df.drop(columns=NON_COPSOQ_COLUMNS)
-
-            # count total number of subjects only on the first questionnaire
-            if q_index == 0:
-                total_subjects += len(results_df)
-
-            # store column names only once per questionnaire
-            if file_num == 0:
-                column_names_list.append(results_df.columns.tolist())
-
-            # sum values for this file
-            values_list = results_df.sum().tolist()
-
-            # store these sums
-            list_sums_questionnaire.append(values_list)
-
-        # sum values across all files for this questionnaire
-        total_summed_questionnaire = [sum(x) for x in zip(*list_sums_questionnaire)]
-
-        # add to list containing the sums of all psicossocial questionnaires
-        list_sums_total.append(total_summed_questionnaire)
-
-    # get final dataframe with the summed scores
-    final_df = _create_df_from_lists(column_names_list, list_sums_total)
-
-    # get mean
-    final_df = final_df/total_subjects
-
-    return final_df
+    # calculate MUEQ scores
+    _calculate_mean_scores(all_mueq_df, 'MUEQ', average_method, output_folder_path)
 
 
 def calculate_linear_scores(folder_path: str, domain: str, output_folder_path: str) -> None:
@@ -147,6 +64,7 @@ def calculate_linear_scores(folder_path: str, domain: str, output_folder_path: s
     :param folder_path: Path to the folder containing the several questionnaire domains (subfolders)
     :param domain: The domain of the questionnaires, which should be the name of the folder that contains the csv files.
                     For this function, only Psicosocial and Ambiente are available #todo check this
+    :param output_folder_path: Path to the folder where the scores will be saved.
     :return: None
     """
     # list for holding the scores_df for all questionnaires
@@ -238,6 +156,60 @@ def calculate_linear_scores(folder_path: str, domain: str, output_folder_path: s
 # ------------------------------------------------------------------------------------------------------------------- #
 # private functions
 # ------------------------------------------------------------------------------------------------------------------- #
+
+def _calculate_mean_scores(all_results_df: pd.DataFrame, score_type: str, average_method: str,
+                           output_folder_path: str) -> None:
+    """
+    Calculate pure COPSOQ or MUEQ scores. This function assumes that the psicossocial results_questionnaires have
+    already been obtained for all groups. There are two averaging methods available.
+    - 'all': obtains the copsoq scores by calculating the mean scores over all subjects
+    - 'atendimento': obtains the copsoq scores by calculating the mean scores over front and back office subjects
+
+    Saves the results_questionnaires in a csv file.
+
+    :param all_results_df: Dataframe with th psychosocial scores for all participants
+    :param score_type: Type of score: 'COPSOQ' or 'MUEQ'. Used for output filename only.
+    :param average_method: Average method to be used for calculating the copsoq scores.
+                        Supported methods: 'all', 'atendimento'
+    :param output_folder_path: Path to the folder where the scores will be saved.
+    :return: None
+    """
+
+    if average_method == POPULATION:
+
+        # drop id column
+        all_results_df = all_results_df.drop(columns=['id.1'], errors='ignore')
+
+        scores_df = pd.DataFrame([all_results_df.mean().round(2)], index=['mean'])
+
+    # it's average by atendimento
+    elif average_method == WORK_TYPE:
+
+        # load subject info
+        subjects_info_df = pd.read_csv((os.path.join(find_project_root(), 'participants_info.csv')), sep=';')
+
+        # get list with subject ids for Front/Back office
+        fo_subjects = subjects_info_df.loc[subjects_info_df['atendimento'] == 'FO', 'subject_id'].tolist()
+        bo_subjects = subjects_info_df.loc[subjects_info_df['atendimento'] == 'BO', 'subject_id'].tolist()
+
+        # Filter all_results_df for FO/BO subjects
+        fo_df = all_results_df[all_results_df['id.1'].isin(fo_subjects)].copy()
+        bo_df = all_results_df[all_results_df['id.1'].isin(bo_subjects)].copy()
+
+        # drop id columns
+        fo_df = fo_df.drop(columns=['id.1'], errors='ignore')
+        bo_df = bo_df.drop(columns=['id.1'], errors='ignore')
+
+        # calculate statistics and save in a dataframe
+        scores_df = pd.DataFrame([fo_df.mean().round(2), bo_df.mean().round(2)], index=['mean_FO', 'mean_BO'])
+
+    else:
+        raise ValueError(
+            f"The following average method is not supported. \nSupported methods are 'all' and 'atendimento'")
+
+    # save dataframe into a csv file
+    scores_df.to_csv(os.path.join(output_folder_path, f"results_{score_type}_{average_method}{CSV}"))
+
 
 def _calculate_scores(domain:str, results_df: pd.DataFrame, calculation_method: str, scale: List[int], values: List[int],
                       inverted: List[Optional[int]], max_value: int) -> pd.Series:
@@ -422,22 +394,82 @@ def _get_all_psicossocial_results(folder_path: str) -> pd.DataFrame:
     # cycle over the groups
     for group_folder in os.listdir(folder_path):
 
-        # cycle over the questionnaire folders
-        for questionnaire_file in os.listdir(os.path.join(folder_path, group_folder)):
+        group_folder_path = os.path.join(folder_path, group_folder)
 
-            # filter only the psicossocial questionnaires
-            if PSYCHOSOCIAL in questionnaire_file:
+        # check if it's a folder (skip files)
+        if os.path.isdir(group_folder_path):
 
-                # get full path to the csv file
-                file_path = os.path.join(folder_path, group_folder, questionnaire_file)
+            # cycle over the questionnaire folders
+            for questionnaire_file in os.listdir(group_folder_path):
 
-                # load df
-                results_df = pd.read_csv(file_path)
+                # filter only the psicossocial questionnaires
+                if PSYCHOSOCIAL in questionnaire_file:
 
-                # add df to the list
-                list_group_dfs.append(results_df)
+                    # get full path to the csv file
+                    file_path = os.path.join(group_folder_path, questionnaire_file)
+
+                    # load df
+                    results_df = pd.read_csv(file_path)
+
+                    # add df to the list
+                    list_group_dfs.append(results_df)
 
     # concat vertically to have the results_questionnaires of all subjects keeping original index (which are the subject ids)
     final_df = pd.concat(list_group_dfs, axis=0)
 
     return final_df
+
+
+
+
+# def calculate_copsoq_scores(folder_path: str) -> pd.DataFrame:
+#
+#     # init lists to hold the column names of all questionnaires and the sums of the columns
+#     column_names_list = []
+#     list_sums_total = []
+#
+#     # init counter for the total nuber of subjects
+#     total_subjects = 0
+#
+#     for q_index, questionnaire_name in enumerate(PSICOSSOCIAL_QUESTIONNAIRES):
+#
+#         files = glob.glob(os.path.join(folder_path, "**", questionnaire_name), recursive=True)
+#
+#         list_sums_questionnaire = []
+#
+#         for file_num, file in enumerate(files):
+#
+#             # load df
+#             results_df = pd.read_csv(file)
+#
+#             # drop non copsoq questions from exigências questionnaire
+#             if questionnaire_name == EXIGENCIAS:
+#                 results_df = results_df.drop(columns=NON_COPSOQ_COLUMNS)
+#
+#             # count total number of subjects only on the first questionnaire
+#             if q_index == 0:
+#                 total_subjects += len(results_df)
+#
+#             # store column names only once per questionnaire
+#             if file_num == 0:
+#                 column_names_list.append(results_df.columns.tolist())
+#
+#             # sum values for this file
+#             values_list = results_df.sum().tolist()
+#
+#             # store these sums
+#             list_sums_questionnaire.append(values_list)
+#
+#         # sum values across all files for this questionnaire
+#         total_summed_questionnaire = [sum(x) for x in zip(*list_sums_questionnaire)]
+#
+#         # add to list containing the sums of all psicossocial questionnaires
+#         list_sums_total.append(total_summed_questionnaire)
+#
+#     # get final dataframe with the summed scores
+#     final_df = _create_df_from_lists(column_names_list, list_sums_total)
+#
+#     # get mean
+#     final_df = final_df/total_subjects
+#
+#     return final_df
