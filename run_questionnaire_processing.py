@@ -7,7 +7,7 @@ import re
 # internal imports
 import questionnaires
 import sensors.load as sl
-from constants import WORKLOAD
+from constants import WORKLOAD, PSYCHOSOCIAL
 from OH_profile.constants import *
 from OH_profile.load import get_OH_profile
 from OH_profile.write import save_OH_profile, write_to_OH_profile
@@ -15,14 +15,14 @@ from OH_profile.write import save_OH_profile, write_to_OH_profile
 # ------------------------------------------------------------------------------------------------------------------- #
 # flags
 # ------------------------------------------------------------------------------------------------------------------- #
-GENERATE_SCORES = True
+GENERATE_SCORES = False
 PROCESS_PSYCHOSOCIAL = True
 PROCESS_PERSONAL = False
 PROCESS_ENVIRONMENT = False
 PROCESS_BIOMECHANICAL = False
 PROCESS_WORKLOAD = False
 GENERATE_QUESTIONNAIRES_DATASET = False
-GENERATE_OH_PROFILE = False
+GENERATE_OH_PROFILE = True
 
 # ------------------------------------------------------------------------------------------------------------------- #
 # file constants
@@ -51,36 +51,39 @@ if GENERATE_SCORES:
     # cycle over the several group folders with the questionnaire data
     for group_folder in os.listdir(QUEST_DATASET_PATH):
 
-        # inside there should be two folder: 'sensors' and 'questionnaires'
-        for questionnaires_folder in os.listdir(os.path.join(QUEST_DATASET_PATH, group_folder)):
+        # if it's a folder (example: group1, group2, group3)
+        if os.path.isdir(os.path.join(QUEST_DATASET_PATH, group_folder)):
 
-            # go into questionnaires
-            if questionnaires_folder == 'questionnaires':
+            # inside there should be two folder: 'sensors' and 'questionnaires'
+            for questionnaires_folder in os.listdir(os.path.join(QUEST_DATASET_PATH, group_folder)):
 
-                # get questionnaire folder path
-                domain_folder_path = os.path.join(QUEST_DATASET_PATH, group_folder, questionnaires_folder)
+                # go into questionnaires
+                if questionnaires_folder == 'questionnaires':
 
-                if PROCESS_PSYCHOSOCIAL:
+                    # get questionnaire folder path
+                    domain_folder_path = os.path.join(QUEST_DATASET_PATH, group_folder, questionnaires_folder)
 
-                    # generate individual results
-                    questionnaires.calculate_linear_scores(domain_folder_path, domain='psychosocial',
-                                                           output_folder_path=SCORES_OUT_PATH)
+                    if PROCESS_PSYCHOSOCIAL:
 
-                if PROCESS_ENVIRONMENT:
-                    questionnaires.calculate_linear_scores(QUEST_DATASET_PATH, domain='environment',
-                                                           output_folder_path=SCORES_OUT_PATH)
+                        # generate individual results
+                        questionnaires.calculate_linear_scores(domain_folder_path, domain='psychosocial',
+                                                               output_folder_path=SCORES_OUT_PATH)
 
-                if PROCESS_PERSONAL:
-                    questionnaires.calculate_personal_scores(domain_folder_path, output_folder_path=SCORES_OUT_PATH)
+                    if PROCESS_ENVIRONMENT:
+                        questionnaires.calculate_linear_scores(QUEST_DATASET_PATH, domain='environment',
+                                                               output_folder_path=SCORES_OUT_PATH)
 
-                if PROCESS_BIOMECHANICAL:
-                    questionnaires.calculate_biomechanical_scores(domain_folder_path, pure_rosa=False,
-                                                                  output_folder_path=SCORES_OUT_PATH)
+                    if PROCESS_PERSONAL:
+                        questionnaires.calculate_personal_scores(domain_folder_path, output_folder_path=SCORES_OUT_PATH)
 
-                    questionnaires.calculate_rosa_scores(domain_folder_path, output_folder_path=SCORES_OUT_PATH)
+                    if PROCESS_BIOMECHANICAL:
+                        questionnaires.calculate_biomechanical_scores(domain_folder_path, pure_rosa=False,
+                                                                      output_folder_path=SCORES_OUT_PATH)
 
-                if PROCESS_WORKLOAD:
-                    questionnaires.clean_daily_workload(domain_folder_path, output_folder_path=SCORES_OUT_PATH)
+                        questionnaires.calculate_rosa_scores(domain_folder_path, output_folder_path=SCORES_OUT_PATH)
+
+                    if PROCESS_WORKLOAD:
+                        questionnaires.clean_daily_workload(domain_folder_path, output_folder_path=SCORES_OUT_PATH)
 
     # generate copsoq and mueq scores only if PROCESS PSYCHOSOCIAL = True since it needs the scores from all subjects
     if PROCESS_PSYCHOSOCIAL:
@@ -98,42 +101,37 @@ if GENERATE_SCORES:
 
 if GENERATE_OH_PROFILE:
 
+    # init list fo holding the id's of all participants
+    all_ids = []
+
     # (1) iterate through the folders inside the questionnaire scores directory
     for group_folder in os.listdir(SCORES_OUT_PATH):
 
         # get path
         path = os.path.join(SCORES_OUT_PATH, group_folder)
 
-        # get list of ids for this group
-        list_ids = sl.get_ids_per_group(sl.load_participants_info(), group=re.findall(r"\d+", group_folder)[0])
+        # subject specific scores
+        if os.path.isdir(path):
 
-        # (2) cycle over the ids in the group
-        for subject_id in list_ids:
+            # get list of ids for this group
+            list_ids = sl.get_ids_per_group(sl.load_participants_info(), group=re.findall(r"\d+", group_folder)[0])
 
-            # open or generate OH dictionary for this subject
-            oh_profile = get_OH_profile(OH_PROFILE_PATH, subject_id)
+            # (2) cycle over the ids in the group
+            for subject_id in list_ids:
 
-            # check if it's a file and not a folder
-            if os.path.isfile(path):
+                # add to list of all ids
+                all_ids.append(subject_id)
 
-                # if it's a file then it's the psychosocial scores
-                metrics_dict = questionnaires.get_psychosocial_metrics(path)
+                # open or generate OH dictionary for this subject
+                oh_profile = get_OH_profile(OH_PROFILE_PATH, subject_id)
 
-                # write to OH profile
-                oh_profile = write_to_OH_profile(oh_profile, main_outer_key=SINGLE_INSTANCE_QUESTIONNAIRE_KEY,
-                                                 main_inner_key=PSYCHOSOCIAL_DOMAIN_KEY,
-                                                 dict_to_write=metrics_dict)
-
-            # subject specific scores
-            else:
-
-                # (3) iterate through the score files for that group
+                # (3) iterate through the score files for that group (example: results_biomechanical.csv, results_personal.csv...)
                 for results_file in os.listdir(path):
 
                     # generate path to csv file
                     results_file_path = os.path.join(path, results_file)
 
-                    # check if it is a single instance questionnaire - save metrics
+                    # check if it is a single instance questionnaire
                     if WORKLOAD in results_file_path:
                         print(f"Getting metrics for daily workload questionnaire of subject {subject_id}...")
 
@@ -145,8 +143,8 @@ if GENERATE_OH_PROFILE:
                                                          main_inner_key=WORKLOAD_DOMAIN_KEY,
                                                          dict_to_write=metrics_dict)
 
-                    # it's single instance questionnaire - save metrics
-                    else:
+                    # it's single instance questionnaire except psychosocial
+                    elif PSYCHOSOCIAL not in results_file_path:
 
                         print(f"Getting metrics for {results_file} of subject {subject_id}...")
                         # get metrics
@@ -159,9 +157,35 @@ if GENERATE_OH_PROFILE:
                         oh_profile = write_to_OH_profile(oh_profile, main_outer_key=SINGLE_INSTANCE_QUESTIONNAIRE_KEY,
                                                          main_inner_key=main_inner_key,
                                                          dict_to_write=metrics_dict)
-
                     # save OH profile to json
                     save_OH_profile(OH_PROFILE_PATH, subject_id, oh_profile)
+
+        # if it's not a dir then it's a csv file with copsoq or mueq
+        else:
+
+            # the results are the same for all subjects
+            for participant_id in all_ids:
+
+                # open or generate OH dictionary for this subject
+                oh_profile = get_OH_profile(OH_PROFILE_PATH, participant_id)
+
+                # if it's a file then it's the psychosocial scores
+                metrics_dict = questionnaires.get_psychosocial_metrics(path)
+
+                # write to OH profile
+                oh_profile = write_to_OH_profile(oh_profile, main_outer_key=SINGLE_INSTANCE_QUESTIONNAIRE_KEY,
+                                                 main_inner_key=PSYCHOSOCIAL_DOMAIN_KEY,
+                                                 dict_to_write=metrics_dict)
+
+                # save OH profile to json
+                save_OH_profile(OH_PROFILE_PATH, participant_id, oh_profile)
+
+
+
+
+
+
+
 
 
 
