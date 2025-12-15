@@ -1,4 +1,4 @@
-subject_id;device_num;mBAN_left;mBAN_right;group;atendimento
+subject_id;device_num;mBAN_left;mBAN_right;group;work_type
 80;#001;588E81A24A27;886B0FABF921;1;FO
 81;#002;886B0FABF7D3;588E81A24A0D;1;FO
 82;#003;886B0FABF79E;84FD27E50653;1;FO

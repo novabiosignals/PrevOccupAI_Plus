@@ -1,19 +1,38 @@
+"""
+Function to clean the daily workload questionnaires
 
+Available Functions
+-------------------
+[Public]
+clean_daily_workload(...): Cleans the dataframe with the daily workload questionnaire answers.
+-------------------
+
+[Private]
+None
+-------------------
+"""
+# -------------------------------------------------------------------------------------------------------------------- #
+# imports
+# -------------------------------------------------------------------------------------------------------------------- #
 import os
-import pandas as pd
 
 # internal imports
-from utils import find_project_root, create_dir, get_group_from_path
+from utils import find_project_root, create_dir, extract_group_from_path
 from questionnaires.load.questionnaire_loader import load_questionnaire_answers
 from constants import WORKLOAD, CSV
 from questionnaires.process.mappings.questionnaire_mappings import WORKLOAD_COLUMN_NAMES_MAP
 
+# -------------------------------------------------------------------------------------------------------------------- #
+# public functions
+# -------------------------------------------------------------------------------------------------------------------- #
 
 def clean_daily_workload(folder_path: str, output_folder_path: str) -> None:
     """
+    Cleans the dataframe with the daily workload questionnaire answers. Cleans the column names to be more readable and
+    likert scale from A1, A2, A3, A4, A5 -> 1,2,3,4,5.
 
-    :param output_folder_path:
     :param folder_path: Path to the folder containing the several questionnaire domains (subfolders)
+    :param output_folder_path: Path to the folder where the cleaned answers will be saved.
     :return: None
     """
 
@@ -38,5 +57,5 @@ def clean_daily_workload(folder_path: str, output_folder_path: str) -> None:
 
     # save dataframe into a csv file
     folder_path = create_dir(find_project_root(),
-                             os.path.join(output_folder_path, get_group_from_path(folder_path)))
+                             os.path.join(output_folder_path, extract_group_from_path(folder_path)))
     results_df.to_csv(os.path.join(folder_path, f"workload{CSV}"))

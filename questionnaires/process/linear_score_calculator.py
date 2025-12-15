@@ -1,15 +1,36 @@
+"""
+Function to calculate psychosocial and environment scores
+
+Available Functions
+-------------------
+[Public]
+get_psychosocial_scores(...): Calculates COPSOQ and MUEQ scores for the entire population or work type.
+calculate_linear_scores(...): Calculates the individual scores for the psychosocial and environment questionnaires for one group.
+-------------------
+
+[Private]
+_calculate_mean_scores(...): calculates the mean of the psychosocial scores of all subjects.
+_calculate_individual_scores(...): calculates the normalized individual scores for all subjects.
+_assign_answer_values(...): Map questionnaire responses to scoring values.
+_clean_results_dataframe(...): Cleans likert scale answers.
+_create_df_from_lists(...): Merge multiple psychosocial questionnaires into a single-row DataFrame.
+_get_all_psychosocial_results(...): Load and aggregate all psychosocial questionnaire results into one single dataframe.
+_get_questionnaire_name_from_json(...): Extracts the questionnaire name from a JSON configuration file by matching the questionnaire id.
+_check_valid_domain(...): checks if the input domain is valid
+_check_valid_average_method(...): checks if the input average method is valid
+-------------------
+"""
+
 # ------------------------------------------------------------------------------------------------------------------- #
 # imports
 # ------------------------------------------------------------------------------------------------------------------- #
 import os
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 import pandas as pd
-import glob
 
 # internal imports
-from utils import load_json_file, create_dir, get_group_from_path, find_project_root
+from utils import load_json_file, create_dir, extract_group_from_path, find_project_root
 from questionnaires.load.questionnaire_loader import load_questionnaire_answers
-from questionnaires.process.json_parser import get_questionnaire_name_from_json
 from constants import CONFIG_FOLDER_NAME, CSV, ENVIRONMENT, PSYCHOSOCIAL, WORK_TYPE, POPULATION
 
 # ------------------------------------------------------------------------------------------------------------------- #
@@ -18,14 +39,6 @@ from constants import CONFIG_FOLDER_NAME, CSV, ENVIRONMENT, PSYCHOSOCIAL, WORK_T
 JSON_SCORES_FILENAME = 'scores.json'
 LIKERT_SCALE = 'likert'
 COPSOQ_RESULTS_FOLDER = 'COPSOQ_results'
-
-BEM_ESTAR = 'Bem-Estar Geral.csv'
-EXIGENCIAS = 'Exigências Laborais.csv'
-ORGANIZACAO = 'Organização do Trabalho e Conteúdo.csv'
-RELACOES = 'Relações Sociais e Liderança.csv'
-VALORES = 'Valores no Local de Trabalho.csv'
-PSICOSSOCIAL_QUESTIONNAIRES = [BEM_ESTAR, EXIGENCIAS, ORGANIZACAO, RELACOES, VALORES]
-
 NON_COPSOQ_COLUMNS = ['Autonomia', 'Qualidade das Pausas']
 
 # ------------------------------------------------------------------------------------------------------------------- #
@@ -34,16 +47,20 @@ NON_COPSOQ_COLUMNS = ['Autonomia', 'Qualidade das Pausas']
 
 def get_psychosocial_scores(folder_path: str, average_method: str, output_folder_path: str) -> None:
     """
-     Loads psychosocial questionnaire results for all subjects, separates COPSOQ and MUEQ
+    Loads psychosocial questionnaire results for all subjects, separates COPSOQ and MUEQ
     questionnaire data, computes their mean scores, and saves the results.
 
     :param folder_path: Path to the folder containing the raw psychosocial questionnaire result files for all subjects.
-    :param average_method: Average method to be used for calculating the copsoq scores. Supported methods: 'all', 'atendimento'
+    :param average_method: Average method to be used for calculating the copsoq scores.
+                            Supported methods: 'population', 'work_type'
     :param output_folder_path: Path to the folder where the scores will be saved.
     :return: None
     """
+    # check if average_method is valid
+    _check_valid_average_method(average_method)
+
     # get dataframe with the psicossocial results_questionnaires for all subjects
-    all_results_df = _get_all_psicossocial_results(folder_path)
+    all_results_df = _get_all_psychosocial_results(folder_path)
 
     # get only COPSOQ dataframe
     all_copsoq_df = all_results_df.drop(columns=NON_COPSOQ_COLUMNS, errors='ignore')
@@ -60,13 +77,19 @@ def get_psychosocial_scores(folder_path: str, average_method: str, output_folder
 
 def calculate_linear_scores(folder_path: str, domain: str, output_folder_path: str) -> None:
     """
-    Calculates the scores for the Psicossocial and Ambiente questionnaires and saves the results_questionnaires into a csv file
+    Calculates the individual scores for the psychosocial and environment questionnaires for one group. Assumes that
+    the questionnaire answers are stored in a directory such as: '...\\group1\\psychosocial(environment)\\files.csv'
+    Saves the results into a csv file.
+
     :param folder_path: Path to the folder containing the several questionnaire domains (subfolders)
     :param domain: The domain of the questionnaires, which should be the name of the folder that contains the csv files.
-                    For this function, only Psicosocial and Ambiente are available #todo check this
+                    For this function, only psychosocial and environment are available
     :param output_folder_path: Path to the folder where the scores will be saved.
     :return: None
     """
+    # check if input domain is valid for this function
+    _check_valid_linear_domain(domain)
+
     # list for holding the scores_df for all questionnaires
     list_dfs: List[pd.DataFrame] = []
 
@@ -87,7 +110,7 @@ def calculate_linear_scores(folder_path: str, domain: str, output_folder_path: s
         questionnaire_scores_df = pd.DataFrame()
 
         # get questionnaire name from the id
-        questionnaire_name = get_questionnaire_name_from_json(config_dict, questionnaire_id)
+        questionnaire_name = _get_questionnaire_name_from_json(config_dict, questionnaire_id)
 
         # iterate through topics of the questionnaire
         domain_topics = config_dict[questionnaire_name]['topics']
@@ -119,7 +142,7 @@ def calculate_linear_scores(folder_path: str, domain: str, output_folder_path: s
                 max_value = scores_dict[subtopic_name]["max"]
 
                 # calculate scores
-                scores_series = _calculate_scores(domain, subtopic_df, calculation_method, scale, values, inverted, max_value)
+                scores_series = _calculate_individual_scores(domain, subtopic_df, calculation_method, scale, values, inverted, max_value)
 
                 # add subject id column and scores
                 if not 'id' in questionnaire_scores_df.columns:
@@ -143,14 +166,14 @@ def calculate_linear_scores(folder_path: str, domain: str, output_folder_path: s
         list_dfs.append(questionnaire_scores_df)
 
 
-    # concat dataframes horizontally to have all psicossocial/ambiente questionnaires
+    # concat dataframes horizontally to have all psychosocial/environment questionnaires
     final_df = pd.concat(list_dfs, axis=1)
 
     # fill NaN values with 0
     final_df.fillna(0, inplace=True)
 
     # save dataframe into a csv file
-    folder_path = create_dir(find_project_root(), os.path.join(output_folder_path, get_group_from_path(folder_path)))
+    folder_path = create_dir(find_project_root(), os.path.join(output_folder_path, extract_group_from_path(folder_path)))
     final_df.to_csv(os.path.join(folder_path, f"results_{domain}{CSV}"))
 
 # ------------------------------------------------------------------------------------------------------------------- #
@@ -182,15 +205,15 @@ def _calculate_mean_scores(all_results_df: pd.DataFrame, score_type: str, averag
 
         scores_df = pd.DataFrame([all_results_df.mean().round(2)], index=['mean'])
 
-    # it's average by atendimento
+    # it's average by work_type
     elif average_method == WORK_TYPE:
 
         # load subject info
         subjects_info_df = pd.read_csv((os.path.join(find_project_root(), 'participants_info.csv')), sep=';')
 
         # get list with subject ids for Front/Back office
-        fo_subjects = subjects_info_df.loc[subjects_info_df['atendimento'] == 'FO', 'subject_id'].tolist()
-        bo_subjects = subjects_info_df.loc[subjects_info_df['atendimento'] == 'BO', 'subject_id'].tolist()
+        fo_subjects = subjects_info_df.loc[subjects_info_df['work_type'] == 'FO', 'subject_id'].tolist()
+        bo_subjects = subjects_info_df.loc[subjects_info_df['work_type'] == 'BO', 'subject_id'].tolist()
 
         # Filter all_results_df for FO/BO subjects
         fo_df = all_results_df[all_results_df['id.1'].isin(fo_subjects)].copy()
@@ -205,14 +228,14 @@ def _calculate_mean_scores(all_results_df: pd.DataFrame, score_type: str, averag
 
     else:
         raise ValueError(
-            f"The following average method is not supported. \nSupported methods are 'all' and 'atendimento'")
+            f"The following average method is not supported. \nSupported methods are 'population' and 'work_type'")
 
     # save dataframe into a csv file
     scores_df.to_csv(os.path.join(output_folder_path, f"results_{score_type}_{average_method}{CSV}"))
 
 
-def _calculate_scores(domain:str, results_df: pd.DataFrame, calculation_method: str, scale: List[int], values: List[int],
-                      inverted: List[Optional[int]], max_value: int) -> pd.Series:
+def _calculate_individual_scores(domain:str, results_df: pd.DataFrame, calculation_method: str, scale: List[int], values: List[int],
+                                 inverted: List[Optional[int]], max_value: int) -> pd.Series:
     """
     Calculate normalized domain scores for each participant.
 
@@ -296,7 +319,7 @@ def _assign_answer_values(results_df: pd.DataFrame, scale: List[int], values: Li
     return results_df
 
 
-def _clean_results_dataframe(scale_type: str, subtopic_df):
+def _clean_results_dataframe(scale_type: str, subtopic_df: pd.DataFrame) -> pd.DataFrame:
     """
     Clean questionnaire responses based on the scale type. Currently, supports the Likert scale by removing the prefix 'A'
     from all answer values (e.g., converting 'A1' → '1').
@@ -315,17 +338,12 @@ def _clean_results_dataframe(scale_type: str, subtopic_df):
             # remove the prefix 'A' from
             subtopic_df[col] = subtopic_df[col].str.replace("^A", "", regex=True)
 
-
-        else:
-            # TODO implement other scales
-            pass
-
     return subtopic_df
 
 
 def _create_df_from_lists(column_names_list: List[List[str]], list_sums_total: List[List[float]]):
     """
-    Merge multiple COPSOQ questionnaires into a single-row DataFrame.
+    Merge multiple psychosocial questionnaires into a single-row DataFrame.
 
     Each questionnaire is represented by a list of column names and a list of summed values.
     This function combines all questionnaires into one pandas DataFrame with:
@@ -362,12 +380,12 @@ def _create_df_from_lists(column_names_list: List[List[str]], list_sums_total: L
     return final_df
 
 
-def _get_all_psicossocial_results(folder_path: str) -> pd.DataFrame:
+def _get_all_psychosocial_results(folder_path: str) -> pd.DataFrame:
     """
-    Load and aggregate all psicossocial questionnaire results_questionnaires into one single dataframe.
+    Load and aggregate psychosocial questionnaire results from all groups into one single dataframe.
 
     This function navigates through a directory where each group has its own folder,
-    and within each group folder exists a `PSICOSSOCIAL` subfolder containing exactly
+    and within each group folder exists a `psychosocial` subfolder containing exactly
     one CSV file with questionnaire results_questionnaires. It loads each of these CSV files into a
     DataFrame and concatenates them vertically into a single DataFrame.
 
@@ -375,15 +393,15 @@ def _get_all_psicossocial_results(folder_path: str) -> pd.DataFrame:
     ---------------------------
     folder_path/
         group_1/
-            PSICOSSOCIAL/
+            psychosocial/
                 results_questionnaires.csv
         group_2/
-            PSICOSSOCIAL/
+            psychosocial/
                 results_questionnaires.csv
         ...
     :param folder_path: The root directory containing group folders. Each group folder must contain
-            a subfolder named `PSICOSSOCIAL` with exactly one CSV file.
-    :return: A DataFrame containing all psicossocial questionnaire results_questionnaires stacked vertically,
+            a subfolder named `psychosocial` with exactly one CSV file.
+    :return: A DataFrame containing all psychosocial questionnaire results_questionnaires stacked vertically,
             with original indices preserved. Each row corresponds to a subject, and each
             column represents a questionnaire item.
     """
@@ -402,7 +420,7 @@ def _get_all_psicossocial_results(folder_path: str) -> pd.DataFrame:
             # cycle over the questionnaire folders
             for questionnaire_file in os.listdir(group_folder_path):
 
-                # filter only the psicossocial questionnaires
+                # filter only the psychosocial questionnaires
                 if PSYCHOSOCIAL in questionnaire_file:
 
                     # get full path to the csv file
@@ -420,7 +438,62 @@ def _get_all_psicossocial_results(folder_path: str) -> pd.DataFrame:
     return final_df
 
 
+def _get_questionnaire_name_from_json(config_dict: Dict[str, Dict[str, Any]], questionnaire_id: str) -> str:
+    """
+    Extracts the questionnaire name from a JSON configuration file by matching the questionnaire id.
+    :param config_dict: The config dictionary for the given questionnaire domain.
+    :param questionnaire_id: The unique id of the questionnaire.
+    :return: The questionnaire name
+    """
 
+    # iterate through the several questionnaires in the config dict
+    for questionnaire_name, questionnaire_info in config_dict.items():
+
+        # check which id matches
+        if questionnaire_info.get('id') == questionnaire_id:
+
+            # return the name of the questionnaire with the given id
+            return questionnaire_name
+
+    raise ValueError(f"No questionnaire found with id: {questionnaire_id}")
+
+
+def _check_valid_linear_domain(domain: str) -> None:
+    """
+    Checks that the given domain is valid.
+    :param domain: the input domain
+    :return: None
+    """
+
+    if domain not in (PSYCHOSOCIAL, ENVIRONMENT):
+        raise ValueError(
+            f"Invalid domain. Expected {PSYCHOSOCIAL} or {ENVIRONMENT}, but got {domain}."
+        )
+
+
+def _check_valid_average_method(average_method: str) -> None:
+    """
+    Checks that the given average_method is valid.
+    :param average_method: the input domain
+    :return: None
+    """
+
+    if average_method not in (POPULATION, WORK_TYPE):
+        raise ValueError(
+            f"Invalid domain. Expected {POPULATION} or {WORK_TYPE}, but got {average_method}."
+        )
+# ------------------------------------------------------------------------------------------------------------------- #
+# old functions
+# ------------------------------------------------------------------------------------------------------------------- #
+
+# import glob
+
+# BEM_ESTAR = 'Bem-Estar Geral.csv'
+# EXIGENCIAS = 'Exigências Laborais.csv'
+# ORGANIZACAO = 'Organização do Trabalho e Conteúdo.csv'
+# RELACOES = 'Relações Sociais e Liderança.csv'
+# VALORES = 'Valores no Local de Trabalho.csv'
+# PSICOSSOCIAL_QUESTIONNAIRES = [BEM_ESTAR, EXIGENCIAS, ORGANIZACAO, RELACOES, VALORES]
 
 # def calculate_copsoq_scores(folder_path: str) -> pd.DataFrame:
 #
@@ -428,7 +501,7 @@ def _get_all_psicossocial_results(folder_path: str) -> pd.DataFrame:
 #     column_names_list = []
 #     list_sums_total = []
 #
-#     # init counter for the total nuber of subjects
+#     # init counter for the total number of subjects
 #     total_subjects = 0
 #
 #     for q_index, questionnaire_name in enumerate(PSICOSSOCIAL_QUESTIONNAIRES):

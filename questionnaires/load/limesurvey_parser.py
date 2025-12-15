@@ -1,9 +1,25 @@
+"""
+Function to generate the questionnaires dataset
+
+Available Functions
+-------------------
+[Public]
+generate_questionnaires_dataset(...): Generates the questionnaire dataset by organizing the raw files by group and questionnaire domain, downloaded from limesurvey.
+-------------------
+
+[Private]
+_load_and_clean_limesurvey_results(...): Loads a raw LimeSurvey CSV file, filters it to keep only the list of ids in subject_ids, and cleans the data.
+_clean_limesurvey_files(...): Cleans the limesurvey dataframe by removing irrelevant columns.
+_find_survey_path(...): finds the path with a given survey id in the filename
+-------------------
+"""
 # ------------------------------------------------------------------------------------------------------------------- #
 # imports
 # ------------------------------------------------------------------------------------------------------------------- #
 import pandas as pd
 import os
 
+# internal imports
 from constants import CSV, QUESTIONNAIRE_DOMAINS, ENVIRONMENT, PSYCHOSOCIAL, CONFIG_FOLDER_NAME, WORKLOAD
 from utils import create_dir, load_json_file, find_project_root
 import sensors.load as sl
@@ -19,6 +35,19 @@ OUTPUT_FOLDER_NAME = 'questionnaires'
 
 
 def generate_questionnaires_dataset(file_paths_dir: str, output_folder_path: str) -> None:
+    """
+    Generates the questionnaire dataset by organizing the raw files by group and questionnaire domain, downloaded from limesurvey.
+    Each file should have the questionnaire id in the filename and should have the answers from all subjects.
+    All raw files (from all questionnaires of the valid domains) should be in a folder in file_paths_dir.
+    This function then organizes the answers by group and domain, generating csv files with only the results of the subjects
+    of the same group.
+
+    Saves the results as follows: (example) 'output_folder_path/questionnaires/group1/psychosocial/results_279517.csv'
+
+    :param file_paths_dir: Path to the folder containing all raw limesurvey files for all questionnaires.
+    :param output_folder_path: Path to the folder where to save the generated dataset.
+    :return: None
+    """
     # load metadata
     meta_data_df = sl.load_participants_info()
 
@@ -71,7 +100,15 @@ def generate_questionnaires_dataset(file_paths_dir: str, output_folder_path: str
 # private functions
 # ------------------------------------------------------------------------------------------------------------------- #
 
-def _load_and_clean_limesurvey_results(limesurvey_csv_path: str, subject_ids: pd.Series, domain: str):
+def _load_and_clean_limesurvey_results(limesurvey_csv_path: str, subject_ids: pd.Series, domain: str) -> pd.DataFrame:
+    """
+    Loads a raw LimeSurvey CSV file, filters it to keep only the list of ids in subject_ids, and cleans the data.
+
+    :param limesurvey_csv_path: Path to the raw LimeSurvey CSV file.
+    :param subject_ids: Series of subject IDs to keep in the dataset.
+    :param domain: Questionnaire domain, used to customize cleaning.
+    :return: Cleaned dataframe with only the relevant subjects and columns.
+    """
 
     # load raw limesurvey csv
     limesurvey_df = pd.read_csv(limesurvey_csv_path)
@@ -88,7 +125,15 @@ def _load_and_clean_limesurvey_results(limesurvey_csv_path: str, subject_ids: pd
     return group_df
 
 
-def _clean_limesurvey_files(df: pd.DataFrame, domain: str):
+def _clean_limesurvey_files(df: pd.DataFrame, domain: str) -> pd.DataFrame:
+    """
+    Cleans a LimeSurvey dataframe by renaming columns, dropping irrelevant columns,
+    converting submission dates, and keeping the most recent submission per participant.
+
+    :param df: Raw LimeSurvey dataframe.
+    :param domain: Questionnaire domain, used to determine cleaning rules.
+    :return: The cleaned dataframe.
+    """
 
     # rename hiddenid column to just id
     df = df.rename(columns={'hiddenid': 'id.1'})
@@ -111,6 +156,16 @@ def _clean_limesurvey_files(df: pd.DataFrame, domain: str):
 
 
 def _find_survey_path(paths: list[str], survey_id: str) -> str:
+    """
+    Finds the file path with the survey_id in the filename.
+
+    Searches in a list of file paths if one of them contain the survey ID in the filename.
+    Raises an error if no paths or multiple paths match.
+
+    :param paths: List of file paths to search.
+    :param survey_id: Survey ID to locate in the file paths.
+    :return: The single path that contains the survey ID.
+    """
     # Find all paths that contain the substring
     matching_paths = [path for path in paths if survey_id in path]
 

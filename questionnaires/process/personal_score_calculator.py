@@ -1,3 +1,25 @@
+"""
+Function to calculate IPAQ scores and to clean personal questionnaire answers.
+
+Available Functions
+-------------------
+[Public]
+calculate_personal_scores(...): Calculates the IPAQ scores and cleans the answers for the personal questionnaires of one group.
+-------------------
+
+[Private]
+_get_dados_demograficos_results(...): Cleans column names and answers for readability and consistency of the 'dados demograficos' questionnaire.
+_get_estilo_vida_results(...): Cleans column names and answers for readability and consistency of the 'estilo de vida' questionnaire.
+_get_atividade_fisica_results(...): Processes physical activity questionnaire data according to IPAQ guidelines and calculates IPAQ scores.
+_calculate_total_time_and_truncate(...): Calculates total activity time in minutes and applies truncation rules.
+_calculate_met_scores(...): Calculates MET (Metabolic Equivalent of Task) scores for physical activities.
+_assign_ipaq_categories(...): Assigns IPAQ physical activity categories.
+_outlier_detection(...): Flags IPAQ outliers based on total activity time.
+_compute_sitting_times(...): Computes total sitting time in minutes for weekdays and weekends.
+_correct_false_input(...): Corrects wrong time inputs.
+_correct_false_working_time(...): Corrects inconsistent working days and working hours inputs.
+-------------------
+"""
 # -------------------------------------------------------------------------------------------------------------------- #
 # imports
 # -------------------------------------------------------------------------------------------------------------------- #
@@ -8,10 +30,9 @@ from typing import Tuple, List
 
 # internal imports
 from questionnaires.load.questionnaire_loader import load_questionnaire_answers
-from utils import load_json_file, create_dir, get_group_from_path, find_project_root
-from constants import CONFIG_FOLDER_NAME, RESULTS_FOLDER_NAME, CSV
-from questionnaires.process.mappings.questionnaire_mappings import EV_COLUMN_NAMES_MAP, EV_ANSWERS_MAP, AF_NEW_COLUMNS, AF_OLD_COLUMNS, DD_ANSWERS_MAP, \
-    AF_TIME_PAIRS, DD_COLUMN_NAMES_MAP, AF_FINAL_RESULTS_COLUMNS
+from utils import load_json_file, create_dir, extract_group_from_path, find_project_root
+from constants import CONFIG_FOLDER_NAME, CSV
+from questionnaires.process.mappings.questionnaire_mappings import *
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # constants
@@ -25,6 +46,16 @@ ATIVIDADE_FISICA = "Atividade Física"
 # -------------------------------------------------------------------------------------------------------------------- #
 
 def calculate_personal_scores(folder_path: str, output_folder_path: str) -> None:
+    """
+    Calculates the IPAQ scores and cleans the answers for the personal questionnaires of one group. Assumes that
+    the questionnaire answers are stored in a directory such as: '...\\group1\\personal\\files.csv'
+    Saves the results into a csv file.
+
+    :param folder_path: Path to the folder containing the several questionnaire domains (subfolders)
+    :param output_folder_path: Path to the folder where the scores will be saved.
+    :return: None
+
+    """
 
     # list for holding the scores_df for all questionnaires
     list_dfs: List[pd.DataFrame] = []
@@ -79,7 +110,7 @@ def calculate_personal_scores(folder_path: str, output_folder_path: str) -> None
     final_df.fillna(0, inplace=True)
 
     # save dataframe into a csv file
-    folder_path = create_dir(find_project_root(), os.path.join(output_folder_path, get_group_from_path(folder_path)))
+    folder_path = create_dir(find_project_root(), os.path.join(output_folder_path, extract_group_from_path(folder_path)))
     final_df.to_csv(os.path.join(folder_path, f"results_personal{CSV}"))
 
 
@@ -89,8 +120,18 @@ def calculate_personal_scores(folder_path: str, output_folder_path: str) -> None
 
 def _get_dados_demograficos_results(results_df: pd.DataFrame) -> pd.DataFrame:
     """
-    Cleans and standardizes data for readability and consistency.
-    No scores are calculated in this questionnaire.
+    Cleans column names and answers for readability and consistency of the 'dados demograficos' questionnaire.
+
+    This function:
+    - Renames columns to human-readable names
+    - Replaces coded answers with readable text
+    - Corrects common input errors (e.g. height entered in meters instead of centimeters,
+      working hours entered as daily hours instead of weekly hours)
+
+    No scores are calculated for this questionnaire.
+
+    :param results_df: Raw demographic questionnaire results.
+    :return: Cleaned demographic results.
     """
     # create copy to avoid warnings
     df = results_df.copy()
@@ -114,6 +155,19 @@ def _get_dados_demograficos_results(results_df: pd.DataFrame) -> pd.DataFrame:
 
 
 def _get_estilo_vida_results(results_df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Cleans column names and answers for readability and consistency of the 'estilo de vida' questionnaire.
+
+    This function:
+    - Renames existing columns to readable names
+    - Replaces coded answers with readable text
+    - Cleans and converts numeric time-related responses to proper numeric values
+
+    No scores are calculated for this questionnaire.
+
+    :param results_df: Raw lifestyle questionnaire results.
+    :return: Cleaned and standardized lifestyle results.
+    """
 
     # create copy to avoid warnings
     df = results_df.copy()
@@ -146,9 +200,17 @@ def _get_estilo_vida_results(results_df: pd.DataFrame) -> pd.DataFrame:
 
 def _get_atividade_fisica_results(results_df: pd.DataFrame) -> pd.DataFrame:
     """
+    Processes physical activity questionnaire data according to IPAQ guidelines and calculates IPAQ scores.
 
-    :param results_df:
-    :return:
+    This function:
+    - Cleans and renames columns
+    - Corrects inconsistent or false time inputs
+    - Calculates total activity time and MET scores
+    - Assigns IPAQ activity categories (Alta, Moderada, Baixa)
+    - Flags outliers and computes sitting times
+
+    :param results_df: Raw physical activity questionnaire results.
+    :return: Processed dataframe with activity totals, MET scores, IPAQ categories, and flags.
     """
     # Safe copy to avoid modifying original dataframe
     df = results_df.copy()
@@ -194,10 +256,18 @@ def _get_atividade_fisica_results(results_df: pd.DataFrame) -> pd.DataFrame:
 
 def _calculate_total_time_and_truncate(df: pd.DataFrame, prefixes: list) -> pd.DataFrame:
     """
+    Calculates total activity time in minutes and applies truncation rules.
 
-    :param df:
-    :param prefixes:
-    :return:
+    For each activity prefix, total time is calculated as:
+    hours * 60 + minutes.
+
+    Activity durations are truncated to a maximum of 180 minutes per activity.
+    Values below 10 minutes are set to 0.
+
+    :param df: Dataframe containing activity hour and minute columns.
+    :param prefixes: List of activity prefixes (e.g. ['vigorosa', 'moderada', 'caminhada']).
+    :return: Dataframe with total and truncated activity time columns added.
+
     """
     # iterate through the prefixes
     for prefix in prefixes:
@@ -221,9 +291,15 @@ def _calculate_total_time_and_truncate(df: pd.DataFrame, prefixes: list) -> pd.D
 
 def _calculate_met_scores(df: pd.DataFrame) -> pd.DataFrame:
     """
+    Calculates MET (Metabolic Equivalent of Task) scores for physical activities.
 
-    :param df:
-    :return:
+    MET values used:
+    - Vigorous: 8.0
+    - Moderate: 4.0
+    - Walking: 3.3
+
+    :param df: Dataframe containing activity days and truncated time columns.
+    :return: Dataframe with MET scores and total MET added.
     """
     df["vigorosa_met"] = 8 * df["vigorosa_dias"] * df["vigorosa_t_trunc"]
     df["moderada_met"] = 4 * df["moderada_dias"] * df["moderada_t_trunc"]
@@ -234,9 +310,15 @@ def _calculate_met_scores(df: pd.DataFrame) -> pd.DataFrame:
 
 def _assign_ipaq_categories(df: pd.DataFrame) -> pd.DataFrame:
     """
+    Assigns IPAQ physical activity categories.
 
-    :param df:
-    :return:
+    Categories are assigned based on IPAQ scoring rules:
+    - Alta (High)
+    - Moderada (Moderate)
+    - Baixa (Low)
+
+    :param df: Dataframe containing activity totals and MET scores.
+    :return: Dataframe with IPAQ category flags and final category column.
     """
     # Initialize all flags to 'N'
     for col in ["atividade_elevada_3", "atividade_elevada_7",
@@ -266,9 +348,13 @@ def _assign_ipaq_categories(df: pd.DataFrame) -> pd.DataFrame:
 
 def _outlier_detection(df: pd.DataFrame) -> pd.DataFrame:
     """
+    Flags IPAQ outliers based on total activity time.
 
-    :param df:
-    :return:
+    Participants with more than 960 minutes of total activity
+    are flagged as outliers.
+
+    :param df: Dataframe containing total activity time.
+    :return: Dataframe with an outlier flag column added.
     """
     df["ipaq_outlier"] = 'N'
     df.loc[df["total_atividade"] > 960, "ipaq_outlier"] = 'Y'
@@ -277,9 +363,10 @@ def _outlier_detection(df: pd.DataFrame) -> pd.DataFrame:
 
 def _compute_sitting_times(df: pd.DataFrame) -> pd.DataFrame:
     """
+    Computes total sitting time in minutes for weekdays and weekends.
 
-    :param df:
-    :return:
+    :param df: Dataframe containing sitting time hours and minutes.
+    :return: Dataframe with total sitting time columns added.
     """
     df["sentado_semana_total_min"] = df["sentada_semana_horas"] * 60 + df["sentada_semana_minutos"]
     df["sentado_fds_total_min"] = df["sentada_fds_horas"] * 60 + df["sentada_fds_minutos"]
@@ -325,7 +412,19 @@ def _correct_false_input(hours, minutes):
 
 
 def _correct_false_working_time(working_days: float, working_hours: float) -> Tuple[float, float]:
+    """
+    Corrects inconsistent working days and working hours inputs.
 
+    Corrections applied:
+    - If 7 working days are reported but weekly hours are unrealistically low,
+      the input is corrected to 5 working days.
+    - If daily working hours are entered instead of weekly hours,
+      total weekly hours are recalculated.
+
+    :param working_days: Number of working days reported.
+    :param working_hours: Number of working hours reported.
+    :return: Corrected working days and weekly working hours.
+    """
     # if the subject has entered that they worked that last 7 days, but the hours don't match 7 * 7 = 49 hours, correct
     # the input assuming that they worked 5 days and 5*7=35 hours
     if working_days == 7 and working_hours < 49:

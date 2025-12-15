@@ -88,7 +88,7 @@ if GENERATE_SCORES:
     # generate copsoq and mueq scores only if PROCESS PSYCHOSOCIAL = True since it needs the scores from all subjects
     if PROCESS_PSYCHOSOCIAL:
 
-        # get copsoq and mueq scores # TODO ADD CHECK FOR AVERAGE METHOD
+        # get copsoq and mueq scores
         questionnaires.get_psychosocial_scores(SCORES_OUT_PATH, average_method='population',
                                                output_folder_path=SCORES_OUT_PATH)
         questionnaires.get_psychosocial_scores(SCORES_OUT_PATH, average_method='work_type',

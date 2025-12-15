@@ -13,7 +13,6 @@ get_psychosocial_metrics(...): Loads a psychosocial scores CSV file and returns 
 [Private]
 -------------------
 """
-
 # ------------------------------------------------------------------------------------------------------------------- #
 # imports
 # ------------------------------------------------------------------------------------------------------------------- #
@@ -140,10 +139,10 @@ def get_psychosocial_metrics(scores_csv_file: str) -> Dict:
     (population or work type).
 
     The function determines the correct dictionary key based on the file name
-    containing `COPSOQ` or `MUEQ` and `POPULATION` or work-type indicator.
+    containing 'COPSOQ' or 'MUEQ' and 'population' or 'work_type' strings.
 
     :param scores_csv_file: Path to the CSV file containing psychosocial questionnaire scores.
-                            The file name should indicate the questionnaire type and averaging method.
+                            The file name should indicate the score type and averaging method.
     :return: A dictionary where the key corresponds to the questionnaire type and
             averaging method (e.g., `PSYCHOSOCIAL_COPSOQ_POPULATION_KEY`) and
             the value is a nested dictionary representation of the CSV data.
