@@ -8,6 +8,7 @@ get_single_instance_questionnaire_metrics(...): Load questionnaire scores from a
 a specific subject as a dictionary.
 get_domain_key_from_filename(...): Given a results file name, return the corresponding OH domain key.
 get_psychosocial_metrics(...): Loads a psychosocial scores CSV file and returns a dictionary with the scores
+get_metadata_metrics(...): Get metadata metrics for the OH profile.
 -------------------
 
 [Private]
@@ -22,6 +23,7 @@ from typing import Dict
 # internal imports
 from constants import ENVIRONMENT, PERSONAL, BIOMECHANICAL, ROSA, COPSOQ, POPULATION
 from OH_profile.constants import *
+import sensors.load as sl
 
 # ------------------------------------------------------------------------------------------------------------------- #
 # file specific constants
@@ -31,6 +33,8 @@ KEY_DOMAIN_MAPPING = {PERSONAL: PERSONAL_DOMAIN_KEY,
                       BIOMECHANICAL: BIOMECHANICAL_DOMAIN_KEY, ENVIRONMENT: ENVIRONMENTAL_DOMAIN_KEY,
                       ROSA: BIOMECHANICAL_DOMAIN_KEY}
 
+# columns from personal questionnaire results
+META_DATA_COLUMNS = ['idade', 'sexo', 'altura', 'peso', 'mao']
 # ------------------------------------------------------------------------------------------------------------------- #
 # public functions
 # ------------------------------------------------------------------------------------------------------------------- #
@@ -132,7 +136,7 @@ def get_domain_key_from_filename(results_file: str) -> str:
     raise ValueError(f"Could not determine domain for file: {results_file}")
 
 
-def get_psychosocial_metrics(scores_csv_file: str) -> Dict:
+def get_psychosocial_metrics(scores_csv_file: str, subject_id: int) -> Dict:
     """
     Loads a psychosocial scores CSV file and returns a dictionary with the scores
     organized by questionnaire type (COPSOQ or MUEQ) and averaging method
@@ -143,6 +147,7 @@ def get_psychosocial_metrics(scores_csv_file: str) -> Dict:
 
     :param scores_csv_file: Path to the CSV file containing psychosocial questionnaire scores.
                             The file name should indicate the score type and averaging method.
+    :param subject_id: The ID of the subject for which metrics should be extracted.
     :return: A dictionary where the key corresponds to the questionnaire type and
             averaging method (e.g., `PSYCHOSOCIAL_COPSOQ_POPULATION_KEY`) and
             the value is a nested dictionary representation of the CSV data.
@@ -151,12 +156,21 @@ def get_psychosocial_metrics(scores_csv_file: str) -> Dict:
     # init metrics dict
     metrics_dict = {}
 
+    # check the work_type of the subject
+    work_type = sl.get_participant_work_type(sl.load_participants_info(), subject_id)
+
     # load results to a dataframe
     scores_df = pd.read_csv(scores_csv_file, index_col=0)
 
     # Determine questionnaire type
     is_copsoq = COPSOQ in scores_csv_file
     is_population = POPULATION in scores_csv_file
+
+    # it it's a work_type mean score
+    if not is_population:
+
+        # remove the index (work_type mean) that does not correspond to the worker's type
+        scores_df = scores_df[scores_df.index.str.contains(work_type)]
 
     # Select correct output key
     if is_copsoq:
@@ -170,3 +184,39 @@ def get_psychosocial_metrics(scores_csv_file: str) -> Dict:
     metrics_dict[key] = scores_df.to_dict()
 
     return metrics_dict
+
+
+def get_metadata_metrics(personal_scores_csv_file: str, subject_id: int) -> Dict:
+    """
+    Get metadata metrics for the OH profile.
+    :param personal_scores_csv_file: Path to the CSV file containing personal questionnaire results.
+    :param subject_id: The ID of the subject for which metrics should be extracted.
+    :return: A dictionary mapping each metric/column name to the subject's value.
+            (example: {'age': 46, 'height': 154, 'weight': 65 ....})
+    """
+
+    # load results to a dataframe
+    scores_df = pd.read_csv(personal_scores_csv_file, index_col=0)
+
+    # get a sub dataframe with the data from the particular subject only and only the relevant columns
+    subject_results = scores_df.loc[subject_id, META_DATA_COLUMNS]
+
+    # get work type and start date from participants info
+    work_type = sl.get_participant_work_type(sl.load_participants_info(), subject_id)
+    start_date = sl.get_participant_start_date(sl.load_participants_info(), subject_id)
+
+    # turn df into a dict
+    metrics_dict = subject_results.to_dict()
+
+    # add work type and start date to metrics
+    metrics_dict['work_type'] = work_type
+    metrics_dict['start_date'] = start_date
+    metrics_dict['subject_id'] = subject_id
+
+    return metrics_dict
+
+
+
+
+
+

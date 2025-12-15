@@ -7,7 +7,7 @@ import re
 # internal imports
 import questionnaires
 import sensors.load as sl
-from constants import WORKLOAD, PSYCHOSOCIAL
+from constants import WORKLOAD, PSYCHOSOCIAL, PERSONAL, WORK_TYPE
 from OH_profile.constants import *
 from OH_profile.load import get_OH_profile
 from OH_profile.write import save_OH_profile, write_to_OH_profile
@@ -16,7 +16,7 @@ from OH_profile.write import save_OH_profile, write_to_OH_profile
 # flags
 # ------------------------------------------------------------------------------------------------------------------- #
 GENERATE_SCORES = False
-PROCESS_PSYCHOSOCIAL = True
+PROCESS_PSYCHOSOCIAL = False
 PROCESS_PERSONAL = False
 PROCESS_ENVIRONMENT = False
 PROCESS_BIOMECHANICAL = False
@@ -146,6 +146,15 @@ if GENERATE_OH_PROFILE:
                     # it's single instance questionnaire except psychosocial
                     elif PSYCHOSOCIAL not in results_file_path:
 
+                        # use personal questionnaire results to add the metadata
+                        if PERSONAL in results_file_path:
+
+                            # add metadata to OH profile
+                            metadata_dict = questionnaires.get_metadata_metrics(results_file_path, int(subject_id))
+
+                            oh_profile = write_to_OH_profile(oh_profile, main_outer_key=METADATA_KEY,
+                                                             main_inner_key=None, dict_to_write=metadata_dict)
+
                         print(f"Getting metrics for {results_file} of subject {subject_id}...")
                         # get metrics
                         metrics_dict = questionnaires.get_single_instance_questionnaire_metrics(results_file_path, int(subject_id))
@@ -155,8 +164,7 @@ if GENERATE_OH_PROFILE:
 
                         # write to OH profile
                         oh_profile = write_to_OH_profile(oh_profile, main_outer_key=SINGLE_INSTANCE_QUESTIONNAIRE_KEY,
-                                                         main_inner_key=main_inner_key,
-                                                         dict_to_write=metrics_dict)
+                                                         main_inner_key=main_inner_key, dict_to_write=metrics_dict)
                     # save OH profile to json
                     save_OH_profile(OH_PROFILE_PATH, subject_id, oh_profile)
 
@@ -166,11 +174,18 @@ if GENERATE_OH_PROFILE:
             # the results are the same for all subjects
             for participant_id in all_ids:
 
+                # check if the file corresponds to COPSOQ/MUEQ scores with work_type mean
+                if WORK_TYPE in path:
+
+                    # check the work_type of the subject
+                    work_type = sl.get_participant_work_type(sl.load_participants_info(), int(participant_id))
+
+
                 # open or generate OH dictionary for this subject
                 oh_profile = get_OH_profile(OH_PROFILE_PATH, participant_id)
 
                 # if it's a file then it's the psychosocial scores
-                metrics_dict = questionnaires.get_psychosocial_metrics(path)
+                metrics_dict = questionnaires.get_psychosocial_metrics(path, int(participant_id))
 
                 # write to OH profile
                 oh_profile = write_to_OH_profile(oh_profile, main_outer_key=SINGLE_INSTANCE_QUESTIONNAIRE_KEY,
