@@ -14,6 +14,8 @@ from .emg_visuals import (
     plot_metric_series,
     plot_session_effort_grid,
     plot_session_effort_stacks,
+    plot_mvc_segments,
+    plot_mvc_hybrid_diagnostics,
 )
 
 __all__ = [
@@ -28,4 +30,7 @@ __all__ = [
     "plot_metric_series",
     "plot_session_effort_grid",
     "plot_session_effort_stacks",
+    # MVC visualization
+    "plot_mvc_segments",
+    "plot_mvc_hybrid_diagnostics",
 ]

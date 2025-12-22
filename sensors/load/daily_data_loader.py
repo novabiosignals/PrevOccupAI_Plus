@@ -35,8 +35,10 @@ from constants import PHONE, WATCH, VALID_MBAN_DATA, NSEQ, IMU_SENSORS, TIME_COL
 from .data_quality import (
     DataQualityError,
     FileQualityReport,
-    QualityIssue,
     assess_muscleban_dataframe,
+    add_report_context,
+    describe_report,
+    is_report_valid,
     MIN_MUSCLEBAN_SAMPLES,
     MIN_MVC_OSCOMPATIBLE_SAMPLES,
 )
@@ -111,11 +113,11 @@ def load_daily_acquisitions(
                     try:
                         muscleban_sensor_data = _load_muscleban_data(paths_list[0], sensor_list_mban)
                     except DataQualityError as exc:
-                        report = exc.report.with_context(device, acquisition_time)
+                        report = add_report_context(exc.report, device, acquisition_time)
                         if quality_log is not None:
                             quality_log.append(report)
                         print(
-                            f"[data_quality] Skipping {device} acquisition {acquisition_time}: {exc.report.describe()}"
+                            f"[data_quality] Skipping {device} acquisition {acquisition_time}: {describe_report(exc.report)}"
                         )
                         continue
 
@@ -340,7 +342,7 @@ def _pad_data(sensor_data: List[pd.DataFrame], report: Dict[str, Any], padding_t
             sensor_df = sensor_df[sensor_df[TIME_COLUMN_NAME] >= start_timestamp]
 
         # get the timestamp values that need to be padded at the beginning of the DataFrame
-        timestamps_start_pad = time_axis_start[time_axis_start < sensor_df[TIME_COLUMN_NAME].iloc[0]]
+        timestamps_start_pad = time_axis_start[time_axis_start < sensor_df[TIME_COLUMN_NAME].iloc[0]].tolist()
 
         # (2) padding at the end
         if end_timestamp < sensor_df[TIME_COLUMN_NAME].iloc[
@@ -350,12 +352,12 @@ def _pad_data(sensor_data: List[pd.DataFrame], report: Dict[str, Any], padding_t
             sensor_df = sensor_df[sensor_df[TIME_COLUMN_NAME] <= end_timestamp]
 
         # get the timestamp values that need to be padded at the end of the DataFrame
-        timestamps_end_pad = time_axis_end[time_axis_end > sensor_df[TIME_COLUMN_NAME].iloc[-1]]
+        timestamps_end_pad = time_axis_end[time_axis_end > sensor_df[TIME_COLUMN_NAME].iloc[-1]].tolist()
 
         if padding_type == 'same':
             # create padding for beginning and end
-            padding_start = _create_padding(timestamps_start_pad, sensor_df.iloc[0, 1:].values)
-            padding_end = _create_padding(timestamps_end_pad, sensor_df.iloc[-1, 1:].values)
+            padding_start = _create_padding(timestamps_start_pad, sensor_df.iloc[0, 1:].to_numpy(copy=False))
+            padding_end = _create_padding(timestamps_end_pad, sensor_df.iloc[-1, 1:].to_numpy(copy=False))
         else:
             # create zero padding
             padding_start = _create_padding(timestamps_start_pad, np.zeros(len(sensor_df.columns) - 1))
@@ -471,12 +473,12 @@ def _load_muscleban_data(file_path: Path, sensor_list: List[str]) -> pd.DataFram
     print(f"\nLoading muscleBAN data from file: {file_path.name}.")
 
     def _raise_quality_error(code: str, message: str, rows: int = 0, cols: int = 0) -> None:
-        report = FileQualityReport(
-            file_path=file_path,
-            issues=[QualityIssue(code=code, message=message)],
-            rows=rows,
-            columns=cols,
-        )
+        report: FileQualityReport = {
+            "file_path": file_path,
+            "issues": [{"code": code, "message": message}],
+            "rows": rows,
+            "columns": cols,
+        }
         raise DataQualityError(report)
 
     # load data into a dataframe
@@ -517,7 +519,7 @@ def _load_muscleban_data(file_path: Path, sensor_list: List[str]) -> pd.DataFram
     min_samples = MIN_MVC_OSCOMPATIBLE_SAMPLES if is_oscompatible_mvc else MIN_MUSCLEBAN_SAMPLES
 
     report = assess_muscleban_dataframe(sensor_df, file_path, min_samples=min_samples)
-    if not report.is_valid:
+    if not is_report_valid(report):
         raise DataQualityError(report)
 
     # keep only the sensors in sensor list (plus nSeq)

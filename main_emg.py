@@ -8,7 +8,7 @@ from typing import Sequence
 from constants import MBAN
 from sensors.load.data_quality import FileQualityReport
 from sensors.load.dataset_loader import discover_daily_acquisitions
-from signal_processing import PreprocessConfig, run_emg_pipeline
+from signal_processing import create_preprocess_config, run_emg_pipeline
 
 # ------------------------------------------------------------------------------------------------------------------- #
 # Configuration
@@ -19,7 +19,7 @@ SELECTED_SENSORS = {MBAN: ["EMG"]}
 RESULTS_ROOT = Path(r"/Volumes/USB DISK/PrevOccupAI_plus_Data/results") / "emg_pipeline"
 PLOTS_ROOT = RESULTS_ROOT / "plots"
 OH_PROFILES_ROOT = Path(r"/Volumes/USB DISK/PrevOccupAI_plus_Data/OH_profiles")  # Optional: set to None to disable OH profile saving
-DEFAULT_CONFIG = PreprocessConfig()
+DEFAULT_CONFIG = create_preprocess_config()
 
 
 def _ensure_data_root() -> None:
@@ -54,11 +54,11 @@ def build_day_index(
         max_days_per_subject=max_days_per_subject,
     )
 
-    unique_subjects = {descriptor["subject_id"] for descriptor in descriptors}
+    unique_subjects = {descriptor["subject_id"] for descriptor in descriptors} # uses a set comprehension with {}
     print(
         f"[main_emg] Discovered {len(descriptors)} day folders across {len(unique_subjects)} subjects."
     )
-    return descriptors
+    return descriptors # filtered descriptors if any filters were applied
 
 
 def main(
@@ -70,6 +70,8 @@ def main(
     max_subjects: int | None = None,
     max_days_per_subject: int | None = None,
     save_oh_profiles: bool = True,
+    show_mvc_plots: bool = False,
+    tkeo_segments: bool = False,
 ):
     """Coordinate dataset discovery, preprocessing, and visualization stages.
 
@@ -84,24 +86,22 @@ def main(
     :param max_subjects: Upper bound for subject count, handy for quick subset checks.
     :param max_days_per_subject: Upper bound for day folders per subject.
     :param save_oh_profiles: Whether to save EMG metrics to OH profile JSON files.
+    :param tkeo_segments: Use TKEO-based MVC segmentation and emit failure plots for QA.
     :returns: Mapping of artifact labels to filesystem paths for anything produced by the run.
     """
 
     if run_all:
-        load_data = preprocess = visualize = True
+        load_data = preprocess = visualize = show_mvc_plots = True
+        tkeo_segments = True
 
     descriptors: list[dict] = []
 
     # The underlying data loader is relatively heavy, so only run it when a later stage needs the result.
-    if load_data or preprocess:
+    if load_data:
         descriptors = build_day_index(subject_filter, max_subjects, max_days_per_subject)
         if not descriptors:
             print("[main_emg] No acquisitions found. Nothing to do.")
             return None
-
-    if not preprocess:
-        print("[main_emg] Preprocessing skipped (preprocess flag is False).")
-        return None
 
     print("[main_emg] Starting EMG pipeline...")
     quality_reports: list[FileQualityReport] = []
@@ -109,20 +109,24 @@ def main(
     # Determine OH profiles path
     oh_profiles_path = str(OH_PROFILES_ROOT) if save_oh_profiles and OH_PROFILES_ROOT else None
 
-    artifacts = run_emg_pipeline(
-        descriptors,
-        selected_sensors=SELECTED_SENSORS,
-        results_root=RESULTS_ROOT,
-        plots_root=PLOTS_ROOT,
-        config=DEFAULT_CONFIG,
-        generate_visuals=visualize,
-        quality_log=quality_reports,
-        oh_profiles_path=oh_profiles_path,
-    )
+    if preprocess and visualize:
 
-    print("[main_emg] Pipeline finished. Artifacts:")
-    for label, path in artifacts.items():
-        print(f"    - {label}: {path}")
+        artifacts = run_emg_pipeline(
+            descriptors,
+            selected_sensors=SELECTED_SENSORS,
+            results_root=RESULTS_ROOT,
+            plots_root=PLOTS_ROOT,
+            config=DEFAULT_CONFIG,
+            generate_visuals=visualize,
+            quality_log=quality_reports,
+            oh_profiles_path=oh_profiles_path,
+            show_mvc_plots=show_mvc_plots,
+            tkeo_segments=tkeo_segments,
+        )
+
+        print("[main_emg] Pipeline finished. Artifacts:")
+        for label, path in artifacts.items():
+            print(f"    - {label}: {path}")
 
     if quality_reports:
         report_path = artifacts.get("quality_report")

@@ -8,15 +8,17 @@ This module contains functions for preprocessing raw EMG signals:
 - Rectification
 - Smoothing (envelope extraction)
 """
-
+# external imports
 import json
 from pathlib import Path
 from typing import Tuple, List
-
 import numpy as np
 import pandas as pd
 from scipy.ndimage import gaussian_filter1d
 from scipy.signal import butter, filtfilt
+
+# internal imports
+from signal_processing.emg_types import PreprocessConfig
 
 
 # -------------------------------------------------------------------------------------------------------------------- #
@@ -82,36 +84,85 @@ def load_opensignals_txt(path: str) -> Tuple[pd.DataFrame, dict, float]:
     return df, meta, fs
 
 
-def load_emg_channel(df: pd.DataFrame) -> np.ndarray:
-    """
-    Extract the first EMG-related column from a dataframe.
-
-    :param df: DataFrame loaded from OpenSignals file.
-    :return: 1D array of EMG values.
-    """
-    for column in df.columns:
-        column_name = str(column)
-        if "emg" in column_name.lower():
-            return df[column].to_numpy()
-
-    # Fallback to second column (common for MVC files)
-    return df.iloc[:, 1].to_numpy()
-
-
 # -------------------------------------------------------------------------------------------------------------------- #
 # Signal Processing Functions
 # -------------------------------------------------------------------------------------------------------------------- #
+def _compute_envelope(
+    df: pd.DataFrame,
+    config: PreprocessConfig,
+    return_raw: bool = False,
+) -> np.ndarray | tuple[np.ndarray, np.ndarray]:
+    """Transform a raw session dataframe into an EMG envelope (and optionally raw signal).
+
+    :param df: DataFrame that still contains nSeq + EMG (and possibly ACC) columns.
+    :param config: Frequency-domain configuration shared across sessions.
+    :param return_raw: When ``True`` also returns the unfiltered EMG trace for plotting.
+    :returns: Envelope-only array or ``(envelope, raw)`` tuple when ``return_raw`` is set.
+    """
+
+    emg_mv = _extract_emg_mv(df) # get EMG column in mV
+    envelope = preprocess_emg(emg_mv, config["fs"], config["lowcut"], config["highcut"], config["smooth_sigma_ms"]) 
+    if return_raw:
+        return envelope, emg_mv # return both envelope and raw EMG in mV
+    return envelope
+
+
+def _extract_emg_mv(df: pd.DataFrame) -> np.ndarray:
+    """Locate the EMG column, convert it to millivolts, and guard against empty recordings.
+
+    :param df: Session dataframe containing EMG plus optional auxiliary channels.
+    :returns: One-dimensional NumPy array with values expressed in millivolts.
+    """
+
+    emg_cols = [col for col in df.columns if "emg" in str(col).lower()]
+    target_col = None
+    if emg_cols:
+        target_col = emg_cols[0]
+    elif len(df.columns) > 1:
+        target_col = df.columns[1]
+    else:
+        raise ValueError("No EMG column available")
+
+    raw_values = df[target_col].to_numpy()
+    if raw_values.size == 0:
+        raise ValueError("Empty EMG column")
+    return _to_millivolts(raw_values)
+
+
+def _to_millivolts(raw_values: np.ndarray) -> np.ndarray:
+    """Convert EMG samples to millivolts, respecting files that are already scaled.
+
+    :param raw_values: EMG samples straight from disk (could be ints or floats, scaled or not).
+    :returns: Array of EMG values in millivolts.
+    """
+
+    arr = np.asarray(raw_values)
+
+    # Raw OpenSignals files store EMG as unsigned integers; StudioData MVC files are floats in mV already.
+    if np.issubdtype(arr.dtype, np.integer):
+        return transfer_emg(arr.astype(float))
+
+    arr = arr.astype(float)
+    finite = arr[np.isfinite(arr)]
+    max_abs = float(np.max(np.abs(finite))) if finite.size else 0.0
+
+    # Values below ~10 mV typically indicate that the file is already calibrated; avoid double-scaling.
+    if max_abs <= 10.0:
+        return arr
+
+    return transfer_emg(arr)
 
 def transfer_emg(raw_emg: np.ndarray) -> np.ndarray:
     """
-    Convert raw 16-bit EMG samples to millivolts using the device transfer function.
+    Convert raw 16-bit EMG samples to millivolts using the muscleBAN transfer function.
 
-    Formula: ((raw / 2^15) - 0.5) * 2500 / 1100
+    MuscleBAN-specific formula: ((ADC / (2^16 - 1)) - 0.5) * VCC / Gain
+    For muscleBAN EMG sensor: VCC = 2500 mV, Gain = 1100, n = 16 bits
 
     :param raw_emg: Array of raw ADC values.
     :return: Array of EMG values in millivolts.
     """
-    return (((raw_emg / (2 ** (16 - 1.0))) - 0.5) * 2500) / 1100
+    return (((raw_emg / (2 ** 16 - 1.0)) - 0.5) * 2500) / 1100
 
 
 def bandpass_filter(signal: np.ndarray, fs: float, lowcut: float = 10.0,
@@ -160,60 +211,60 @@ def preprocess_emg(emg_mv: np.ndarray, fs: float, lowcut: float = 10.0,
 
     return envelope
 
-
-# -------------------------------------------------------------------------------------------------------------------- #
-# Session Processing Functions
-# -------------------------------------------------------------------------------------------------------------------- #
-
-def process_emg_session(emg_files: List[str], mvc_file: str, lowcut: float = 10.0,
-                        highcut: float = 500.0, smooth_sigma_ms: float = 50.0
-                        ) -> Tuple[np.ndarray, float, float]:
+def tkeo(x: np.ndarray, rectify: bool = True) -> np.ndarray:
+    """Teager-Kaiser Energy Operator.
+    
+    Computes instantaneous energy: Ψ[n] = x[n]² - x[n-1]·x[n+1]
+    
+    Note: The discrete TKEO can produce negative values for real signals.
+    Clamping to zero is a pragmatic rectification step commonly applied
+    for EMG onset detection, but is not a mathematical property of TKEO.
+    
+    Reference: Solnik et al. (2008) "Teager-Kaiser Operator improves the
+    accuracy of EMG onset detection independent of signal-to-noise ratio"
+    
+    :param x: Input signal (typically bandpass-filtered EMG).
+    :param rectify: If True, clamp negative values to 0 (default for EMG).
+    :returns: TKEO energy signal.
     """
-    Process a complete EMG session: load files, preprocess, and normalize to %MVC.
+    x = np.asarray(x, dtype=float)
+    n = len(x)
+    psi = np.zeros_like(x)
+    if n >= 3:
+        psi[1:-1] = x[1:-1]**2 - x[:-2] * x[2:]
+        if rectify:
+            psi[psi < 0] = 0.0
+    return psi
 
-    :param emg_files: List of paths to OpenSignals files for this session.
-    :param mvc_file: Path to the MVC recording file for normalization.
-    :param lowcut: Lower bandpass cutoff in Hz.
-    :param highcut: Upper bandpass cutoff in Hz.
-    :param smooth_sigma_ms: Smoothing sigma in milliseconds.
-    :return: Tuple of (percent_mvc_signal, sampling_rate, mvc_peak_value).
+
+def compute_tkeo_envelope(
+    emg_filt: np.ndarray, 
+    fs: float, 
+    smooth_cutoff_hz: float = 50.0,
+) -> np.ndarray:
+    """Compute TKEO energy envelope from already-filtered EMG.
+    
+    Pipeline: TKEO → 6th-order low-pass smoothing
+    
+    This follows Solnik et al. (2008) Conditioning 2, but expects the input
+    to already be bandpass-filtered (their Step 2). Do not call bandpass_filter
+    again if your signal is already filtered.
+    
+    Note: The paper used a 50 Hz low-pass for smoothing the TKEO output,
+    which is different from Gaussian smoothing with σ=50ms.
+    
+    :param emg_filt: Bandpass-filtered EMG signal (NOT raw, NOT envelope).
+    :param fs: Sampling frequency in Hz.
+    :param smooth_cutoff_hz: Low-pass cutoff for smoothing TKEO output (default 50 Hz).
+    :returns: Smoothed TKEO energy envelope.
     """
-    envelopes = []
-    fs_session = None
-
-    # Process each EMG file in the session
-    for file_path in emg_files:
-        df, _, fs = load_opensignals_txt(file_path)
-        emg_mv = transfer_emg(load_emg_channel(df))
-        envelope = preprocess_emg(emg_mv, fs, lowcut=lowcut, highcut=highcut,
-                                  smooth_sigma_ms=smooth_sigma_ms)
-        envelopes.append(envelope)
-
-        if fs_session is None:
-            fs_session = fs
-        elif not np.isclose(fs_session, fs):
-            print(f"[process_emg_session] Warning: Sampling rate mismatch in {file_path}")
-
-    if not envelopes:
-        raise ValueError("No EMG files provided for session processing")
-
-    # Concatenate all envelopes from the session
-    session_envelope = np.concatenate(envelopes)
-
-    # Process MVC file
-    df_mvc, _, fs_mvc = load_opensignals_txt(mvc_file)
-    mvc_mv = transfer_emg(load_emg_channel(df_mvc))
-    mvc_envelope = preprocess_emg(mvc_mv, fs_mvc, lowcut=lowcut, highcut=highcut,
-                                  smooth_sigma_ms=smooth_sigma_ms)
-    mvc_peak = float(np.max(mvc_envelope))
-
-    if mvc_peak <= 0:
-        raise ValueError(f"MVC peak is non-positive for file {mvc_file}")
-
-    if fs_session is None:
-        fs_session = fs_mvc
-
-    # Normalize to %MVC
-    percent_signal = (session_envelope / mvc_peak) * 100.0
-
-    return percent_signal, fs_session, mvc_peak
+    # Apply TKEO to filtered signal
+    energy = tkeo(emg_filt, rectify=True)
+    
+    # Low-pass smoothing (6th order as per paper)
+    nyq = 0.5 * fs
+    cutoff_norm = min(smooth_cutoff_hz / nyq, 0.99)  # Guard against edge cases
+    b, a = butter(6, cutoff_norm, btype='low')
+    envelope = filtfilt(b, a, energy)
+    
+    return envelope

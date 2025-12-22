@@ -11,7 +11,7 @@ All functions use simple data structures (dicts, arrays) rather than classes.
 """
 
 from pathlib import Path
-from typing import Sequence
+from typing import Sequence, List
 
 import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
@@ -357,3 +357,272 @@ def _annotate_missing(ax: Axes, message: str) -> None:
     ax.text(0.5, 0.5, message, ha="center", va="center", fontsize=10, color="#555555")
     for spine in ax.spines.values():
         spine.set_visible(False)
+
+
+# -------------------------------------------------------------------------------------------------------------------- #
+# MVC Plotting Functions
+# -------------------------------------------------------------------------------------------------------------------- #
+def plot_mvc_segments(
+    envelope: np.ndarray,
+    segments: List[tuple[int, int]],
+    fs: float,
+    threshold_value: float,
+    output_path: Path,
+    title: str,
+    method: str = "unknown",
+    show: bool = False,
+) -> None:
+    """
+    Plot MVC envelope with detected segments and threshold.
+
+    :param envelope: 1-D array of the MVC envelope signal.
+    :param segments: List of (start, end) sample index tuples for detected segments.
+    :param fs: Sampling frequency in Hz.
+    :param threshold_value: Amplitude threshold used for segment detection.
+    :param output_path: Destination file path for the PNG.
+    :param title: Plot title for context.
+    :param method: Segmentation method used (e.g., "TKEO", "envelope", "envelope fallback").
+    :param show: If True, display the plot interactively before closing.
+    """
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    t = np.arange(len(envelope)) / fs if fs else np.arange(len(envelope))
+    env_abs = np.abs(envelope)
+
+    plt.figure(figsize=(10, 4))
+    plt.plot(t, env_abs, label="MVC envelope", color="#1f77b4", linewidth=1.2)
+    plt.axhline(threshold_value, color="red", linestyle="--", linewidth=1.0, 
+                label=f"threshold={threshold_value:.3f}")
+
+    for idx, (start, end) in enumerate(segments):
+        plt.axvspan(start / fs, end / fs, alpha=0.2, color="#2ca02c", 
+                    label=f"segment ({method})" if idx == 0 else None)
+
+    plt.title(title)
+    plt.xlabel("Time (s)")
+    plt.ylabel("Amplitude (mV)")
+    plt.grid(True, alpha=0.3)
+    plt.legend(loc="upper right")
+    plt.tight_layout()
+
+    if show:
+        plt.show(block=True)  # allow user interaction before persisting to disk
+
+    plt.savefig(output_path)
+    plt.close()
+
+
+def plot_mvc_hybrid_diagnostics(
+    emg_mv: np.ndarray,
+    segments: List[tuple[int, int]],
+    debug_info: dict,
+    fs: float,
+    output_path: Path,
+    title: str = "MVC Hybrid Detection Diagnostics",
+    show: bool = False,
+) -> None:
+    """
+    Multi-panel diagnostic plot for hybrid MVC segmentation.
+
+    Creates a 4-panel figure showing:
+    - Panel 1: Filtered EMG with detected segments highlighted + baseline window
+    - Panel 2: Log-energy curve with threshold lines and baseline region
+    - Panel 3: Histogram of log-energy with thresholds and baseline IQR info
+    - Panel 4: Binary activation mask with segment ranking (top-2 by energy)
+
+    :param emg_mv: Original raw EMG signal in millivolts.
+    :param segments: List of (start, end) sample index tuples for detected segments.
+    :param debug_info: Dictionary from detect_mvc_segments_hybrid containing:
+                       emg_filt, log_energy, threshold, threshold_otsu,
+                       threshold_baseline, threshold_method, p10, p90, floor,
+                       baseline_start, baseline_end, robust_sigma, binary.
+    :param fs: Sampling frequency in Hz.
+    :param output_path: Destination file path for the PNG.
+    :param title: Overall figure title.
+    :param show: If True, display the plot interactively before saving.
+    """
+    ensure_parent(output_path)
+
+    # Extract debug values
+    emg_filt = debug_info.get("emg_filt", emg_mv)
+    log_energy = debug_info["log_energy"]
+    threshold = debug_info["threshold"]
+    threshold_otsu = debug_info["threshold_otsu"]
+    threshold_baseline = debug_info["threshold_baseline"]
+    threshold_method = debug_info["threshold_method"]
+    p10 = debug_info["p10"]
+    p90 = debug_info["p90"]
+    floor_val = debug_info["floor"]
+    baseline_median = debug_info.get("baseline_median", threshold_baseline - 6 * 0.1)
+    baseline_start = debug_info.get("baseline_start", 0)
+    baseline_end = debug_info.get("baseline_end", 0)
+    robust_sigma = debug_info.get("robust_sigma", 0.1)
+    binary = debug_info["binary"]
+    
+    # Get candidate scores for display
+    candidate_scores = debug_info.get("candidate_scores", {})
+    best_score = debug_info.get("best_score", 0)
+
+    # Time axis
+    t = np.arange(len(emg_filt)) / fs
+
+    # Create figure with 4 panels
+    fig, axes = plt.subplots(4, 1, figsize=(14, 12), sharex=True)
+    fig.suptitle(f"{title}\n[Method: {threshold_method.upper()} | Score: {best_score:.1f} | σ: {robust_sigma:.3f}]", 
+                 fontsize=14, fontweight="bold")
+
+    # -------------------------------------------------------------------------
+    # Panel 1: Filtered EMG with segments and baseline window
+    # -------------------------------------------------------------------------
+    ax1 = axes[0]
+    ax1.plot(t, emg_filt, color="#1f77b4", linewidth=0.5, alpha=0.8)
+    
+    # Highlight baseline window
+    if baseline_start < baseline_end:
+        t_bl_start, t_bl_end = baseline_start / fs, baseline_end / fs
+        ax1.axvspan(t_bl_start, t_bl_end, alpha=0.2, color="cyan",
+                    label=f"Baseline window ({t_bl_end - t_bl_start:.2f}s)")
+    
+    # Highlight detected segments
+    n_segments = len(segments)
+    for idx, (start, end) in enumerate(segments):
+        t_start, t_end = start / fs, end / fs
+        ax1.axvspan(t_start, t_end, alpha=0.3, color="#2ca02c",
+                    label=f"MVC segment (n={n_segments})" if idx == 0 else None)
+    ax1.set_ylabel("EMG (mV)")
+    ax1.set_title("Filtered EMG with Detected MVC Segments & Baseline Window")
+    ax1.legend(loc="upper right")
+    ax1.grid(True, alpha=0.3)
+
+    # -------------------------------------------------------------------------
+    # Panel 2: Log-energy with threshold lines and baseline region
+    # -------------------------------------------------------------------------
+    ax2 = axes[1]
+    ax2.plot(t[:len(log_energy)], log_energy, color="#ff7f0e", linewidth=0.8)
+    
+    # Highlight baseline region on energy plot
+    if baseline_start < baseline_end:
+        ax2.axvspan(baseline_start / fs, baseline_end / fs, alpha=0.15, color="cyan")
+
+    # Threshold used (solid red)
+    score_str = ""
+    if threshold_method in candidate_scores:
+        score_str = f" [score={candidate_scores[threshold_method]['score']:.1f}]"
+    ax2.axhline(threshold, color="red", linestyle="-", linewidth=1.5,
+                label=f"✓ Used ({threshold_method}): {threshold:.2f}{score_str}")
+
+    # Otsu threshold (dashed blue)
+    otsu_info = ""
+    if "otsu" in candidate_scores:
+        otsu_n = candidate_scores['otsu']['n_segments']
+        otsu_info = f" [n={otsu_n}, score={candidate_scores['otsu']['score']:.1f}]"
+    ax2.axhline(threshold_otsu, color="blue", linestyle="--", linewidth=1.0, alpha=0.7,
+                label=f"Otsu: {threshold_otsu:.2f}{otsu_info}")
+
+    # Baseline threshold (dashed green) - only if different from used
+    if threshold_method != "baseline":
+        baseline_info = ""
+        if "baseline" in candidate_scores:
+            base_n = candidate_scores['baseline']['n_segments']
+            baseline_info = f" [n={base_n}, score={candidate_scores['baseline']['score']:.1f}]"
+        ax2.axhline(threshold_baseline, color="green", linestyle="--", linewidth=1.0, alpha=0.7,
+                    label=f"Baseline: {threshold_baseline:.2f}{baseline_info}")
+
+    # Floor (dotted gray) - baseline-derived
+    ax2.axhline(floor_val, color="gray", linestyle=":", linewidth=1.0, alpha=0.5,
+                label=f"Floor (median+2σ): {floor_val:.2f}")
+    
+    # Baseline median (dotted cyan)
+    ax2.axhline(baseline_median, color="cyan", linestyle=":", linewidth=1.0, alpha=0.5,
+                label=f"Baseline median: {baseline_median:.2f}")
+
+    ax2.set_ylabel("Log₁₀(Energy)")
+    ax2.set_title("Log-Energy with Threshold Lines (Evidence-Driven Selection)")
+    ax2.legend(loc="upper right", fontsize=7)
+    ax2.grid(True, alpha=0.3)
+
+    # -------------------------------------------------------------------------
+    # Panel 3: Histogram of log-energy with thresholds and sigma info
+    # -------------------------------------------------------------------------
+    ax3 = axes[2]
+    ax3.hist(log_energy, bins=100, color="#9467bd", alpha=0.7, edgecolor="none", density=True)
+    ax3.axvline(threshold, color="red", linestyle="-", linewidth=2,
+                label=f"Used: {threshold:.2f}")
+    ax3.axvline(threshold_otsu, color="blue", linestyle="--", linewidth=1.5,
+                label=f"Otsu: {threshold_otsu:.2f}")
+    if threshold_method != "baseline":
+        ax3.axvline(threshold_baseline, color="green", linestyle="--", linewidth=1.5,
+                    label=f"Baseline: {threshold_baseline:.2f}")
+    ax3.axvline(p10, color="gray", linestyle=":", linewidth=1.0, alpha=0.6,
+                label=f"P10: {p10:.2f}")
+    ax3.axvline(p90, color="gray", linestyle=":", linewidth=1.0, alpha=0.6,
+                label=f"P90: {p90:.2f}")
+    ax3.axvline(baseline_median, color="cyan", linestyle=":", linewidth=1.5, alpha=0.8,
+                label=f"Baseline med: {baseline_median:.2f}")
+    
+    # Add text annotation with key parameters
+    dynamic_range = p90 - p10
+    info_text = (f"σ_robust = {robust_sigma:.3f}\n"
+                 f"Range (P90-P10) = {dynamic_range:.2f}\n"
+                 f"Threshold = med + 6σ")
+    ax3.text(0.02, 0.98, info_text, transform=ax3.transAxes, fontsize=8,
+             verticalalignment='top', fontfamily='monospace',
+             bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
+    
+    ax3.set_ylabel("Density")
+    ax3.set_xlabel("Log₁₀(Energy)")
+    ax3.set_title("Log-Energy Distribution with Threshold Analysis")
+    ax3.legend(loc="upper right", fontsize=8)
+    ax3.grid(True, alpha=0.3)
+
+    # -------------------------------------------------------------------------
+    # Panel 4: Binary activation mask with segment details
+    # -------------------------------------------------------------------------
+    ax4 = axes[3]
+    ax4.fill_between(t[:len(binary)], 0, binary, step="mid", color="#2ca02c", alpha=0.6)
+    
+    # Annotate each segment with duration and rank (if >2 segments)
+    if len(segments) > 0:
+        # Compute peak energy for each segment to determine top-2
+        seg_info = []
+        for start, end in segments:
+            peak_e = float(np.max(log_energy[start:end]))
+            duration = (end - start) / fs
+            seg_info.append((peak_e, start, end, duration))
+        
+        # Sort by peak energy for ranking
+        seg_info_sorted = sorted(seg_info, key=lambda x: x[0], reverse=True)
+        rank_map = {(s, e): rank + 1 for rank, (_, s, e, _) in enumerate(seg_info_sorted)}
+        
+        # Add annotations
+        for peak_e, start, end, duration in seg_info:
+            center_t = (start + end) / 2 / fs
+            rank = rank_map[(start, end)]
+            
+            # Color top-2 differently
+            if rank <= 2:
+                color = "#2ca02c"
+                label = f"#{rank} ({duration:.1f}s)"
+            else:
+                color = "#d62728"
+                label = f"#{rank} ({duration:.1f}s)"
+            
+            ax4.annotate(label, xy=(center_t, 0.5), fontsize=8, ha='center', 
+                        color=color, fontweight='bold')
+    
+    ax4.set_ylim(-0.1, 1.1)
+    ax4.set_yticks([0, 1])
+    ax4.set_yticklabels(["Rest", "Active"])
+    ax4.set_ylabel("State")
+    ax4.set_xlabel("Time (s)")
+    ax4.set_title(f"Binary Activation Mask ({len(segments)} segments detected)")
+    ax4.grid(True, alpha=0.3)
+
+    # Finalize
+    fig.tight_layout(rect=(0, 0, 1, 0.96))
+
+    if show:
+        plt.show(block=True)
+
+    fig.savefig(output_path, dpi=150)
+    plt.close(fig)

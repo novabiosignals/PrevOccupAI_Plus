@@ -173,45 +173,62 @@ def compute_session_metrics(signal_percent: np.ndarray, fs: float, metadata: dic
 def aggregate_daily_metrics(session_df: pd.DataFrame, value_columns: list,
                             sum_columns: list | None = None) -> pd.DataFrame:
     """
-    Aggregate session metrics to daily level (average or sum depending on column).
+    Aggregate session metrics to daily level using duration-weighted averages.
+
+    Percentage and intensity metrics are weighted by session duration to ensure
+    accurate aggregation (e.g., a 60-min session contributes more than a 20-min session).
 
     :param session_df: DataFrame with per-session metrics.
     :param value_columns: All columns to include in aggregation.
-    :param sum_columns: Columns to sum (e.g., duration). Others will be averaged.
+    :param sum_columns: Columns to sum (e.g., duration, effort minutes). Others use weighted average.
     :return: DataFrame with one row per subject/side/date combination.
     """
     sum_cols = set(sum_columns) if sum_columns else set()
 
-    # Build aggregation rules
-    agg_map = {}
-    for col in value_columns:
-        if col in sum_cols:
-            agg_map[col] = "sum"
-        else:
-            agg_map[col] = "mean"
+    records = []
 
-    agg_map["session_label"] = "count"  # Count number of sessions
+    for (subject_id, side, date), group in session_df.groupby(["subject_id", "side", "date"]):
+        entry = {
+            "subject_id": subject_id,
+            "side": side,
+            "date": date,
+            "session_count": len(group),
+        }
 
-    daily_df = (
-        session_df
-        .groupby(["subject_id", "side", "date"], as_index=False)
-        .agg(agg_map)
-        .rename(columns={"session_label": "session_count"})
-    )
+        # Get durations for weighting
+        durations = group["duration_s"].values if "duration_s" in group.columns else np.ones(len(group))
+        total_duration = durations.sum()
 
-    return daily_df
+        for col in value_columns:
+            if col not in group.columns:
+                continue
+
+            if col in sum_cols:
+                # Sum columns (duration, effort minutes)
+                entry[col] = group[col].sum()
+            else:
+                # Duration-weighted average for percentages and intensity metrics
+                if total_duration > 0:
+                    entry[col] = np.average(group[col].values, weights=durations)
+                else:
+                    entry[col] = group[col].mean()
+
+        records.append(entry)
+
+    return pd.DataFrame(records)
 
 
 def aggregate_weekly_metrics(daily_df: pd.DataFrame, sum_columns: list,
                              mean_columns: list) -> pd.DataFrame:
     """
-    Aggregate daily metrics to weekly level.
+    Aggregate daily metrics to weekly level using duration-weighted averages.
 
     Weeks are numbered starting from the first acquisition date (week_1, week_2, ...).
+    Percentage and intensity metrics are weighted by daily duration.
 
     :param daily_df: DataFrame with daily aggregated metrics.
     :param sum_columns: Columns to sum across the week.
-    :param mean_columns: Columns to average across the week.
+    :param mean_columns: Columns to use duration-weighted average.
     :return: DataFrame with one row per subject/side/week combination.
     """
     if daily_df.empty:
@@ -239,15 +256,22 @@ def aggregate_weekly_metrics(daily_df: pd.DataFrame, sum_columns: list,
                 "day_count": len(week_group),
             }
 
+            # Get durations for weighting
+            durations = week_group["duration_s"].values if "duration_s" in week_group.columns else np.ones(len(week_group))
+            total_duration = durations.sum()
+
             # Sum columns
             for col in sum_columns:
                 if col in week_group.columns:
                     entry[col] = week_group[col].sum()
 
-            # Mean columns
+            # Duration-weighted average columns
             for col in mean_columns:
                 if col in week_group.columns:
-                    entry[col] = week_group[col].mean()
+                    if total_duration > 0:
+                        entry[col] = np.average(week_group[col].values, weights=durations)
+                    else:
+                        entry[col] = week_group[col].mean()
 
             records.append(entry)
 
