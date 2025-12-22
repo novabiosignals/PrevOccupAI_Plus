@@ -289,9 +289,9 @@ We can now compute thresholds that define "above rest = muscle activity."
 
 #### Primary Threshold: Baseline + k×σ
 
-$$T_{baseline} = median_{baseline} + k \times \sigma_{robust}$$
+$$T_{baseline} = median_{baseline} + k \times \sigma_{robust}$$ where \(k = 6\) (our default).
 
-With k = 6 (our default), this means: "anything more than 6 standard deviations above the baseline median is considered active."
+This means: "anything more than 6 standard deviations above the baseline median is considered active."
 
 **Why 6 sigma?**
 In a normal distribution, 6 sigma catches 99.9999998% of the data. So if the noise is normally distributed, there's essentially zero chance of noise exceeding this threshold. However, we're being extra conservative because false positives (calling rest as active) are worse than false negatives.
@@ -410,7 +410,7 @@ A 30-second segment would get a massive penalty: -20 - 2×20 = **-60 points**.
 
 The top-2 segments should have significantly higher energy than the baseline. We compute:
 
-$$contrast = average(peak\ energy\ of\ top\text{-}2) - median(baseline\ energy)$$
+$$contrast = average(\text{peak energy of top-2}) - median(\text{baseline energy})$$
 
 | Contrast | Score | Interpretation |
 |----------|-------|----------------|
@@ -527,7 +527,7 @@ Our scoring aligns with the pipeline's guardrail: recordings with <2 segments ar
                            ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │ STEP 2: ENERGY EXTRACTION                                       │
-│   • TKEO: ψ[n] = x[n]² - x[n-1]·x[n+1]                         │
+│   • TKEO: \psi[n] = x[n]^2 - x[n-1]\cdot x[n+1]                │
 │   • Rectify (negatives → 0)                                     │
 │   • 50ms windowed sum (smooth out spikes)                       │
 └──────────────────────────┬──────────────────────────────────────┘
