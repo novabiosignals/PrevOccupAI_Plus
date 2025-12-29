@@ -3,6 +3,7 @@
 # ------------------------------------------------------------------------------------------------------------------- #
 import os
 import re
+import pandas as pd
 
 # internal imports
 import questionnaires
@@ -20,7 +21,7 @@ PROCESS_PSYCHOSOCIAL = False
 PROCESS_PERSONAL = False
 PROCESS_ENVIRONMENT = False
 PROCESS_BIOMECHANICAL = False
-PROCESS_WORKLOAD = False
+PROCESS_WORKLOAD = True
 GENERATE_QUESTIONNAIRES_DATASET = False
 GENERATE_OH_PROFILE = True
 
@@ -194,13 +195,6 @@ if GENERATE_OH_PROFILE:
 
                 # save OH profile to json
                 save_OH_profile(OH_PROFILE_PATH, participant_id, oh_profile)
-
-
-
-
-
-
-
 
 
 

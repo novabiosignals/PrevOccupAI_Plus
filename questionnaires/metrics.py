@@ -12,13 +12,15 @@ get_metadata_metrics(...): Get metadata metrics for the OH profile.
 -------------------
 
 [Private]
+_get_missing_workload_dates(...): gets the missing workload questionnaire dates based on the start date and the existing acquisition dates
 -------------------
 """
 # ------------------------------------------------------------------------------------------------------------------- #
 # imports
 # ------------------------------------------------------------------------------------------------------------------- #
 import pandas as pd
-from typing import Dict
+from typing import Dict, List
+from datetime import datetime, timedelta
 
 # internal imports
 from constants import ENVIRONMENT, PERSONAL, BIOMECHANICAL, ROSA, COPSOQ, POPULATION
@@ -35,6 +37,8 @@ KEY_DOMAIN_MAPPING = {PERSONAL: PERSONAL_DOMAIN_KEY,
 
 # columns from personal questionnaire results
 META_DATA_COLUMNS = ['idade', 'sexo', 'altura', 'peso', 'mao']
+
+DATE_FORMAT = "%d-%m-%Y"
 # ------------------------------------------------------------------------------------------------------------------- #
 # public functions
 # ------------------------------------------------------------------------------------------------------------------- #
@@ -73,14 +77,17 @@ def get_daily_workload_metrics(scores_csv_file: str, subject_id: int) -> Dict:
     containing date and time strings in the format 'dd/mm/yyyy HH:MM', and several workload-related metric columns.
     If a subject has multiple submissions on different dates, each date will be a key in the returned dictionary.
 
+    Fills in missing acquisition dates with 'No data available'
+
     :param scores_csv_file: Path to the CSV file containing questionnaire results.
     :param subject_id: The ID of the subject for which metrics should be extracted.
     :return: A dictionary where each key is a date string ('dd/mm/yyyy') and each value is
              another dictionary of metric names and their corresponding values for that date.
              Example:
              {
-                 '24/09/2025': {'focus_and_mental_strain': 5, 'heavy_workload': 4, ...},
-                 '25/09/2025': {'focus_and_mental_strain': 5, 'heavy_workload': 4, ...},
+                 '24-09-2025': {'focus_and_mental_strain': 5, 'heavy_workload': 4, ...},
+                 '25-09-2025': {'focus_and_mental_strain': 5, 'heavy_workload': 4, ...},
+                 '26-09-2025': 'No data available',
                  ...
              }
     """
@@ -89,7 +96,7 @@ def get_daily_workload_metrics(scores_csv_file: str, subject_id: int) -> Dict:
 
     # load questionnaire results into a dataframe
     # subject id is the index of this dataframe
-    scores_df = pd.read_csv(scores_csv_file, index_col=0)
+    scores_df = pd.read_csv(scores_csv_file, index_col=0, dtype={'submitdate': str})
 
     # get a sub dataframe with the data from the particular subject only
     subject_results = scores_df.loc[subject_id]
@@ -107,11 +114,30 @@ def get_daily_workload_metrics(scores_csv_file: str, subject_id: int) -> Dict:
         # extract only the date part (dd/mm/yyyy)
         date = submitdate_str.split(' ')[0]
 
+        # replace / with -
+        date = date.replace('/', '-')
+
         # convert row to dictionary except submit date
         row_dict = row.drop('submitdate').to_dict()
 
         # add to metrics dictionary
         metrics_dict[date] = row_dict
+
+    # check if there are less than 5 entries - if so, add missing data
+    if len(metrics_dict) < 5:
+
+        # get start_date
+        start_date = sl.get_participant_start_date(sl.load_participants_info(), subject_id)
+
+        # get missing dates list
+        missing_dates = _get_missing_workload_dates(start_date, list(metrics_dict.keys()))
+
+        # add missing entries
+        for missing_date in missing_dates:
+            metrics_dict.update({missing_date: 'No data available'})
+
+        # sort metrics_dict by date keys
+        metrics_dict = dict(sorted(metrics_dict.items(), key=lambda x: datetime.strptime(x[0], DATE_FORMAT)))
 
     return metrics_dict
 
@@ -216,7 +242,31 @@ def get_metadata_metrics(personal_scores_csv_file: str, subject_id: int) -> Dict
     return metrics_dict
 
 
+# ------------------------------------------------------------------------------------------------------------------- #
+# private functions
+# ------------------------------------------------------------------------------------------------------------------- #
 
+def _get_missing_workload_dates(start_date: str, acquisition_dates: List[str]) -> List[str]:
+    """
+    Return the missing workload dates within a 5-day window starting from a given date.
 
+    The function generates a list of expected dates consisting of the start date
+    and the following four consecutive days, then compares it against the provided
+    acquisition dates and returns the dates that are missing.
+    Date strings should have the format as in DATE_FORMAT.
 
+    :param start_date: The start date of the acquisitions
+    :param acquisition_dates: List of dates where data exists
+    :return: List of missing data strings
+    """
 
+    # parse string to date
+    start_date = datetime.strptime(start_date, DATE_FORMAT)
+
+    # generate 5 dates (start date + next 4 days)
+    expected_dates = [(start_date + timedelta(days=i)).strftime(DATE_FORMAT) for i in range(5)]
+
+    # find missing dates
+    missing_dates = [date for date in expected_dates if date not in acquisition_dates]
+
+    return missing_dates

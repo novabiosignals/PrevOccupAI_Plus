@@ -55,6 +55,8 @@ def clean_daily_workload(folder_path: str, output_folder_path: str) -> None:
     # set id column to int, set as index of the dataframe, and order
     results_df = results_df.set_index('id.1').sort_index()
 
+    results_df = results_df.astype(str)
+
     # save dataframe into a csv file
     folder_path = create_dir(find_project_root(),
                              os.path.join(output_folder_path, extract_group_from_path(folder_path)))

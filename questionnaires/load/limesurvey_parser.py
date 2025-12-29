@@ -18,6 +18,7 @@ _find_survey_path(...): finds the path with a given survey id in the filename
 # ------------------------------------------------------------------------------------------------------------------- #
 import pandas as pd
 import os
+import re
 
 # internal imports
 from constants import CSV, QUESTIONNAIRE_DOMAINS, ENVIRONMENT, PSYCHOSOCIAL, CONFIG_FOLDER_NAME, WORKLOAD
@@ -134,26 +135,30 @@ def _clean_limesurvey_files(df: pd.DataFrame, domain: str) -> pd.DataFrame:
     :param domain: Questionnaire domain, used to determine cleaning rules.
     :return: The cleaned dataframe.
     """
-
     # rename hiddenid column to just id
     df = df.rename(columns={'hiddenid': 'id.1'})
 
     # drop all irrelevant initial columns except submitdate and the hidden ids
     df = df.drop(df.columns[[0, *range(2, 9)]], axis=1)
 
-    # convert submitdate to real datetime
-    df['submitdate'] = pd.to_datetime(df['submitdate'], errors='coerce')
+    # define columns to drop which have irrelevant info in between pages
+    cols_to_drop = df.filter(regex='(?i)(interviewtime|groupTime|hiddenTime)').columns
+
+    # drop those columns
+    df = df.drop(columns=cols_to_drop)
 
     # drop submissions with no submitdate
     df = df.dropna(subset=['submitdate'])
 
     if domain != WORKLOAD:
 
+        # convert submitdate to real datetime
+        df['submitdate'] = pd.to_datetime(df['submitdate'], errors='coerce')
+
         # sort by submitdate, then keep only the most recent submission per participant
         df = (df.sort_values('submitdate').drop_duplicates(subset=['id.1'], keep='last').reset_index(drop=True))
 
     return df
-
 
 def _find_survey_path(paths: list[str], survey_id: str) -> str:
     """

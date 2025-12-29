@@ -55,7 +55,7 @@ def load_questionnaire_answers(folder_path: str, domain: str) -> Dict[str, pd.Da
         results_path = os.path.join(os.path.join(folder_path, domain, csv_file))
 
         # load results_questionnaires to a dataframe
-        results_df = pd.read_csv(results_path, index_col=0)
+        results_df = pd.read_csv(results_path, index_col=0, dtype=str)
 
         # get questionnaire id from the file name
         questionnaire_id = csv_file.replace(RESULTS_FILE_PREFIX, "").replace(CSV, "")
