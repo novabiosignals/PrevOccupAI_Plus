@@ -165,6 +165,55 @@ def transfer_emg(raw_emg: np.ndarray) -> np.ndarray:
     return (((raw_emg / (2 ** 16 - 1.0)) - 0.5) * 2500) / 1100
 
 
+def compute_mvc_peak_rms(
+    emg_mv: np.ndarray,
+    fs: float,
+    lowcut: float = 10.0,
+    highcut: float = 500.0,
+    window_ms: float = 250.0,
+) -> float:
+    """Compute MVC peak using peak-centered RMS on bandpass-filtered, rectified signal.
+
+    This method:
+    1. Bandpass filters the raw EMG (no smoothing)
+    2. Rectifies (absolute value)
+    3. Finds the peak location
+    4. Computes RMS in a window centered on the peak
+
+    This provides a robust MVC estimate that:
+    - Preserves peak amplitude (no smoothing attenuation)
+    - Resists noise spikes (RMS averaging)
+
+    :param emg_mv: Raw EMG signal in millivolts.
+    :param fs: Sampling frequency in Hz.
+    :param lowcut: Lower bandpass cutoff in Hz.
+    :param highcut: Upper bandpass cutoff in Hz.
+    :param window_ms: RMS window duration in milliseconds (centered on peak).
+    :returns: MVC peak value in millivolts (RMS of peak window).
+    """
+    # Step 1: Bandpass filter (no smoothing)
+    emg_dc = emg_mv - np.mean(emg_mv)
+    emg_filt = bandpass_filter(emg_dc, fs, lowcut=lowcut, highcut=highcut)
+
+    # Step 2: Rectify
+    emg_rect = np.abs(emg_filt)
+
+    # Step 3: Find peak location
+    peak_idx = int(np.argmax(emg_rect))
+
+    # Step 4: Compute RMS in window centered on peak
+    half_window = int((window_ms / 1000.0) * fs / 2)
+    start = max(0, peak_idx - half_window)
+    end = min(len(emg_rect), peak_idx + half_window)
+    window_data = emg_rect[start:end]
+
+    if len(window_data) == 0:
+        return float(np.max(emg_rect))  # Fallback to max if window is empty
+
+    mvc_peak = float(np.sqrt(np.mean(window_data ** 2)))
+    return mvc_peak
+
+
 def bandpass_filter(signal: np.ndarray, fs: float, lowcut: float = 10.0,
                     highcut: float = 500.0, order: int = 4) -> np.ndarray:
     """

@@ -1,11 +1,14 @@
 '''
 EMG signal processing pipeline.
+
 This module implements the end-to-end EMG processing pipeline, including:
 - Loading day acquisitions
 - Preprocessing (filtering, rectification, smoothing)
 - MVC normalization
-- Metric computation (APDF, effort bins, session/daily/weekly aggregates)
-- Visualization generation (APDF plots, histograms, envelope previews)
+- Metric computation (APDF, Active APDF, rest metrics, session/daily/weekly aggregates)
+- Visualization generation (APDF plots, histograms, envelope previews, rest vs active charts)
+
+Uses Active APDF + Rest Time framework for physiologically meaningful metrics.
 '''
 # external imports
 from __future__ import annotations
@@ -19,7 +22,7 @@ import pandas as pd
 from constants import FS_MBAN, MBAN_LEFT, MBAN_RIGHT
 from sensors.load.data_quality import FileQualityReport, create_file_quality_report, create_quality_issue
 from sensors.load.dataset_loader import load_day_acquisitions
-from sensors.metrics.emg_metrics import compute_session_metrics
+from sensors.metrics.emg_metrics import compute_session_metrics, compute_relative_intensity_bins, MIN_ACTIVE_DURATION_FOR_BASELINE_S
 from signal_processing.emg_preprocessing import preprocess_emg, transfer_emg, bandpass_filter
 from visualize.emg_visuals import plot_mvc_segments, plot_mvc_hybrid_diagnostics, plot_apdf, plot_histogram
 from visualize.oh_profile_plots import generate_emg_plots_from_oh_profiles
@@ -27,8 +30,6 @@ from visualize.processing import plot_envelope
 from .emg_metrics_export import (
     build_tables,
     persist_quality_report,
-    record_effort_bins,
-    write_effort_bins,
     write_tables,
 )
 from .emg_mvc import (
@@ -40,7 +41,7 @@ from .emg_mvc import (
     pick_mvc,
 )
 from .emg_oh_helper import _save_emg_to_oh_profiles
-from .emg_preprocessing import _compute_envelope, _extract_emg_mv, compute_tkeo_envelope
+from .emg_preprocessing import _compute_envelope, _extract_emg_mv, compute_tkeo_envelope, compute_mvc_peak_rms
 from .emg_types import PreprocessConfig  # shared type definition
 
 # Re-export PreprocessConfig for backwards compatibility
@@ -113,40 +114,41 @@ def run_emg_pipeline(
 
     quality_records = quality_log if quality_log is not None else []
 
-    session_metrics: List[dict] = [] # Accumulates metrics for all sessions processed
-    effort_records: List[dict] = [] # Accumulates effort-bin summaries for all sessions processed
+    session_metrics: List[dict] = []  # Accumulates metrics for all sessions processed
+    session_signals: Dict[str, np.ndarray] = {}  # Cache signals for relative bin computation
 
-    # Main per-day processing loop
+    # Main per-day processing loop (first pass: compute metrics and cache signals)
     for day in day_descriptors:
-        day_data = load_day_acquisitions(day, selected_sensors, quality_log=quality_records) # load data for the day using day path; return nested dict device -> session_label -> dataframe
+        day_data = load_day_acquisitions(day, selected_sensors, quality_log=quality_records)
         if not day_data:
             print(f"[emg_pipeline] No data found for {day['subject_id']} on {day['date_label']}")
             continue
-        session_metrics.extend(
-            _process_day(
-                day,
-                day_data,
-                config,
-                percentiles,
-                plots_root if generate_visuals else None,
-                effort_records,
-                quality_log=quality_records,
-                show_mvc_plots=show_mvc_plots,
-                tkeo_segments=tkeo_segments,
-            )
+        day_metrics, day_signals = _process_day(
+            day,
+            day_data,
+            config,
+            percentiles,
+            plots_root if generate_visuals else None,
+            quality_log=quality_records,
+            show_mvc_plots=show_mvc_plots,
+            tkeo_segments=tkeo_segments,
         )
+        session_metrics.extend(day_metrics)
+        session_signals.update(day_signals)
 
     report_path = persist_quality_report(quality_records, results_root)
-    effort_path = write_effort_bins(effort_records, results_root)
 
     if not session_metrics:
         print("[emg_pipeline] No session metrics were computed.")
         artifacts: Dict[str, Path] = {}
         if report_path:
             artifacts["quality_report"] = report_path
-        if effort_path:
-            artifacts["effort_bins"] = effort_path
         return artifacts
+
+    # Second pass: compute relative intensity bins using weekly baseline
+    session_metrics = _add_relative_intensity_bins(
+        session_metrics, session_signals, config["fs"]
+    )
 
     tables = build_tables(session_metrics)
     write_tables(tables, results_root)
@@ -171,10 +173,120 @@ def run_emg_pipeline(
 
     if report_path is not None:
         artifacts["quality_report"] = report_path
-    if effort_path is not None:
-        artifacts["effort_bins"] = effort_path
 
     return artifacts
+
+
+# -------------------------------------------------------------------------------------------------------------------- #
+# Relative Intensity Bins (Second Pass)
+# -------------------------------------------------------------------------------------------------------------------- #
+
+def _add_relative_intensity_bins(
+    session_metrics: List[dict],
+    session_signals: Dict[str, np.ndarray],
+    fs: float,
+) -> List[dict]:
+    """
+    Add relative intensity bins to session metrics using weekly baseline thresholds.
+    
+    This implements the second pass of the Active APDF + Rest Time framework:
+    1. Compute weekly Active APDF baseline (P10, P50, P90) for each subject/side
+    2. For each session, bin the active samples relative to that baseline
+    
+    Bins are:
+    - Below usual: active EMG < weekly P10
+    - Typical-low: weekly P10 to P50
+    - Typical-high: weekly P50 to P90
+    - High for you: > weekly P90
+    
+    :param session_metrics: List of session metric dicts from first pass.
+    :param session_signals: Dict mapping session keys to %MVC signal arrays.
+    :param fs: Sampling frequency in Hz.
+    :returns: Updated session_metrics list with relative bin columns added.
+    """
+    # Convert to DataFrame for easier aggregation
+    df = pd.DataFrame(session_metrics)
+    
+    # Compute weekly baseline (Active APDF P10, P50, P90) for each subject/side
+    # Uses duration-weighted average across all sessions
+    weekly_baseline = {}
+    for (subject_id, side), group in df.groupby(["subject_id", "side"]):
+        # Sum active duration to check minimum requirement
+        total_active_duration = group["active_duration_s"].sum()
+        
+        if total_active_duration < MIN_ACTIVE_DURATION_FOR_BASELINE_S:
+            # Not enough active time for stable baseline - skip relative binning
+            print(
+                f"[emg_pipeline] Insufficient active time for {subject_id} {side}: "
+                f"{total_active_duration:.0f}s < {MIN_ACTIVE_DURATION_FOR_BASELINE_S}s minimum"
+            )
+            continue
+        
+        # Duration-weighted average of Active APDF percentiles
+        durations = np.asarray(group["duration_s"].values)
+        total_duration = durations.sum()
+        
+        if total_duration > 0:
+            p10 = np.average(np.asarray(group["active_apdf_p10"].values), weights=durations)
+            p50 = np.average(np.asarray(group["active_apdf_p50"].values), weights=durations)
+            p90 = np.average(np.asarray(group["active_apdf_p90"].values), weights=durations)
+        else:
+            p10 = group["active_apdf_p10"].mean()
+            p50 = group["active_apdf_p50"].mean()
+            p90 = group["active_apdf_p90"].mean()
+        
+        weekly_baseline[(subject_id, side)] = {
+            "p10": p10,
+            "p50": p50,
+            "p90": p90,
+        }
+    
+    # Add relative bins to each session
+    for metrics in session_metrics:
+        subject_id = metrics["subject_id"]
+        side = metrics["side"]
+        date = metrics["date"]
+        session_label = metrics["session_label"]
+        
+        # Look up baseline
+        baseline = weekly_baseline.get((subject_id, side))
+        if baseline is None:
+            # No baseline available - set bins to None
+            metrics["bin_below_usual_pct"] = None
+            metrics["bin_typical_low_pct"] = None
+            metrics["bin_typical_high_pct"] = None
+            metrics["bin_high_for_you_pct"] = None
+            continue
+        
+        # Look up cached signal
+        signal_key = f"{subject_id}|{side}|{date}|{session_label}"
+        signal = session_signals.get(signal_key)
+        
+        if signal is None:
+            # Signal not cached (shouldn't happen, but handle gracefully)
+            metrics["bin_below_usual_pct"] = None
+            metrics["bin_typical_low_pct"] = None
+            metrics["bin_typical_high_pct"] = None
+            metrics["bin_high_for_you_pct"] = None
+            continue
+        
+        # Compute relative intensity bins for this session
+        bin_result = compute_relative_intensity_bins(
+            signal,
+            fs,
+            weekly_active_p10=baseline["p10"],
+            weekly_active_p50=baseline["p50"],
+            weekly_active_p90=baseline["p90"],
+        )
+        
+        # Add bin percentages to metrics
+        metrics["bin_below_usual_pct"] = bin_result["bin_below_usual_pct"]
+        metrics["bin_typical_low_pct"] = bin_result["bin_typical_low_pct"]
+        metrics["bin_typical_high_pct"] = bin_result["bin_typical_high_pct"]
+        metrics["bin_high_for_you_pct"] = bin_result["bin_high_for_you_pct"]
+    
+    return session_metrics
+
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # Day Processing Functions
@@ -185,11 +297,10 @@ def _process_day(
     config: PreprocessConfig,
     percentiles: Sequence[int],
     plots_root: Optional[Path],
-    effort_records: Optional[List[dict]],
     quality_log: Optional[List[FileQualityReport]] = None,
     show_mvc_plots: bool = False,
     tkeo_segments: bool = False,
-) -> List[dict]:
+) -> Tuple[List[dict], Dict[str, np.ndarray]]:
     """Compute per-session metrics and optional visuals for a single calendar day.
 
     :param day: Descriptor that points to folders and metadata (subject, group, MAC addresses).
@@ -197,16 +308,19 @@ def _process_day(
     :param config: Shared preprocessing configuration for filtering/enveloping.
     :param percentiles: Percentiles used when building the APDF summary record.
     :param plots_root: Root path where visuals should be written, or ``None`` to skip.
-    :param effort_records: Mutable list that is extended with effort-bin summaries for CSV export.
     :param quality_log: Optional list of FileQualityReport entries to append guardrail failures.
     :param show_mvc_plots: If True, show MVC debug plots while running.
     :param tkeo_segments: If True, run TKEO-based MVC segmentation and still plot on guardrail failure.
-    :returns: List of metric dictionaries that later become rows in ``session_metrics.csv``.
+    :returns: Tuple of:
+        - List of metric dictionaries that become rows in ``session_metrics.csv``.
+        - Dict mapping session keys (subject_id|side|date|session) to %MVC signal arrays
+          for later relative intensity bin computation.
     """
 
     percentiles = tuple(percentiles)
 
     day_metrics: List[dict] = []
+    day_signals: Dict[str, np.ndarray] = {}  # Cache signals for relative bin computation
 
     for device_label, acquisitions in day_data.items():
         mvc_label, mvc_df = pick_mvc(acquisitions) 
@@ -214,7 +328,9 @@ def _process_day(
             print(f"[emg_pipeline] Missing MVC for {day['subject_id']} {device_label} on {day['date_label']}")
             continue
         try:
-             # preprocess the MVC recording to get its envelope    
+            # Extract raw EMG in mV for MVC peak computation
+            mvc_raw_mv = _extract_emg_mv(mvc_df)
+            # preprocess the MVC recording to get its envelope (for segment detection/plotting)
             mvc_env = cast(np.ndarray, _compute_envelope(mvc_df, config)) # cast is used to inform type checker
         except ValueError as exc:
             print(f"[emg_pipeline] MVC preprocessing error ({day['subject_id']} {device_label}): {exc}")
@@ -353,7 +469,14 @@ def _process_day(
                     )
             continue
 
-        mvc_peak = float(np.max(mvc_env)) # get peak value of MVC envelope
+        # Compute MVC peak using peak-centered RMS on rectified signal (no smoothing attenuation)
+        mvc_peak = compute_mvc_peak_rms(
+            mvc_raw_mv,
+            config["fs"],
+            lowcut=config["lowcut"],
+            highcut=config["highcut"],
+            window_ms=250.0,  # 250ms RMS window centered on peak
+        )
         if mvc_peak <= 0:
             print(f"[emg_pipeline] MVC peak <= 0 for {day['subject_id']} {device_label}")
             continue
@@ -421,8 +544,9 @@ def _process_day(
             metrics["mvc_peak"] = mvc_peak  # Add MVC reference value (in mV)
             day_metrics.append(metrics)
 
-            if effort_records is not None:
-                record_effort_bins(effort_records, metadata, percent_signal, config["fs"])
+            # Cache signal for relative bin computation (keyed by unique session identifier)
+            signal_key = f"{day['subject_id']}|{side_label}|{day['date_label']}|{session_label}"
+            day_signals[signal_key] = percent_signal
 
             if plots_root:
                 _save_session_visuals(
@@ -441,7 +565,7 @@ def _process_day(
     # Note: Day-level visualizations (effort grid/stacks) are now generated
     # after OH profile JSON is written, using visualize.oh_profile_plots module.
     
-    return day_metrics
+    return day_metrics, day_signals
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # Helper Functions

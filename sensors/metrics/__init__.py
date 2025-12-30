@@ -1,8 +1,11 @@
 from .sensor_timeline import get_sensor_timeline_metrics
 from .emg_metrics import (
-    EFFORT_BANDS,
+    DEFAULT_REST_THRESHOLD_MVC,
+    MIN_ACTIVE_DURATION_FOR_BASELINE_S,
     compute_apdf,
-    compute_effort_bins,
+    compute_active_apdf,
+    compute_rest_metrics,
+    compute_relative_intensity_bins,
     compute_session_metrics,
     aggregate_daily_metrics,
     aggregate_weekly_metrics,
@@ -11,9 +14,12 @@ from .emg_metrics import (
 
 __all__ = [
     'get_sensor_timeline_metrics',
-    'EFFORT_BANDS',
+    'DEFAULT_REST_THRESHOLD_MVC',
+    'MIN_ACTIVE_DURATION_FOR_BASELINE_S',
     'compute_apdf',
-    'compute_effort_bins',
+    'compute_active_apdf',
+    'compute_rest_metrics',
+    'compute_relative_intensity_bins',
     'compute_session_metrics',
     'aggregate_daily_metrics',
     'aggregate_weekly_metrics',

@@ -75,7 +75,7 @@ def median_and_lowpass_filter(sensor_data: np.ndarray, fs: int, medfilt_window_l
         med_filt = signal.medfilt(sensor_data, medfilt_window_length)
 
         # apply butterworth filter
-        filtered_data = signal.sosfilt(filt, med_filt)
+        filtered_data = np.asarray(signal.sosfilt(filt, med_filt))
 
     return filtered_data
 
@@ -114,12 +114,12 @@ def gravitational_filter(acc_data: np.ndarray, fs: int) -> np.ndarray:
 
     else:  # 1-D array
 
-        gravity_data = signal.sosfilt(filter, acc_data)
+        gravity_data = np.asarray(signal.sosfilt(filter, acc_data))
 
     return gravity_data
 
 
-def get_envelope(signal_array: np.array, envelope_type: str = RMS, type_param: int = 10, fs: int = 100) -> np.array:
+def get_envelope(signal_array: np.ndarray, envelope_type: str = RMS, type_param: int = 10, fs: int = 100) -> np.ndarray:
     """
     Gets the envelope of the passed signal. There are three types available
     1. 'lowpass': uses a lowpass filter
@@ -156,7 +156,7 @@ def get_envelope(signal_array: np.array, envelope_type: str = RMS, type_param: i
 # ------------------------------------------------------------------------------------------------------------------- #
 # private functions
 # ------------------------------------------------------------------------------------------------------------------- #
-def _butter_lowpass_filter(signal_array: np.array, cutoff: int, fs: int, order: int = 4) -> np.array:
+def _butter_lowpass_filter(signal_array: np.ndarray, cutoff: int, fs: int, order: int = 4) -> np.ndarray:
     """
     Filters a signal using a butterworth lowpass filter.
     :param signal_array: the signal
@@ -169,12 +169,12 @@ def _butter_lowpass_filter(signal_array: np.array, cutoff: int, fs: int, order: 
     b, a = signal.butter(order, cutoff, btype='low', fs=fs, analog=False)
 
     # apply filter
-    filtered_signal = signal.lfilter(b, a, signal_array)
+    filtered_signal = np.asarray(signal.lfilter(b, a, signal_array))
 
     return filtered_signal
 
 
-def _moving_average(signal_array: np.array, wind_size: int = 3) -> np.array:
+def _moving_average(signal_array: np.ndarray, wind_size: int = 3) -> np.ndarray:
     """
     Application of a moving average filter for signal smoothing.
     :param signal_array: the signal
@@ -194,7 +194,7 @@ def _moving_average(signal_array: np.array, wind_size: int = 3) -> np.array:
     return np.concatenate((np.zeros(wind_size - 1), ret[wind_size - 1:] / wind_size))
 
 
-def _window_rms(signal_array: np.array, window_size: int = 3) -> np.array:
+def _window_rms(signal_array: np.ndarray, window_size: int = 3) -> np.ndarray:
     """
     Passes a root-mean-square filter over the data.
     :param signal_array: the data for which the root-mean-square should be calculated

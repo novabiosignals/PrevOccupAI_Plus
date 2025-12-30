@@ -5,9 +5,14 @@ This module contains functions for creating EMG plots from OH profile JSON data.
 These plots are generated AFTER the pipeline writes metrics to JSON files, allowing
 visualization from persisted data rather than in-memory arrays.
 
+Uses Active APDF + Rest Time framework for physiologically meaningful metrics:
+- Active APDF shows intensity when working (excluding rest)
+- Rest metrics show relaxation patterns (rest%, gap frequency)
+- Relative intensity bins compare to personal weekly baseline
+
 Plots generated here:
-- Effort distribution grids (per day)
-- Effort session stacks (per day)  
+- Rest vs Active time distribution (pie/donut charts)
+- Active APDF percentile comparisons
 - Session-level metric trends
 - Daily-level metric trends
 
@@ -29,10 +34,17 @@ from OH_profile.load import get_OH_profile
 from OH_profile.constants import (
     SENSOR_METRICS_KEY, EMG_KEY,
     EMG_DAILY_AGGREGATE_KEY, EMG_WEEKLY_AGGREGATE_KEY,
-    EMG_EFFORT_LOW_PCT_KEY, EMG_EFFORT_MODERATE_PCT_KEY,
-    EMG_EFFORT_HIGH_PCT_KEY, EMG_EFFORT_OVER100_PCT_KEY,
+    # Basic and traditional APDF
     EMG_IEMG_PERCENT_SECONDS_KEY, EMG_APDF_P50_KEY,
     EMG_DURATION_S_KEY, EMG_SESSION_COUNT_KEY,
+    # Active APDF (intensity when working)
+    EMG_ACTIVE_APDF_P10_KEY, EMG_ACTIVE_APDF_P50_KEY, EMG_ACTIVE_APDF_P90_KEY,
+    # Rest metrics
+    EMG_REST_PERCENT_KEY, EMG_GAP_FREQUENCY_PER_MINUTE_KEY,
+    EMG_MAX_SUSTAINED_ACTIVITY_S_KEY, EMG_ACTIVE_DURATION_S_KEY,
+    # Relative bins (weekly level)
+    EMG_BIN_BELOW_USUAL_PCT_KEY, EMG_BIN_TYPICAL_LOW_PCT_KEY,
+    EMG_BIN_TYPICAL_HIGH_PCT_KEY, EMG_BIN_HIGH_FOR_YOU_PCT_KEY,
 )
 
 
@@ -40,9 +52,13 @@ from OH_profile.constants import (
 # Constants
 # -------------------------------------------------------------------------------------------------------------------- #
 
-# Colors for effort bands: green (low), amber (moderate), red (high), dark red (>100%)
-EFFORT_COLORS = ["#2ca02c", "#ffbf00", "#d62728", "#7f0000"]
-EFFORT_LABELS = ["Low effort", "Moderate effort", "High effort", ">100% effort"]
+# Colors for rest vs active distribution
+REST_ACTIVE_COLORS = ["#4CAF50", "#2196F3"]  # Green for rest, blue for active
+REST_ACTIVE_LABELS = ["Rest time (<0.5% MVC)", "Active time (≥0.5% MVC)"]
+
+# Colors for relative intensity bins (compared to weekly baseline)
+RELATIVE_BIN_COLORS = ["#81C784", "#4CAF50", "#FF9800", "#F44336"]  # Light green → red
+RELATIVE_BIN_LABELS = ["Below usual", "Typical-low", "Typical-high", "High for you"]
 
 
 # -------------------------------------------------------------------------------------------------------------------- #
@@ -60,21 +76,37 @@ def _get_emg_data(oh_profile: Dict[str, Any]) -> Dict[str, Any]:
     return sensor_metrics.get(EMG_KEY, {})
 
 
-def _get_effort_percentages(metrics: Dict[str, Any]) -> List[float]:
-    """Extract effort band percentages from a metrics dict."""
+def _get_rest_active_percentages(metrics: Dict[str, Any]) -> List[float]:
+    """Extract rest vs active time percentages from a metrics dict."""
+    rest_pct = metrics.get(EMG_REST_PERCENT_KEY, 0.0)
+    active_pct = 100.0 - rest_pct
+    return [rest_pct, active_pct]
+
+
+def _get_relative_bin_percentages(metrics: Dict[str, Any]) -> List[float]:
+    """Extract relative intensity bin percentages from a metrics dict."""
     return [
-        metrics.get(EMG_EFFORT_LOW_PCT_KEY, 0.0),
-        metrics.get(EMG_EFFORT_MODERATE_PCT_KEY, 0.0),
-        metrics.get(EMG_EFFORT_HIGH_PCT_KEY, 0.0),
-        metrics.get(EMG_EFFORT_OVER100_PCT_KEY, 0.0),
+        metrics.get(EMG_BIN_BELOW_USUAL_PCT_KEY, 0.0) or 0.0,
+        metrics.get(EMG_BIN_TYPICAL_LOW_PCT_KEY, 0.0) or 0.0,
+        metrics.get(EMG_BIN_TYPICAL_HIGH_PCT_KEY, 0.0) or 0.0,
+        metrics.get(EMG_BIN_HIGH_FOR_YOU_PCT_KEY, 0.0) or 0.0,
     ]
 
 
+def _get_active_apdf_values(metrics: Dict[str, Any]) -> Dict[str, float]:
+    """Extract Active APDF percentile values from a metrics dict."""
+    return {
+        "P10": metrics.get(EMG_ACTIVE_APDF_P10_KEY, 0.0),
+        "P50": metrics.get(EMG_ACTIVE_APDF_P50_KEY, 0.0),
+        "P90": metrics.get(EMG_ACTIVE_APDF_P90_KEY, 0.0),
+    }
+
+
 # -------------------------------------------------------------------------------------------------------------------- #
-# Effort Distribution Plots (from JSON)
+# Rest vs Active Distribution Plots (from JSON)
 # -------------------------------------------------------------------------------------------------------------------- #
 
-def plot_day_effort_grid_from_json(
+def plot_day_rest_active_grid_from_json(
     oh_profile: Dict[str, Any],
     date: str,
     plots_root: Path,
@@ -82,7 +114,11 @@ def plot_day_effort_grid_from_json(
     max_sessions: int = 4,
 ) -> Optional[Path]:
     """
-    Plot a left/right effort distribution grid for a single day from OH profile JSON.
+    Plot a left/right rest vs active time distribution grid for a single day.
+
+    Shows the percentage of time in rest (<0.5% MVC) vs active (≥0.5% MVC) states
+    for each session. This is a cleaner, more physiologically meaningful view than
+    the old arbitrary effort bins.
 
     :param oh_profile: OH profile dictionary containing EMG metrics.
     :param date: Date string (e.g., "2024-01-15") to plot.
@@ -114,7 +150,7 @@ def plot_day_effort_grid_from_json(
     sides = ("left", "right")
     n_rows = len(session_labels)
     fig, axes = plt.subplots(n_rows, len(sides), figsize=(12, 2.8 * n_rows), squeeze=False)
-    fig.suptitle(f"{subject_id} – {date}", fontsize=14, fontweight="bold")
+    fig.suptitle(f"{subject_id} – {date} – Rest vs Active Time", fontsize=14, fontweight="bold")
 
     for row_idx, session_label in enumerate(session_labels):
         for col_idx, side in enumerate(sides):
@@ -133,8 +169,8 @@ def plot_day_effort_grid_from_json(
                 _annotate_missing(ax, "No data for this session")
                 continue
 
-            percentages = _get_effort_percentages(side_metrics)
-            _plot_effort_bars(ax, percentages)
+            percentages = _get_rest_active_percentages(side_metrics)
+            _plot_rest_active_bars(ax, percentages)
 
             if col_idx == 0:
                 ax.set_ylabel("Session time (%)")
@@ -144,7 +180,7 @@ def plot_day_effort_grid_from_json(
             ax.text(-0.25, 0.5, session_label, transform=ax.transAxes, rotation=90,
                     va="center", ha="center", fontweight="bold")
 
-    output_path = plots_root / subject_id / date / "summary" / "effort_distribution.png"
+    output_path = plots_root / subject_id / date / "summary" / "rest_active_distribution.png"
     ensure_parent(output_path)
     fig.tight_layout(rect=(0, 0, 1, 0.97))
     fig.savefig(output_path)
@@ -152,17 +188,24 @@ def plot_day_effort_grid_from_json(
     return output_path
 
 
-def plot_day_effort_donut_from_json(
+def plot_day_rest_active_donut_from_json(
     oh_profile: Dict[str, Any],
     date: str,
     plots_root: Path,
     subject_id: str,
 ) -> Optional[List[Path]]:
-    """Plot daily-aggregate effort bins as donuts (left/right) and save as png.
-
-    Uses the daily aggregate metrics for each side to avoid session-level noise.
     """
+    Plot daily-aggregate rest vs active time as donuts (left/right).
 
+    Shows rest time (<0.5% MVC) vs active time, plus Active APDF percentiles
+    as text annotation in the center.
+
+    :param oh_profile: OH profile dictionary containing EMG metrics.
+    :param date: Date string to plot.
+    :param plots_root: Root directory for plots.
+    :param subject_id: Subject identifier.
+    :returns: List of paths to generated plots, or None if no data.
+    """
     emg_data = _get_emg_data(oh_profile)
     if not emg_data or date not in emg_data:
         return None
@@ -178,66 +221,51 @@ def plot_day_effort_donut_from_json(
         if side_metrics is None:
             continue
 
-        percentages = _get_effort_percentages(side_metrics)
-        output_path = plots_root / subject_id / date / "summary" / f"effort_daily_donut_{side}.png"
+        percentages = _get_rest_active_percentages(side_metrics)
+        active_apdf = _get_active_apdf_values(side_metrics)
+        
+        output_path = plots_root / subject_id / date / "summary" / f"rest_active_donut_{side}.png"
         ensure_parent(output_path)
 
-        fig, ax = plt.subplots(figsize=(5.0, 5.2))
+        fig, ax = plt.subplots(figsize=(5.5, 5.5))
         wedges, _ = ax.pie(
             percentages,
-            colors=EFFORT_COLORS,
+            colors=REST_ACTIVE_COLORS,
             labels=None,
-            wedgeprops={"width": 0.4, "edgecolor": "white"},
+            wedgeprops={"width": 0.35, "edgecolor": "white"},
             startangle=90,
         )
 
-        # Annotate percentages on the donut: prefer outside labels for small slices to avoid overlap.
+        # Annotate percentages on the donut
         for i, (wedge, pct) in enumerate(zip(wedges, percentages)):
-            # Skip labels for 0% (or rounding to 0%) to reduce clutter
             if round(pct) < 1:
                 continue
-
             angle = 0.5 * (wedge.theta2 + wedge.theta1)
             radians = np.deg2rad(angle)
             label = f"{pct:.0f}%"
+            
+            width = getattr(wedge, "width", 0.0)
+            inner_r = wedge.r - width * 0.5
+            x_inner = inner_r * np.cos(radians)
+            y_inner = inner_r * np.sin(radians)
+            ax.text(x_inner, y_inner, label, ha="center", va="center", fontsize=10, 
+                    color="white", fontweight="bold")
 
-            if pct >= 10:
-                width = getattr(wedge, "width", 0.0)
-                inner_r = wedge.r - width * 0.5
-                x_inner = inner_r * np.cos(radians)
-                y_inner = inner_r * np.sin(radians)
-                ax.text(x_inner, y_inner, label, ha="center", va="center", fontsize=8, color="black")
-            else:
-                # Stagger radius for outside labels to avoid overlap of adjacent small slices
-                # Use index parity to alternate distances
-                stagger = 0.15 if (i % 2 == 1) else 0.0
-                outer_r = wedge.r + 0.25 + stagger
-                
-                x_outer = outer_r * np.cos(radians)
-                y_outer = outer_r * np.sin(radians)
-                
-                ax.annotate(
-                    label,
-                    xy=(np.cos(radians), np.sin(radians)),
-                    xytext=(x_outer, y_outer),
-                    textcoords="data",
-                    ha="center",
-                    va="center",
-                    fontsize=7.5,
-                    arrowprops={"arrowstyle": "-", "color": "#444444", "lw": 0.7},
-                )
+        # Add Active APDF values in center
+        center_text = f"Active APDF\nP10: {active_apdf['P10']:.1f}%\nP50: {active_apdf['P50']:.1f}%\nP90: {active_apdf['P90']:.1f}%"
+        ax.text(0, 0, center_text, ha="center", va="center", fontsize=9)
 
         ax.legend(
             wedges,
-            EFFORT_LABELS,
+            REST_ACTIVE_LABELS,
             loc="lower center",
-            bbox_to_anchor=(0.5, -0.16),
-            ncol=len(EFFORT_LABELS),
+            bbox_to_anchor=(0.5, -0.12),
+            ncol=2,
             frameon=True,
-            prop={"size": 8},
+            prop={"size": 9},
         )
-        ax.set_title(f"{subject_id} – {date} – {side}")
-        fig.subplots_adjust(bottom=0.32, top=0.9, left=0.1, right=0.9)
+        ax.set_title(f"{subject_id} – {date} – {side.title()}")
+        fig.subplots_adjust(bottom=0.2, top=0.9, left=0.1, right=0.9)
         fig.savefig(output_path, format="png")
         plt.close(fig)
         output_paths.append(output_path)
@@ -245,7 +273,7 @@ def plot_day_effort_donut_from_json(
     return output_paths or None
 
 
-def plot_day_effort_stacks_from_json(
+def plot_day_rest_active_stacks_from_json(
     oh_profile: Dict[str, Any],
     date: str,
     plots_root: Path,
@@ -253,7 +281,9 @@ def plot_day_effort_stacks_from_json(
     max_sessions: int = 4,
 ) -> Optional[Path]:
     """
-    Plot stacked effort bins per session for left/right mBANs from OH profile JSON.
+    Plot stacked rest/active bars per session for left/right mBANs.
+
+    Shows session progression with rest vs active time plus Active APDF P50 values.
 
     :param oh_profile: OH profile dictionary containing EMG metrics.
     :param date: Date string to plot.
@@ -279,7 +309,6 @@ def plot_day_effort_stacks_from_json(
         return None
 
     sides = ("left", "right")
-    n_bins = len(EFFORT_LABELS)
 
     # Extra height to leave room for a bottom legend without clipping
     fig = plt.figure(figsize=(12, 4.8))
@@ -290,7 +319,7 @@ def plot_day_effort_stacks_from_json(
     }
     label_ax = fig.add_subplot(gs[0, 1])
     label_ax.axis("off")
-    fig.suptitle(f"{subject_id} – {date} session progression", fontsize=14, fontweight="bold")
+    fig.suptitle(f"{subject_id} – {date} – Rest vs Active", fontsize=14, fontweight="bold")
 
     legend_handles = []
     legend_labels = []
@@ -300,6 +329,7 @@ def plot_day_effort_stacks_from_json(
         ax = axes_map[side]
         ax.set_title(f"{side.title()} mBAN – Sessions")
         session_data_list = []
+        active_p50_list = []
 
         for session_label in session_labels:
             session_data = day_data.get(session_label, {})
@@ -307,10 +337,12 @@ def plot_day_effort_stacks_from_json(
 
             if side_metrics is None:
                 session_data_list.append(None)
+                active_p50_list.append(None)
                 continue
 
-            percentages = _get_effort_percentages(side_metrics)
+            percentages = _get_rest_active_percentages(side_metrics)
             session_data_list.append(percentages)
+            active_p50_list.append(side_metrics.get(EMG_ACTIVE_APDF_P50_KEY, 0.0))
 
         if not any(session_data_list):
             _annotate_missing(ax, "No sessions for this day")
@@ -318,15 +350,23 @@ def plot_day_effort_stacks_from_json(
 
         left_offsets = np.zeros(len(session_labels))
 
-        for bin_idx, bin_label in enumerate(EFFORT_LABELS):
+        for bin_idx, bin_label in enumerate(REST_ACTIVE_LABELS):
             widths = [values[bin_idx] if values is not None else 0.0 for values in session_data_list]
             bars = ax.barh(y_positions, widths, height=0.6, left=left_offsets,
-                           color=EFFORT_COLORS[bin_idx], label=bin_label)
+                           color=REST_ACTIVE_COLORS[bin_idx], label=bin_label)
             left_offsets += widths
 
-            if len(legend_handles) < len(EFFORT_LABELS):
+            if len(legend_handles) < len(REST_ACTIVE_LABELS):
                 legend_handles.append(bars[0])
                 legend_labels.append(bin_label)
+
+        # Add Active APDF P50 annotations
+        for y_pos, p50 in zip(y_positions, active_p50_list):
+            if p50 is not None and p50 > 0:
+                text_x = 102 if side == "left" else -2
+                halign = "left" if side == "left" else "right"
+                ax.text(text_x, float(y_pos), f"P50: {p50:.1f}%", va="center", ha=halign,
+                        fontsize=7, color="#333333")
 
         for y_pos, values in zip(y_positions, session_data_list):
             if values is None or sum(values) == 0:
@@ -363,7 +403,7 @@ def plot_day_effort_stacks_from_json(
             label_ax.text(0.5, float(y_pos), session_label, va="center", ha="center", fontweight="bold")
         label_ax.invert_yaxis()
 
-    output_path = plots_root / subject_id / date / "summary" / "effort_sessions.png"
+    output_path = plots_root / subject_id / date / "summary" / "rest_active_sessions.png"
     ensure_parent(output_path)
     fig.subplots_adjust(bottom=0.22, top=0.9, left=0.08, right=0.98)
     fig.savefig(output_path)
@@ -371,13 +411,19 @@ def plot_day_effort_stacks_from_json(
     return output_path
 
 
-def plot_week_effort_stacks_from_json(
+def plot_week_rest_active_stacks_from_json(
     oh_profile: Dict[str, Any],
     plots_root: Path,
     subject_id: str,
 ) -> Optional[Path]:
-    """Show session effort per day, with left/right side-by-side, ordered by day."""
-
+    """
+    Show session rest/active time per day, with left/right side-by-side, ordered by day.
+    
+    :param oh_profile: OH profile dictionary containing EMG metrics.
+    :param plots_root: Root directory for plots.
+    :param subject_id: Subject identifier.
+    :returns: Path to generated plot, or None if no data.
+    """
     emg_data = _get_emg_data(oh_profile)
     if not emg_data:
         return None
@@ -409,7 +455,7 @@ def plot_week_effort_stacks_from_json(
     # Use 2x columns to allow centering of 1 or 2 items in a 3-column layout
     grid_cols = n_cols * 2
     outer_gs = fig.add_gridspec(n_rows, grid_cols, wspace=0.35, hspace=0.6)
-    fig.suptitle(f"{subject_id} – Week sessions effort", fontsize=14, fontweight="bold")
+    fig.suptitle(f"{subject_id} – Week Rest vs Active", fontsize=14, fontweight="bold")
 
     legend_handles: List[Any] = []
     legend_labels: List[str] = []
@@ -463,7 +509,7 @@ def plot_week_effort_stacks_from_json(
                 if side_metrics is None:
                     session_percentages.append(None)
                 else:
-                    session_percentages.append(_get_effort_percentages(side_metrics))
+                    session_percentages.append(_get_rest_active_percentages(side_metrics))
 
             all_missing = all(vals is None for vals in session_percentages)
             if all_missing:
@@ -472,20 +518,20 @@ def plot_week_effort_stacks_from_json(
                 continue
 
             left_offsets = np.zeros(len(sessions))
-            for bin_idx, bin_label in enumerate(EFFORT_LABELS):
+            for bin_idx, bin_label in enumerate(REST_ACTIVE_LABELS):
                 widths = [vals[bin_idx] if vals is not None else 0.0 for vals in session_percentages]
                 bars = ax.barh(
                     y_positions,
                     widths,
                     height=0.6,
                     left=left_offsets,
-                    color=EFFORT_COLORS[bin_idx],
+                    color=REST_ACTIVE_COLORS[bin_idx],
                     label=bin_label,
                 )
                 left_offsets += widths
 
                 # Capture legend only once
-                if len(legend_handles) < len(EFFORT_LABELS):
+                if len(legend_handles) < len(REST_ACTIVE_LABELS):
                     legend_handles.append(bars[0])
                     legend_labels.append(bin_label)
 
@@ -516,7 +562,7 @@ def plot_week_effort_stacks_from_json(
             prop={"size": 9},
         )
 
-    output_path = plots_root / subject_id / "week" / "effort_sessions_week.png"
+    output_path = plots_root / subject_id / "week" / "rest_active_sessions_week.png"
     ensure_parent(output_path)
     fig.subplots_adjust(bottom=0.18, top=0.92, left=0.06, right=0.98)
     fig.savefig(output_path, format="png")
@@ -681,6 +727,266 @@ def plot_daily_metric_trends_from_json(
 
 
 # -------------------------------------------------------------------------------------------------------------------- #
+# Relative Intensity Bin Plots (from JSON)
+# -------------------------------------------------------------------------------------------------------------------- #
+
+def plot_day_relative_bins_from_json(
+    oh_profile: Dict[str, Any],
+    date: str,
+    plots_root: Path,
+    subject_id: str,
+) -> Optional[List[Path]]:
+    """
+    Plot daily-aggregate relative intensity bins as donuts (left/right).
+    
+    Shows how the day's active EMG compares to the subject's weekly baseline:
+    - Below usual: active EMG < weekly P10
+    - Typical-low: between P10 and P50
+    - Typical-high: between P50 and P90  
+    - High for you: above weekly P90
+    
+    :param oh_profile: OH profile dictionary containing EMG metrics.
+    :param date: Date string to plot.
+    :param plots_root: Root directory for plots.
+    :param subject_id: Subject identifier.
+    :returns: List of paths to generated plots, or None if no data.
+    """
+    emg_data = _get_emg_data(oh_profile)
+    if not emg_data or date not in emg_data:
+        return None
+
+    day_data = emg_data[date]
+    daily_agg = day_data.get(EMG_DAILY_AGGREGATE_KEY, {})
+    if not daily_agg:
+        return None
+
+    output_paths: List[Path] = []
+    for side in ("left", "right"):
+        side_metrics = daily_agg.get(side)
+        if side_metrics is None:
+            continue
+
+        # Get relative bin percentages
+        bin_percentages = _get_relative_bin_percentages(side_metrics)
+        
+        # Skip if no bins computed (all None/0)
+        if all(p is None or p == 0.0 for p in bin_percentages):
+            continue
+        
+        # Replace None with 0 for plotting
+        bin_percentages = [p if p is not None else 0.0 for p in bin_percentages]
+        
+        # Also get Active APDF for center annotation
+        active_apdf = _get_active_apdf_values(side_metrics)
+        
+        output_path = plots_root / subject_id / date / "summary" / f"relative_bins_donut_{side}.png"
+        ensure_parent(output_path)
+
+        fig, ax = plt.subplots(figsize=(5.5, 5.5))
+        
+        # Filter out zero values for cleaner donut
+        non_zero_indices = [i for i, p in enumerate(bin_percentages) if p > 0]
+        plot_percentages = [bin_percentages[i] for i in non_zero_indices]
+        plot_colors = [RELATIVE_BIN_COLORS[i] for i in non_zero_indices]
+        plot_labels = [RELATIVE_BIN_LABELS[i] for i in non_zero_indices]
+        
+        if not plot_percentages:
+            plt.close(fig)
+            continue
+            
+        wedges, _ = ax.pie(
+            plot_percentages,
+            colors=plot_colors,
+            labels=None,
+            wedgeprops={"width": 0.35, "edgecolor": "white"},
+            startangle=90,
+        )
+
+        # Annotate percentages on the donut
+        for i, (wedge, pct) in enumerate(zip(wedges, plot_percentages)):
+            if round(pct) < 5:
+                continue
+            angle = 0.5 * (wedge.theta2 + wedge.theta1)
+            radians = np.deg2rad(angle)
+            label = f"{pct:.0f}%"
+            
+            width = getattr(wedge, "width", 0.0)
+            inner_r = wedge.r - width * 0.5
+            x_inner = inner_r * np.cos(radians)
+            y_inner = inner_r * np.sin(radians)
+            ax.text(x_inner, y_inner, label, ha="center", va="center", fontsize=10, 
+                    color="white", fontweight="bold")
+
+        # Add Active APDF values in center
+        center_text = f"Active APDF\nP10: {active_apdf['P10']:.1f}%\nP50: {active_apdf['P50']:.1f}%\nP90: {active_apdf['P90']:.1f}%"
+        ax.text(0, 0, center_text, ha="center", va="center", fontsize=9)
+
+        # Legend with all four bins (even if some are 0)
+        legend_handles = [plt.Rectangle((0, 0), 1, 1, fc=RELATIVE_BIN_COLORS[i]) 
+                          for i in range(len(RELATIVE_BIN_LABELS))]
+        ax.legend(
+            legend_handles,
+            RELATIVE_BIN_LABELS,
+            loc="lower center",
+            bbox_to_anchor=(0.5, -0.12),
+            ncol=2,
+            frameon=True,
+            prop={"size": 9},
+        )
+        ax.set_title(f"{subject_id} – {date} – {side.title()}\nRelative Intensity (vs Weekly Baseline)")
+        fig.subplots_adjust(bottom=0.2, top=0.88, left=0.1, right=0.9)
+        fig.savefig(output_path, format="png")
+        plt.close(fig)
+        output_paths.append(output_path)
+
+    return output_paths or None
+
+
+def plot_day_relative_bins_stacks_from_json(
+    oh_profile: Dict[str, Any],
+    date: str,
+    plots_root: Path,
+    subject_id: str,
+    max_sessions: int = 4,
+) -> Optional[Path]:
+    """
+    Plot stacked relative intensity bins per session for left/right mBANs.
+    
+    Shows session progression with intensity compared to weekly baseline.
+    
+    :param oh_profile: OH profile dictionary containing EMG metrics.
+    :param date: Date string to plot.
+    :param plots_root: Root directory for plots.
+    :param subject_id: Subject identifier for plot title and path.
+    :param max_sessions: Maximum number of sessions to show.
+    :returns: Path to the generated plot, or None if no data available.
+    """
+    emg_data = _get_emg_data(oh_profile)
+    if not emg_data or date not in emg_data:
+        return None
+
+    day_data = emg_data[date]
+    
+    # Collect session labels (exclude aggregates)
+    session_labels = [
+        key for key in day_data.keys()
+        if key not in (EMG_DAILY_AGGREGATE_KEY, EMG_WEEKLY_AGGREGATE_KEY)
+    ]
+    session_labels = sorted(session_labels)[:max_sessions]
+    
+    if not session_labels:
+        return None
+    
+    # Check if any session has relative bins
+    has_bins = False
+    for session_label in session_labels:
+        session_data = day_data.get(session_label, {})
+        for side in ("left", "right"):
+            side_metrics = session_data.get(side, {})
+            bin_pcts = _get_relative_bin_percentages(side_metrics)
+            if any(p is not None and p > 0 for p in bin_pcts):
+                has_bins = True
+                break
+        if has_bins:
+            break
+    
+    if not has_bins:
+        return None
+
+    sides = ("left", "right")
+
+    fig = plt.figure(figsize=(12, 4.8))
+    gs = fig.add_gridspec(1, 3, width_ratios=(1, 0.18, 1), wspace=0.2)
+    axes_map = {
+        "left": fig.add_subplot(gs[0, 0]),
+        "right": fig.add_subplot(gs[0, 2]),
+    }
+    label_ax = fig.add_subplot(gs[0, 1])
+    label_ax.axis("off")
+    fig.suptitle(f"{subject_id} – {date} – Relative Intensity (vs Weekly Baseline)", fontsize=14, fontweight="bold")
+
+    legend_handles = []
+    legend_labels = []
+    y_positions = np.arange(len(session_labels))
+
+    for idx, side in enumerate(sides):
+        ax = axes_map[side]
+        ax.set_title(f"{side.title()} mBAN – Sessions")
+        session_data_list = []
+
+        for session_label in session_labels:
+            session_data = day_data.get(session_label, {})
+            side_metrics = session_data.get(side)
+
+            if side_metrics is None:
+                session_data_list.append(None)
+                continue
+
+            bin_pcts = _get_relative_bin_percentages(side_metrics)
+            # Replace None with 0
+            bin_pcts = [p if p is not None else 0.0 for p in bin_pcts]
+            session_data_list.append(bin_pcts)
+
+        if not any(session_data_list):
+            _annotate_missing(ax, "No sessions for this day")
+            continue
+
+        left_offsets = np.zeros(len(session_labels))
+
+        for bin_idx, bin_label in enumerate(RELATIVE_BIN_LABELS):
+            widths = [values[bin_idx] if values is not None else 0.0 for values in session_data_list]
+            bars = ax.barh(y_positions, widths, height=0.6, left=left_offsets,
+                           color=RELATIVE_BIN_COLORS[bin_idx], label=bin_label)
+            left_offsets += widths
+
+            if len(legend_handles) < len(RELATIVE_BIN_LABELS):
+                legend_handles.append(bars[0])
+                legend_labels.append(bin_label)
+
+        for y_pos, values in zip(y_positions, session_data_list):
+            if values is None or sum(values) == 0:
+                text_x = -1 if side == "left" else 101
+                halign = "right" if side == "left" else "left"
+                ax.text(text_x, float(y_pos), "no data", va="center", ha=halign,
+                        fontsize=8, color="#555555")
+
+        ax.set_yticks(y_positions)
+        ax.set_yticklabels([])
+        ax.set_xlim(0, 100)
+        ax.set_xlabel("Active time (%)")
+        ax.invert_yaxis()
+        ax.grid(axis="x", alpha=0.2)
+
+        if side == "left":
+            ax.invert_xaxis()
+
+    if legend_handles:
+        fig.legend(
+            legend_handles,
+            legend_labels,
+            loc="lower center",
+            bbox_to_anchor=(0.5, 0.02),
+            ncol=len(legend_labels),
+            frameon=True,
+            prop={"size": 9},
+        )
+
+    # Add session labels in center column
+    if len(y_positions) > 0:
+        label_ax.set_ylim(-0.5, len(session_labels) - 0.5)
+        for y_pos, session_label in zip(y_positions, session_labels):
+            label_ax.text(0.5, float(y_pos), session_label, va="center", ha="center", fontweight="bold")
+        label_ax.invert_yaxis()
+
+    output_path = plots_root / subject_id / date / "summary" / "relative_bins_sessions.png"
+    ensure_parent(output_path)
+    fig.subplots_adjust(bottom=0.22, top=0.9, left=0.08, right=0.98)
+    fig.savefig(output_path)
+    plt.close(fig)
+    return output_path
+
+
+# -------------------------------------------------------------------------------------------------------------------- #
 # Internal Helper Functions
 # -------------------------------------------------------------------------------------------------------------------- #
 
@@ -693,11 +999,11 @@ def _annotate_missing(ax: Axes, text: str) -> None:
             fontsize=12, color="#888888")
 
 
-def _plot_effort_bars(ax: Axes, percentages: List[float]) -> None:
-    """Plot horizontal stacked bars for effort band percentages."""
+def _plot_rest_active_bars(ax: Axes, percentages: List[float]) -> None:
+    """Plot horizontal stacked bars for rest vs active percentages."""
     cumulative = 0.0
     for i, pct in enumerate(percentages):
-        ax.barh(0, pct, left=cumulative, color=EFFORT_COLORS[i], height=0.6)
+        ax.barh(0, pct, left=cumulative, color=REST_ACTIVE_COLORS[i], height=0.6)
         cumulative += pct
     ax.set_xlim(0, 100)
     ax.set_ylim(-0.5, 0.5)
@@ -718,10 +1024,13 @@ def generate_emg_plots_from_oh_profiles(
     Generate all EMG visualizations from OH profile JSON files.
 
     This function reads the persisted OH profiles and generates:
-    - Day-level effort distribution grids
-    - Day-level effort session stacks
+    - Day-level rest vs active distribution grids
+    - Day-level rest vs active donuts with Active APDF
+    - Day-level relative intensity bin donuts (vs weekly baseline)
+    - Relative intensity bin session stacks
     - Session-level metric trends
     - Daily-level metric trends
+    - Week-level rest vs active stacks
 
     :param oh_profiles_path: Path to folder containing OH profile JSON files.
     :param subject_ids: List of subject IDs to process.
@@ -748,26 +1057,40 @@ def generate_emg_plots_from_oh_profiles(
         ]
 
         for date in sorted(dates):
-            # Generate effort distribution grid
-            effort_grid_path = plot_day_effort_grid_from_json(
+            # Generate rest vs active distribution grid
+            rest_active_grid_path = plot_day_rest_active_grid_from_json(
                 oh_profile, date, plots_root, subject_id_str
             )
-            if effort_grid_path:
-                subject_plots.append(effort_grid_path)
+            if rest_active_grid_path:
+                subject_plots.append(rest_active_grid_path)
 
-            # Generate daily aggregate effort donuts (png)
-            effort_donut_paths = plot_day_effort_donut_from_json(
+            # Generate daily aggregate rest vs active donuts (png)
+            rest_active_donut_paths = plot_day_rest_active_donut_from_json(
                 oh_profile, date, plots_root, subject_id_str
             )
-            if effort_donut_paths:
-                subject_plots.extend(effort_donut_paths)
+            if rest_active_donut_paths:
+                subject_plots.extend(rest_active_donut_paths)
 
-            # Generate effort session stacks
-            effort_stacks_path = plot_day_effort_stacks_from_json(
+            # Generate rest vs active session stacks
+            rest_active_stacks_path = plot_day_rest_active_stacks_from_json(
                 oh_profile, date, plots_root, subject_id_str
             )
-            if effort_stacks_path:
-                subject_plots.append(effort_stacks_path)
+            if rest_active_stacks_path:
+                subject_plots.append(rest_active_stacks_path)
+
+            # Generate relative intensity bin donuts (vs weekly baseline)
+            relative_bin_donut_paths = plot_day_relative_bins_from_json(
+                oh_profile, date, plots_root, subject_id_str
+            )
+            if relative_bin_donut_paths:
+                subject_plots.extend(relative_bin_donut_paths)
+
+            # Generate relative intensity bin session stacks
+            relative_bin_stacks_path = plot_day_relative_bins_stacks_from_json(
+                oh_profile, date, plots_root, subject_id_str
+            )
+            if relative_bin_stacks_path:
+                subject_plots.append(relative_bin_stacks_path)
 
             # Generate session-level metric trends
             session_trend_paths = plot_session_metric_trends_from_json(
@@ -782,7 +1105,7 @@ def generate_emg_plots_from_oh_profiles(
         subject_plots.extend(daily_trend_paths)
 
         # Generate week-level stacked sessions view (png)
-        week_stack_path = plot_week_effort_stacks_from_json(
+        week_stack_path = plot_week_rest_active_stacks_from_json(
             oh_profile, plots_root, subject_id_str
         )
         if week_stack_path:
@@ -791,5 +1114,7 @@ def generate_emg_plots_from_oh_profiles(
         if subject_plots:
             all_plots[subject_id_str] = subject_plots
             print(f"[oh_profile_plots] Generated {len(subject_plots)} plots for subject {subject_id_str}")
+
+    return all_plots
 
     return all_plots

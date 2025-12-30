@@ -13,12 +13,13 @@ from signal_processing import create_preprocess_config, run_emg_pipeline
 # ------------------------------------------------------------------------------------------------------------------- #
 # Configuration
 # ------------------------------------------------------------------------------------------------------------------- #
-DATA_ROOT = Path(r"/Volumes/USB DISK/PrevOccupAI_plus_Data/data")
+MAIN_ROOT = Path(r"E:\Backup PrevOccupAI_PLUS Data") 
+DATA_ROOT =  MAIN_ROOT / "data"
 PARTICIPANTS_CSV = Path("participants_info.csv")
 SELECTED_SENSORS = {MBAN: ["EMG"]}
-RESULTS_ROOT = Path(r"/Volumes/USB DISK/PrevOccupAI_plus_Data/results") / "emg_pipeline"
+RESULTS_ROOT = MAIN_ROOT / "results" / "emg_pipeline"
 PLOTS_ROOT = RESULTS_ROOT / "plots"
-OH_PROFILES_ROOT = Path(r"/Volumes/USB DISK/PrevOccupAI_plus_Data/OH_profiles")  # Optional: set to None to disable OH profile saving
+OH_PROFILES_ROOT = MAIN_ROOT / "OH_profiles"  # Optional: set to None to disable OH profile saving
 DEFAULT_CONFIG = create_preprocess_config()
 
 
@@ -91,7 +92,7 @@ def main(
     """
 
     if run_all:
-        load_data = preprocess = visualize = show_mvc_plots = True
+        load_data = preprocess = visualize = True
         tkeo_segments = True
 
     descriptors: list[dict] = []
@@ -128,22 +129,23 @@ def main(
         for label, path in artifacts.items():
             print(f"    - {label}: {path}")
 
-    if quality_reports:
-        report_path = artifacts.get("quality_report")
-        if report_path:
-            print(
-                f"[main_emg] {len(quality_reports)} acquisition(s) skipped due to data quality. "
-                f"See {report_path} for details."
-            )
-        else:
-            print(f"[main_emg] {len(quality_reports)} acquisition(s) failed data-quality checks.")
+        if quality_reports:
+            report_path = artifacts.get("quality_report")
+            if report_path:
+                print(
+                    f"[main_emg] {len(quality_reports)} acquisition(s) skipped due to data quality. "
+                    f"See {report_path} for details."
+                )
+            else:
+                print(f"[main_emg] {len(quality_reports)} acquisition(s) failed data-quality checks.")
 
-    return artifacts
+        return artifacts
+
+    return None
 
 
 if __name__ == '__main__':
-    main(run_all=True)
-
-
+    # Run on ALL available subjects to assess 0.5% rest threshold meaningfulness
+    main(run_all=True, subject_filter=None)  
 
 

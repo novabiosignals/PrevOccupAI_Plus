@@ -1,4 +1,9 @@
-"""Functions to save EMG metrics to OH profiles."""
+"""
+EMG OH Profile Helper Functions
+
+Functions to save EMG metrics to Occupational Health profiles.
+Uses Active APDF + Rest Time framework for physiologically meaningful metrics.
+"""
 
 # external imports
 import pandas as pd
@@ -9,12 +14,20 @@ from OH_profile.load import get_OH_profile
 from OH_profile.write import save_OH_profile, write_to_OH_profile
 from OH_profile.constants import (
     SENSOR_METRICS_KEY, EMG_KEY,
+    # Basic metrics
     EMG_DURATION_S_KEY, EMG_MEAN_PERCENT_MVC_KEY, EMG_MAX_PERCENT_MVC_KEY,
     EMG_MIN_PERCENT_MVC_KEY, EMG_IEMG_PERCENT_SECONDS_KEY, EMG_MVC_PEAK_KEY,
+    # Traditional APDF
     EMG_APDF_P10_KEY, EMG_APDF_P50_KEY, EMG_APDF_P90_KEY,
-    EMG_EFFORT_LOW_PCT_KEY, EMG_EFFORT_MODERATE_PCT_KEY, EMG_EFFORT_HIGH_PCT_KEY,
-    EMG_EFFORT_OVER100_PCT_KEY, EMG_EFFORT_LOW_MIN_KEY, EMG_EFFORT_MODERATE_MIN_KEY,
-    EMG_EFFORT_HIGH_MIN_KEY, EMG_EFFORT_OVER100_MIN_KEY,
+    # Active APDF (intensity when working)
+    EMG_ACTIVE_APDF_P10_KEY, EMG_ACTIVE_APDF_P50_KEY, EMG_ACTIVE_APDF_P90_KEY,
+    # Rest metrics
+    EMG_REST_PERCENT_KEY,
+    EMG_MAX_SUSTAINED_ACTIVITY_S_KEY, EMG_ACTIVE_DURATION_S_KEY, EMG_GAP_COUNT_KEY, EMG_GAP_FREQUENCY_PER_MINUTE_KEY,
+    # Relative bins (weekly only)
+    EMG_BIN_BELOW_USUAL_PCT_KEY, EMG_BIN_TYPICAL_LOW_PCT_KEY,
+    EMG_BIN_TYPICAL_HIGH_PCT_KEY, EMG_BIN_HIGH_FOR_YOU_PCT_KEY,
+    # Aggregation keys
     EMG_DAILY_AGGREGATE_KEY, EMG_WEEKLY_AGGREGATE_KEY,
     EMG_SESSION_COUNT_KEY, EMG_DAY_COUNT_KEY,
 )
@@ -24,83 +37,140 @@ from OH_profile.constants import (
 # -------------------------------------------------------------------------------------------------------------------- #
 
 def _build_session_metrics_dict(row: pd.Series) -> Dict[str, Any]:
-    """Build a dictionary of EMG metrics for a single session using OH profile constants."""
+    """
+    Build a dictionary of EMG metrics for a single session.
+    
+    Includes basic stats, traditional APDF, Active APDF, rest metrics,
+    and relative intensity bins (compared to weekly baseline).
+    
+    :param row: Series containing session metrics from compute_session_metrics().
+    :return: Dictionary with OH profile keys mapped to metric values.
+    """
     return {
-        EMG_DURATION_S_KEY: row["duration_s"],
-        EMG_MEAN_PERCENT_MVC_KEY: row["mean_percent_mvc"],
-        EMG_MAX_PERCENT_MVC_KEY: row["max_percent_mvc"],
-        EMG_MIN_PERCENT_MVC_KEY: row["min_percent_mvc"],
-        EMG_IEMG_PERCENT_SECONDS_KEY: row["iemg_percent_seconds"],
+        # Basic metrics
+        EMG_DURATION_S_KEY: row.get("duration_s", 0.0),
+        EMG_MEAN_PERCENT_MVC_KEY: row.get("mean_percent_mvc", 0.0),
+        EMG_MAX_PERCENT_MVC_KEY: row.get("max_percent_mvc", 0.0),
+        EMG_MIN_PERCENT_MVC_KEY: row.get("min_percent_mvc", 0.0),
+        EMG_IEMG_PERCENT_SECONDS_KEY: row.get("iemg_percent_seconds", 0.0),
         EMG_MVC_PEAK_KEY: row.get("mvc_peak", 0.0),
-        EMG_APDF_P10_KEY: row["apdf_p10"],
-        EMG_APDF_P50_KEY: row["apdf_p50"],
-        EMG_APDF_P90_KEY: row["apdf_p90"],
-        EMG_EFFORT_LOW_PCT_KEY: row.get("effort_low_pct", 0.0),
-        EMG_EFFORT_MODERATE_PCT_KEY: row.get("effort_moderate_pct", 0.0),
-        EMG_EFFORT_HIGH_PCT_KEY: row.get("effort_high_pct", 0.0),
-        EMG_EFFORT_OVER100_PCT_KEY: row.get("effort_over100_pct", 0.0),
-        EMG_EFFORT_LOW_MIN_KEY: row.get("effort_low_min", 0.0),
-        EMG_EFFORT_MODERATE_MIN_KEY: row.get("effort_moderate_min", 0.0),
-        EMG_EFFORT_HIGH_MIN_KEY: row.get("effort_high_min", 0.0),
-        EMG_EFFORT_OVER100_MIN_KEY: row.get("effort_over100_min", 0.0),
+        # Traditional APDF percentiles (all samples)
+        EMG_APDF_P10_KEY: row.get("apdf_p10", 0.0),
+        EMG_APDF_P50_KEY: row.get("apdf_p50", 0.0),
+        EMG_APDF_P90_KEY: row.get("apdf_p90", 0.0),
+        # Active APDF percentiles (only active samples)
+        EMG_ACTIVE_APDF_P10_KEY: row.get("active_apdf_p10", 0.0),
+        EMG_ACTIVE_APDF_P50_KEY: row.get("active_apdf_p50", 0.0),
+        EMG_ACTIVE_APDF_P90_KEY: row.get("active_apdf_p90", 0.0),
+        # Rest metrics
+        EMG_REST_PERCENT_KEY: row.get("rest_percent", 0.0),
+        EMG_GAP_FREQUENCY_PER_MINUTE_KEY: row.get("gap_frequency_per_minute", 0.0),
+        EMG_MAX_SUSTAINED_ACTIVITY_S_KEY: row.get("max_sustained_activity_s", 0.0),
+        EMG_ACTIVE_DURATION_S_KEY: row.get("active_duration_s", 0.0),
+        EMG_GAP_COUNT_KEY: row.get("gap_count", 0),
+        # Relative intensity bins (compared to weekly baseline)
+        EMG_BIN_BELOW_USUAL_PCT_KEY: row.get("bin_below_usual_pct", None),
+        EMG_BIN_TYPICAL_LOW_PCT_KEY: row.get("bin_typical_low_pct", None),
+        EMG_BIN_TYPICAL_HIGH_PCT_KEY: row.get("bin_typical_high_pct", None),
+        EMG_BIN_HIGH_FOR_YOU_PCT_KEY: row.get("bin_high_for_you_pct", None),
     }
 
 
 def _build_daily_aggregate_dict(row: pd.Series) -> Dict[str, Any]:
-    """Build a dictionary of aggregated daily EMG metrics using OH profile constants."""
+    """
+    Build a dictionary of aggregated daily EMG metrics.
+    
+    Includes relative intensity bins (averaged across sessions for the day).
+    
+    :param row: Series containing daily aggregated metrics.
+    :return: Dictionary with OH profile keys mapped to metric values.
+    """
     return {
         EMG_SESSION_COUNT_KEY: int(row.get("session_count", 0)),
+        # Basic metrics
         EMG_DURATION_S_KEY: row.get("duration_s", 0.0),
-        EMG_MEAN_PERCENT_MVC_KEY: row["mean_percent_mvc"],
-        EMG_MAX_PERCENT_MVC_KEY: row["max_percent_mvc"],
-        EMG_MIN_PERCENT_MVC_KEY: row["min_percent_mvc"],
-        EMG_IEMG_PERCENT_SECONDS_KEY: row["iemg_percent_seconds"],
-        EMG_APDF_P10_KEY: row["apdf_p10"],
-        EMG_APDF_P50_KEY: row["apdf_p50"],
-        EMG_APDF_P90_KEY: row["apdf_p90"],
-        EMG_EFFORT_LOW_PCT_KEY: row.get("effort_low_pct", 0.0),
-        EMG_EFFORT_MODERATE_PCT_KEY: row.get("effort_moderate_pct", 0.0),
-        EMG_EFFORT_HIGH_PCT_KEY: row.get("effort_high_pct", 0.0),
-        EMG_EFFORT_OVER100_PCT_KEY: row.get("effort_over100_pct", 0.0),
-        EMG_EFFORT_LOW_MIN_KEY: row.get("effort_low_min", 0.0),
-        EMG_EFFORT_MODERATE_MIN_KEY: row.get("effort_moderate_min", 0.0),
-        EMG_EFFORT_HIGH_MIN_KEY: row.get("effort_high_min", 0.0),
-        EMG_EFFORT_OVER100_MIN_KEY: row.get("effort_over100_min", 0.0),
+        EMG_MEAN_PERCENT_MVC_KEY: row.get("mean_percent_mvc", 0.0),
+        EMG_MAX_PERCENT_MVC_KEY: row.get("max_percent_mvc", 0.0),
+        EMG_MIN_PERCENT_MVC_KEY: row.get("min_percent_mvc", 0.0),
+        EMG_IEMG_PERCENT_SECONDS_KEY: row.get("iemg_percent_seconds", 0.0),
+        # Traditional APDF
+        EMG_APDF_P10_KEY: row.get("apdf_p10", 0.0),
+        EMG_APDF_P50_KEY: row.get("apdf_p50", 0.0),
+        EMG_APDF_P90_KEY: row.get("apdf_p90", 0.0),
+        # Active APDF
+        EMG_ACTIVE_APDF_P10_KEY: row.get("active_apdf_p10", 0.0),
+        EMG_ACTIVE_APDF_P50_KEY: row.get("active_apdf_p50", 0.0),
+        EMG_ACTIVE_APDF_P90_KEY: row.get("active_apdf_p90", 0.0),
+        # Rest metrics
+        EMG_REST_PERCENT_KEY: row.get("rest_percent", 0.0),
+        EMG_GAP_FREQUENCY_PER_MINUTE_KEY: row.get("gap_frequency_per_minute", 0.0),
+        EMG_MAX_SUSTAINED_ACTIVITY_S_KEY: row.get("max_sustained_activity_s", 0.0),
+        EMG_ACTIVE_DURATION_S_KEY: row.get("active_duration_s", 0.0),
+        EMG_GAP_COUNT_KEY: row.get("gap_count", 0),
+        # Relative intensity bins (averaged across sessions)
+        EMG_BIN_BELOW_USUAL_PCT_KEY: row.get("bin_below_usual_pct", None),
+        EMG_BIN_TYPICAL_LOW_PCT_KEY: row.get("bin_typical_low_pct", None),
+        EMG_BIN_TYPICAL_HIGH_PCT_KEY: row.get("bin_typical_high_pct", None),
+        EMG_BIN_HIGH_FOR_YOU_PCT_KEY: row.get("bin_high_for_you_pct", None),
     }
 
 
 def _build_weekly_aggregate_dict(row: pd.Series) -> Dict[str, Any]:
-    """Build a dictionary of aggregated weekly EMG metrics using OH profile constants."""
+    """
+    Build a dictionary of aggregated weekly EMG metrics.
+    
+    Weekly level also includes relative intensity bins (compared to baseline).
+    
+    :param row: Series containing weekly aggregated metrics.
+    :return: Dictionary with OH profile keys mapped to metric values.
+    """
     return {
         EMG_DAY_COUNT_KEY: int(row.get("day_count", 0)),
+        # Basic metrics
         EMG_DURATION_S_KEY: row.get("duration_s", 0.0),
-        EMG_MEAN_PERCENT_MVC_KEY: row["mean_percent_mvc"],
-        EMG_MAX_PERCENT_MVC_KEY: row["max_percent_mvc"],
-        EMG_MIN_PERCENT_MVC_KEY: row["min_percent_mvc"],
-        EMG_IEMG_PERCENT_SECONDS_KEY: row["iemg_percent_seconds"],
-        EMG_APDF_P10_KEY: row["apdf_p10"],
-        EMG_APDF_P50_KEY: row["apdf_p50"],
-        EMG_APDF_P90_KEY: row["apdf_p90"],
-        EMG_EFFORT_LOW_PCT_KEY: row.get("effort_low_pct", 0.0),
-        EMG_EFFORT_MODERATE_PCT_KEY: row.get("effort_moderate_pct", 0.0),
-        EMG_EFFORT_HIGH_PCT_KEY: row.get("effort_high_pct", 0.0),
-        EMG_EFFORT_OVER100_PCT_KEY: row.get("effort_over100_pct", 0.0),
-        EMG_EFFORT_LOW_MIN_KEY: row.get("effort_low_min", 0.0),
-        EMG_EFFORT_MODERATE_MIN_KEY: row.get("effort_moderate_min", 0.0),
-        EMG_EFFORT_HIGH_MIN_KEY: row.get("effort_high_min", 0.0),
-        EMG_EFFORT_OVER100_MIN_KEY: row.get("effort_over100_min", 0.0),
+        EMG_MEAN_PERCENT_MVC_KEY: row.get("mean_percent_mvc", 0.0),
+        EMG_MAX_PERCENT_MVC_KEY: row.get("max_percent_mvc", 0.0),
+        EMG_MIN_PERCENT_MVC_KEY: row.get("min_percent_mvc", 0.0),
+        EMG_IEMG_PERCENT_SECONDS_KEY: row.get("iemg_percent_seconds", 0.0),
+        # Traditional APDF
+        EMG_APDF_P10_KEY: row.get("apdf_p10", 0.0),
+        EMG_APDF_P50_KEY: row.get("apdf_p50", 0.0),
+        EMG_APDF_P90_KEY: row.get("apdf_p90", 0.0),
+        # Active APDF (weekly baseline percentiles)
+        EMG_ACTIVE_APDF_P10_KEY: row.get("active_apdf_p10", 0.0),
+        EMG_ACTIVE_APDF_P50_KEY: row.get("active_apdf_p50", 0.0),
+        EMG_ACTIVE_APDF_P90_KEY: row.get("active_apdf_p90", 0.0),
+        # Rest metrics
+        EMG_REST_PERCENT_KEY: row.get("rest_percent", 0.0),
+        EMG_GAP_FREQUENCY_PER_MINUTE_KEY: row.get("gap_frequency_per_minute", 0.0),
+        EMG_MAX_SUSTAINED_ACTIVITY_S_KEY: row.get("max_sustained_activity_s", 0.0),
+        EMG_ACTIVE_DURATION_S_KEY: row.get("active_duration_s", 0.0),
+        EMG_GAP_COUNT_KEY: row.get("gap_count", 0),
+        # Relative intensity bins (only at weekly level, for comparing sessions to baseline)
+        EMG_BIN_BELOW_USUAL_PCT_KEY: row.get("bin_below_usual_pct", None),
+        EMG_BIN_TYPICAL_LOW_PCT_KEY: row.get("bin_typical_low_pct", None),
+        EMG_BIN_TYPICAL_HIGH_PCT_KEY: row.get("bin_typical_high_pct", None),
+        EMG_BIN_HIGH_FOR_YOU_PCT_KEY: row.get("bin_high_for_you_pct", None),
     }
+
 
 def _build_emg_profile_structure(
     session_df: pd.DataFrame,
     daily_df: pd.DataFrame,
     weekly_df: pd.DataFrame,
 ) -> Dict[str, Any]:
-    """Build the nested EMG structure for a subject's OH profile.
+    """
+    Build the nested EMG structure for a subject's OH profile.
 
-    Structure: date → session → side → metrics
-               date → daily_aggregate → side → metrics
-               weekly_aggregate → week_N → side → metrics
+    Structure:
+        date → session → side → metrics
+        date → daily_aggregate → side → metrics
+        weekly_aggregate → side → metrics
+        
+    :param session_df: DataFrame with per-session metrics.
+    :param daily_df: DataFrame with daily aggregated metrics.
+    :param weekly_df: DataFrame with weekly aggregated metrics.
+    :return: Nested dictionary structure for OH profile.
     """
     emg_structure: Dict[str, Any] = {}
 
@@ -139,13 +209,15 @@ def _build_emg_profile_structure(
 
     return emg_structure
 
+
 def _save_emg_to_oh_profiles(
     session_df: pd.DataFrame,
     daily_df: pd.DataFrame,
     weekly_df: pd.DataFrame,
     oh_profiles_path: str,
 ) -> None:
-    """Save EMG metrics to OH profiles for each subject.
+    """
+    Save EMG metrics to OH profiles for each subject.
 
     :param session_df: DataFrame with per-session metrics.
     :param daily_df: DataFrame with daily aggregated metrics.

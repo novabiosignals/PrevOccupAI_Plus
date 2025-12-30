@@ -35,20 +35,20 @@ def _otsu_threshold(data: np.ndarray) -> float:
     
     # Build histogram
     hist, bin_edges = np.histogram(data_flat, bins=256)
-    bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
+    bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2 # output array of shape (256,) with bin centers
     
     # Total statistics
     total = hist.sum()
     if total == 0:
         return float(np.median(data_flat))
     
-    sum_total = np.dot(hist, bin_centers)
+    sum_total = np.dot(hist, bin_centers) # weighted sum of all bins
     
     # Iterate to find optimal threshold
     sum_bg = 0.0
     weight_bg = 0
     var_max = 0.0
-    threshold = bin_centers[0]
+    threshold = bin_centers[0] # default to lowest bin center
     
     for i in range(256):
         weight_bg += hist[i]
@@ -95,7 +95,7 @@ def _robust_sigma(
     """
     med = float(np.median(x))
     mad = float(np.median(np.abs(x - med)))
-    sigma = 1.4826 * mad
+    sigma = 1.4826 * mad # Scale MAD to match std for normal distribution
     
     # Compute adaptive minimum: 5% of signal dynamic range, with absolute floor
     if p10 is None:
@@ -166,7 +166,7 @@ def _select_quiet_baseline(
     # Compute IQR floor for dropout detection (in linear space if available)
     if linear_energy is not None and linear_energy.size > 0:
         full_iqr = float(np.percentile(linear_energy, 75) - np.percentile(linear_energy, 25))
-        iqr_floor = iqr_floor_ratio * full_iqr
+        iqr_floor = iqr_floor_ratio * full_iqr # 1% of full IQR
         use_linear_check = True
     else:
         iqr_floor = 0.0
@@ -592,7 +592,7 @@ def detect_mvc_segments_hybrid(
         windows = np.lib.stride_tricks.sliding_window_view(energy_tkeo, win_samples)
         energy_windowed = np.sum(windows, axis=1)
         # Pad to original length (assign window energy to window center)
-        pad_left = win_samples // 2
+        pad_left = win_samples // 2 
         pad_right = len(energy_tkeo) - len(energy_windowed) - pad_left
         energy = np.pad(energy_windowed, (pad_left, pad_right), mode='edge')
     else:

@@ -1,0 +1,40 @@
+# Virtual environments
+EMG_venv/
+venv/
+.venv/
+env/
+.env/
+
+# Python bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# Output directories (generated data)
+outputs/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Large data files (keep tracked selectively if needed)
+*.csv
+!participants_info.csv
+
+# Logs
+*.log

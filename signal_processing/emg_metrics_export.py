@@ -1,8 +1,11 @@
-"""EMG metrics export and persistence utilities.
+"""
+EMG Metrics Export and Persistence Utilities
 
 This module consolidates all table-building, CSV export, and quality-report
 persistence helpers used by the main EMG pipeline. Functions here are designed
 to work with the data structures produced by ``sensors.metrics.emg_metrics``.
+
+Uses Active APDF + Rest Time framework for physiologically meaningful metrics.
 """
 
 from __future__ import annotations
@@ -15,82 +18,63 @@ import pandas as pd
 
 from sensors.load.data_quality import FileQualityReport, write_quality_report
 from sensors.metrics.emg_metrics import (
-    EFFORT_BANDS,
     aggregate_daily_metrics,
     aggregate_weekly_metrics,
-    compute_effort_bins,
     compute_percentage_changes,
 )
 
 __all__ = [
-    "normalize_band_label",
     "build_tables",
     "write_tables",
     "persist_quality_report",
-    "record_effort_bins",
-    "write_effort_bins",
 ]
-
-
-# ---------------------------------------------------------------------------
-# Label normalization
-# ---------------------------------------------------------------------------
-def normalize_band_label(label: str) -> str:
-    """Create machine-friendly column names from human-readable effort labels.
-
-    :param label: Original text label such as ``"Low effort"`` or ``">100%"``.
-    :returns: Snake-case string safe for use as a column prefix.
-    """
-    cleaned = label.strip().lower()
-    replacements = {
-        "%": "pct",
-        ">": "gt",
-        "+": "plus",
-        "-": "_",
-        "–": "_",
-        "/": "_",
-    }
-    for old, new in replacements.items():
-        cleaned = cleaned.replace(old, new)
-    cleaned = "_".join(filter(None, cleaned.split()))
-    if not cleaned:
-        cleaned = "band"
-    return cleaned
 
 
 # ---------------------------------------------------------------------------
 # Table building
 # ---------------------------------------------------------------------------
 def build_tables(session_metrics: List[dict]) -> Dict[str, pd.DataFrame]:
-    """Convert raw session dictionaries into tidy DataFrames with aggregates/deltas.
+    """
+    Convert raw session dictionaries into tidy DataFrames with aggregates/deltas.
+    
+    Uses Active APDF metrics (intensity when working) and rest metrics.
 
     :param session_metrics: List of per-session metric dicts returned by ``compute_session_metrics``.
     :returns: Dict with DataFrames (sessions, daily/weekly aggregates, and change tables).
     """
     session_df = pd.DataFrame(session_metrics)
 
-    # Columns to average in daily aggregation
+    # Columns for daily aggregation using weighted averages (intensity/percentage metrics)
     mean_value_cols = [
+        # Basic metrics
         "iemg_percent_seconds",
         "mean_percent_mvc",
         "max_percent_mvc",
         "min_percent_mvc",
+        # Traditional APDF
         "apdf_p10",
         "apdf_p50",
         "apdf_p90",
-        "effort_low_pct",
-        "effort_moderate_pct",
-        "effort_high_pct",
-        "effort_over100_pct",
+        # Active APDF (intensity when working)
+        "active_apdf_p10",
+        "active_apdf_p50",
+        "active_apdf_p90",
+        # Rest metrics (percentages and frequencies)
+        "rest_percent",
+        "gap_frequency_per_minute",
+        # Relative intensity bins (computed vs weekly baseline)
+        "bin_below_usual_pct",
+        "bin_typical_low_pct",
+        "bin_typical_high_pct",
+        "bin_high_for_you_pct",
     ]
 
-    # Columns to sum in daily aggregation
+    # Columns to sum in daily aggregation (time-based metrics)
     sum_value_cols = [
         "duration_s",
-        "effort_low_min",
-        "effort_moderate_min",
-        "effort_high_min",
-        "effort_over100_min",
+        "active_duration_s",
+        "max_sustained_activity_s",
+        "gap_count",
     ]
 
     # Filter to only columns that exist in session_df
@@ -103,22 +87,25 @@ def build_tables(session_metrics: List[dict]) -> Dict[str, pd.DataFrame]:
     weekly_sum_cols = [
         "duration_s",
         "iemg_percent_seconds",
-        "effort_low_min",
-        "effort_moderate_min",
-        "effort_high_min",
-        "effort_over100_min",
+        "active_duration_s",
+        "gap_count",
     ]
     weekly_mean_cols = [
         "mean_percent_mvc",
         "max_percent_mvc",
         "min_percent_mvc",
+        # Traditional APDF
         "apdf_p10",
         "apdf_p50",
         "apdf_p90",
-        "effort_low_pct",
-        "effort_moderate_pct",
-        "effort_high_pct",
-        "effort_over100_pct",
+        # Active APDF (weekly baseline)
+        "active_apdf_p10",
+        "active_apdf_p50",
+        "active_apdf_p90",
+        # Rest metrics
+        "rest_percent",
+        "gap_frequency_per_minute",
+        "max_sustained_activity_s",
     ]
 
     # Filter to columns that exist in daily_df
@@ -127,18 +114,21 @@ def build_tables(session_metrics: List[dict]) -> Dict[str, pd.DataFrame]:
 
     weekly_df = aggregate_weekly_metrics(daily_df, weekly_sum_cols, weekly_mean_cols)
 
+    # Compute percentage changes between sessions
     session_increments = compute_percentage_changes(
         session_df,
         group_cols=["subject_id", "side", "date"],
         order_col="session_label",
-        value_cols=["iemg_percent_seconds", "apdf_p50"],
+        value_cols=["iemg_percent_seconds", "apdf_p50", "active_apdf_p50", "rest_percent"],
         label="session",
     )
+    
+    # Compute percentage changes between days
     daily_increments = compute_percentage_changes(
         daily_df,
         group_cols=["subject_id", "side"],
         order_col="date",
-        value_cols=["iemg_percent_seconds", "apdf_p50"],
+        value_cols=["iemg_percent_seconds", "apdf_p50", "active_apdf_p50", "rest_percent"],
         label="day",
     )
 
@@ -155,7 +145,8 @@ def build_tables(session_metrics: List[dict]) -> Dict[str, pd.DataFrame]:
 # CSV writing
 # ---------------------------------------------------------------------------
 def write_tables(tables: Dict[str, pd.DataFrame], output_root: Path) -> None:
-    """Save each table to CSV, naming files after the dictionary keys.
+    """
+    Save each table to CSV, naming files after the dictionary keys.
 
     :param tables: Mapping of ``name -> DataFrame`` produced by :func:`build_tables`.
     :param output_root: Directory where CSVs must be written.
@@ -172,7 +163,8 @@ def persist_quality_report(
     reports: Sequence[FileQualityReport],
     output_root: Path,
 ) -> Path | None:
-    """Write the accumulated data-quality findings (if any) to disk and return the path.
+    """
+    Write the accumulated data-quality findings (if any) to disk and return the path.
 
     :param reports: Collected list of :class:`FileQualityReport` objects from the loader phase.
     :param output_root: Folder containing EMG pipeline artifacts.
@@ -184,59 +176,3 @@ def persist_quality_report(
     write_quality_report(reports, path)
     print(f"[emg_metrics_export] Data-quality report written to {path} ({len(reports)} issue(s))")
     return path
-
-
-# ---------------------------------------------------------------------------
-# Effort bin helpers
-# ---------------------------------------------------------------------------
-def record_effort_bins(
-    effort_records: List[dict],
-    metadata: dict,
-    percent_signal: np.ndarray,
-    fs: float,
-) -> None:
-    """Append a CSV-ready effort-bin summary for the current session.
-
-    :param effort_records: Master list that mirrors eventual CSV rows.
-    :param metadata: Contextual information (subject, date, session, device side, etc.).
-    :param percent_signal: Session envelope expressed in %MVC.
-    :param fs: Sampling frequency so minutes can be derived from sample counts.
-    """
-    minutes, percentages = compute_effort_bins(percent_signal, fs)
-    labels = [band[2] for band in EFFORT_BANDS] + [">100%"]
-    record = {
-        "subject_id": metadata.get("subject_id"),
-        "group": metadata.get("group"),
-        "date": metadata.get("date"),
-        "side": metadata.get("side"),
-        "device_label": metadata.get("device_label"),
-        "session_label": metadata.get("session_label"),
-        "mac_address": metadata.get("mac_address"),
-        "fs_hz": metadata.get("fs_hz"),
-    }
-    total_minutes = 0.0
-    for label, minutes_value, pct_value in zip(labels, minutes, percentages):
-        key = normalize_band_label(label)
-        record[f"{key}_minutes"] = minutes_value
-        record[f"{key}_pct"] = pct_value
-        total_minutes += minutes_value
-    record["total_minutes"] = total_minutes
-    effort_records.append(record)
-
-
-def write_effort_bins(records: Sequence[dict], output_root: Path) -> Path | None:
-    """Persist the effort-bin table (if populated) and report its location to callers.
-
-    :param records: Sequence of dict rows assembled via :func:`record_effort_bins`.
-    :param output_root: Folder that stores CSV artifacts.
-    :returns: Path to the newly written CSV or ``None`` if ``records`` was empty.
-    """
-    if not records:
-        return None
-    path = output_root / "session_effort_bins.csv"
-    df = pd.DataFrame(records)
-    df.to_csv(path, index=False)
-    print(f"[emg_metrics_export] Effort-bin table written to {path} ({len(df)} rows)")
-    return path
-
-    return output_path

@@ -5,8 +5,9 @@ This module contains functions for creating EMG-related plots:
 - APDF (Amplitude Probability Distribution Function) curves
 - Histograms of signal amplitudes
 - Metric series over time
-- Effort distribution grids and stacked bar charts
+- MVC segment diagnostics
 
+Uses Active APDF + Rest Time framework for physiologically meaningful metrics.
 All functions use simple data structures (dicts, arrays) rather than classes.
 """
 
@@ -18,15 +19,20 @@ from matplotlib.axes import Axes
 import numpy as np
 import pandas as pd
 
-from sensors.metrics.emg_metrics import EFFORT_BANDS, compute_effort_bins
+from sensors.metrics.emg_metrics import (
+    DEFAULT_REST_THRESHOLD_MVC,
+    compute_active_apdf,
+    compute_rest_metrics,
+)
 
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # Constants
 # -------------------------------------------------------------------------------------------------------------------- #
 
-# Colors for effort bands: green (low), amber (moderate), red (high), dark red (>100%)
-EFFORT_COLORS = ["#2ca02c", "#ffbf00", "#d62728", "#7f0000"]
+# Colors for rest vs active distribution
+REST_ACTIVE_COLORS = ["#4CAF50", "#2196F3"]  # Green for rest, blue for active
+REST_ACTIVE_LABELS = ["Rest (<0.5% MVC)", "Active (≥0.5% MVC)"]
 
 
 # -------------------------------------------------------------------------------------------------------------------- #
@@ -131,10 +137,10 @@ def plot_metric_series(df: pd.DataFrame, value_col: str, order_col: str,
 
 
 # -------------------------------------------------------------------------------------------------------------------- #
-# Effort Distribution Plots
+# Rest vs Active Distribution Plots
 # -------------------------------------------------------------------------------------------------------------------- #
 
-def plot_session_effort_grid(
+def plot_session_rest_active_grid(
     payloads: dict,
     session_labels: Sequence[str],
     output_path: Path,
@@ -142,7 +148,7 @@ def plot_session_effort_grid(
     max_rows: int = 4,
 ) -> None:
     """
-    Plot a left/right effort distribution grid for up to four sessions.
+    Plot a left/right rest vs active distribution grid for up to four sessions.
 
     :param payloads: Dict mapping (side, session_label) to (percent_signal, fs).
                      Keys are tuples like ("left", "session_1").
@@ -181,8 +187,11 @@ def plot_session_effort_grid(
                 continue
 
             amplitudes, fs = payload
-            minutes, percentages = compute_effort_bins(amplitudes, fs)
-            _plot_effort_bars(ax, percentages)
+            rest_metrics = compute_rest_metrics(amplitudes, fs, DEFAULT_REST_THRESHOLD_MVC)
+            rest_pct = rest_metrics["rest_percent"]
+            active_pct = 100.0 - rest_pct
+            percentages = [rest_pct, active_pct]
+            _plot_rest_active_bars(ax, percentages)
 
             if col_idx == 0:
                 ax.set_ylabel("Session time (%)")
@@ -197,14 +206,14 @@ def plot_session_effort_grid(
     plt.close(fig)
 
 
-def plot_session_effort_stacks(
+def plot_session_rest_active_stacks(
     payloads: dict,
     session_labels: Sequence[str],
     output_path: Path,
     title: str,
 ) -> None:
     """
-    Plot stacked effort bins per session for left/right mBANs.
+    Plot stacked rest/active bars per session for left/right mBANs.
 
     :param payloads: Dict mapping (side, session_label) to (percent_signal, fs).
     :param session_labels: Ordered list of session labels to include.
@@ -217,9 +226,6 @@ def plot_session_effort_stacks(
     if not ordered_labels:
         ordered_labels = sorted({session for (_, session) in payloads.keys()})
     ordered_labels = ordered_labels[:4]
-
-    bin_labels = [band[2] for band in EFFORT_BANDS] + [">100%"]
-    n_bins = len(bin_labels)
 
     fig = plt.figure(figsize=(12, 4))
     gs = fig.add_gridspec(1, 3, width_ratios=(1, 0.18, 1), wspace=0.2)
@@ -253,12 +259,10 @@ def plot_session_effort_stacks(
                 continue
 
             amplitudes, fs = payload
-            _minutes, percentages = compute_effort_bins(amplitudes, fs)
-            needed = n_bins
-            padded = percentages[:needed]
-            if len(padded) < needed:
-                padded = padded + [0.0] * (needed - len(padded))
-            session_data.append(padded)
+            rest_metrics = compute_rest_metrics(amplitudes, fs, DEFAULT_REST_THRESHOLD_MVC)
+            rest_pct = rest_metrics["rest_percent"]
+            active_pct = 100.0 - rest_pct
+            session_data.append([rest_pct, active_pct])
 
         if not session_data:
             _annotate_missing(ax, "No sessions for this day")
@@ -266,10 +270,10 @@ def plot_session_effort_stacks(
 
         left_offsets = np.zeros(len(ordered_labels))
 
-        for bin_idx, bin_label in enumerate(bin_labels):
+        for bin_idx, bin_label in enumerate(REST_ACTIVE_LABELS):
             widths = [values[bin_idx] if values is not None else 0.0 for values in session_data]
             bars = ax.barh(y_positions, widths, height=0.6, left=left_offsets,
-                           color=EFFORT_COLORS[bin_idx], label=bin_label)
+                           color=REST_ACTIVE_COLORS[bin_idx], label=bin_label)
             left_offsets += widths
 
             if idx == 0:
@@ -315,21 +319,18 @@ def plot_session_effort_stacks(
 # -------------------------------------------------------------------------------------------------------------------- #
 # Private Helper Functions
 # -------------------------------------------------------------------------------------------------------------------- #
-def _plot_effort_bars(ax: Axes, percentages: list) -> None:
+def _plot_rest_active_bars(ax: Axes, percentages: list) -> None:
     """
-    Render a colored bar chart showing how time is distributed across effort bands.
+    Render a colored bar chart showing rest vs active time distribution.
 
     :param ax: Matplotlib axes to draw on.
-    :param percentages: List of percentage values for each effort band.
+    :param percentages: List of percentage values [rest_pct, active_pct].
     """
-    num_base_bins = len(EFFORT_BANDS)
-    overflow_percent = percentages[-1] if len(percentages) > num_base_bins else 0.0
-
-    labels = [band[2] for band in EFFORT_BANDS] + [">100%"]
-    values = percentages[:num_base_bins] + [overflow_percent]
+    labels = REST_ACTIVE_LABELS
+    values = percentages
     x_positions = np.arange(len(labels))
 
-    bars = ax.bar(x_positions, values, color=EFFORT_COLORS[:len(labels)], width=0.7)
+    bars = ax.bar(x_positions, values, color=REST_ACTIVE_COLORS[:len(labels)], width=0.7)
     ax.set_xticks(x_positions, labels, rotation=20)
     ax.set_ylim(0, 100)
     ax.grid(axis="y", alpha=0.2)

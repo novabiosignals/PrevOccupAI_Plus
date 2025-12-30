@@ -12,8 +12,8 @@ from .emg_visuals import (
     plot_apdf,
     plot_histogram,
     plot_metric_series,
-    plot_session_effort_grid,
-    plot_session_effort_stacks,
+    plot_session_rest_active_grid,
+    plot_session_rest_active_stacks,
     plot_mvc_segments,
     plot_mvc_hybrid_diagnostics,
 )
@@ -28,8 +28,8 @@ __all__ = [
     "plot_apdf",
     "plot_histogram",
     "plot_metric_series",
-    "plot_session_effort_grid",
-    "plot_session_effort_stacks",
+    "plot_session_rest_active_grid",
+    "plot_session_rest_active_stacks",
     # MVC visualization
     "plot_mvc_segments",
     "plot_mvc_hybrid_diagnostics",
