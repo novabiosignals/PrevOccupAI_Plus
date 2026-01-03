@@ -2,21 +2,14 @@
 # imports
 # ------------------------------------------------------------------------------------------------------------------- #
 import pandas as pd
-from typing import Dict, Union
+from typing import Dict
 import copy
 
 
 # internal imports
 from .classifier import classify_human_activities
-from constants import PHONE, WATCH, MBAN_LEFT, MBAN_RIGHT
+from constants import PHONE, WATCH, MBAN_LEFT, MBAN_RIGHT, WATCH_SUFFIX, MBAN_L_SUFFIX, MBAN_R_SUFFIX
 
-# ------------------------------------------------------------------------------------------------------------------- #
-# constants
-# ------------------------------------------------------------------------------------------------------------------- #
-
-WATCH_SUFFIX = '_WEAR'
-MBAN_L_SUFFIX = '_MBAN_L'
-MBAN_R_SUFFIX = '_MBAN_R'
 
 # ------------------------------------------------------------------------------------------------------------------- #
 # public functions

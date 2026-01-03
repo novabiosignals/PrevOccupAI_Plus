@@ -1,18 +1,20 @@
 import os
 
 # internal imports
+import HAR
 import sensors.visualize as sv
 import sensors.load as sl
 import sensors.metrics as sm
-from OH_profile.constants import SENSOR_TIMELINE_KEY, SENSOR_METRICS_KEY
+import sensors.process as sp
+from OH_profile.constants import SENSOR_TIMELINE_KEY, SENSOR_METRICS_KEY, HEART_RATE_KEY, RELATIVE_HR_BASE_KEY, METADATA_KEY
 from utils import extract_group_from_path, extract_device_num_from_path
 from OH_profile.load import get_OH_profile
 from OH_profile.write import save_OH_profile, write_to_OH_profile
 # ------------------------------------------------------------------------------------------------------------------- #
 # flags
 # ------------------------------------------------------------------------------------------------------------------- #
-GENERATE_SENSOR_TIMELINE = True
-
+GENERATE_SENSOR_TIMELINE = False
+GENERATE_HEART_RATE_PLOTS = True
 
 # ------------------------------------------------------------------------------------------------------------------- #
 # file constants
@@ -22,6 +24,7 @@ SUBJECT_FOLDER_PATH = f"{DRIVE}:\\Backup PrevOccupAI_PLUS Data\\data\\group1\\se
 OH_PROFILE_PATH = r"C:\Users\srale\Desktop\OH_profiles"
 PLOTS_OUTPUT_PATH = r"C:\Users\srale\Desktop\sensor_timeline_plots"
 FS = 100
+W_SIZE = 5.0
 
 # ------------------------------------------------------------------------------------------------------------------- #
 # program starts here
@@ -35,7 +38,6 @@ device_num = extract_device_num_from_path(SUBJECT_FOLDER_PATH)
 subject_id = sl.get_participant_id(sl.load_participants_info(), device_num, group)
 
 if GENERATE_SENSOR_TIMELINE:
-
 
     for acquisition_date in os.listdir(SUBJECT_FOLDER_PATH):
 
@@ -63,6 +65,64 @@ if GENERATE_SENSOR_TIMELINE:
 
     # generate plot
     sv.generate_sensor_timeline_plot(oh_profile[SENSOR_METRICS_KEY][SENSOR_TIMELINE_KEY], PLOTS_OUTPUT_PATH, filename)
+
+
+if GENERATE_HEART_RATE_PLOTS:
+
+    print(f"Extracting heart rate metrics for subject: {subject_id}")
+
+    # get oh profile
+    oh_profile = get_OH_profile(OH_PROFILE_PATH, subject_id)
+
+    # check if the global metrics are not in the oh profile
+    if RELATIVE_HR_BASE_KEY not in oh_profile[SENSOR_METRICS_KEY][HEART_RATE_KEY]:
+
+        print(f"Extracting global heart rate metrics")
+
+        # TODO -   DO THIS AFTER MERGING THE QUESTIONNAIRES BRANCH
+        # # calculate the Min and MAX HR
+        # # get the age from the OH profile, if it exists
+        # try:
+        #     age = oh_profile[METADATA_KEY]['idade']
+        #
+        # except KeyError:
+        #
+        #     # get metadata (age) from data and add it to OH profile
+
+        # calculate relative metrics
+        age = 50
+        relative_HR_dict = sm.get_global_heart_rate_metrics(subject_data_folder=SUBJECT_FOLDER_PATH,
+                                                            subject_age = age)
+
+        # write to oh profile
+        oh_profile = write_to_OH_profile(oh_profile, main_outer_key=SENSOR_METRICS_KEY,
+                                         main_inner_key=HEART_RATE_KEY, dict_to_write=relative_HR_dict)
+
+    # TODO ADD CHECK HERE TO SEE IF THE PROFILE ALREADY HAS THE METRICS
+
+    # get global metrics from OH profile
+    global_metrics_dict = oh_profile[SENSOR_METRICS_KEY][HEART_RATE_KEY][RELATIVE_HR_BASE_KEY]
+
+    # iterate through the folders of the several days
+    for date_folder in os.listdir(SUBJECT_FOLDER_PATH):
+
+        print(f"Extracting heart rate metrics: {date_folder}")
+
+        # get path to the data of the day
+        day_folder_path = os.path.join(SUBJECT_FOLDER_PATH, date_folder)
+
+        # get heart rate metrics for the day
+        metrics_dict = sm.get_heart_rate_metrics(day_folder_path, hr_min=global_metrics_dict['min_HR'],
+                                                 hr_max=global_metrics_dict['max_HR'], fs=FS, w_size=W_SIZE)
+
+        # write to oh profile
+        oh_profile = write_to_OH_profile(oh_profile, main_outer_key=SENSOR_METRICS_KEY,
+                                         main_inner_key=HEART_RATE_KEY, dict_to_write=metrics_dict)
+
+        # save to json
+        save_OH_profile(OH_PROFILE_PATH, subject_id, oh_profile)
+
+
 
 
 
