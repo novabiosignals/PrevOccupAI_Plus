@@ -1,15 +1,14 @@
 import os
 
 # internal imports
-import HAR
 import sensors.visualize as sv
 import sensors.load as sl
 import sensors.metrics as sm
-import sensors.process as sp
 from OH_profile.constants import SENSOR_TIMELINE_KEY, SENSOR_METRICS_KEY, HEART_RATE_KEY, RELATIVE_HR_BASE_KEY, METADATA_KEY
 from utils import extract_group_from_path, extract_device_num_from_path
 from OH_profile.load import get_OH_profile
 from OH_profile.write import save_OH_profile, write_to_OH_profile
+from sensors.metrics.heart_rate import DAILY_PROPORTIONS
 # ------------------------------------------------------------------------------------------------------------------- #
 # flags
 # ------------------------------------------------------------------------------------------------------------------- #
@@ -98,31 +97,44 @@ if GENERATE_HEART_RATE_PLOTS:
         oh_profile = write_to_OH_profile(oh_profile, main_outer_key=SENSOR_METRICS_KEY,
                                          main_inner_key=HEART_RATE_KEY, dict_to_write=relative_HR_dict)
 
-    # TODO ADD CHECK HERE TO SEE IF THE PROFILE ALREADY HAS THE METRICS
-
     # get global metrics from OH profile
     global_metrics_dict = oh_profile[SENSOR_METRICS_KEY][HEART_RATE_KEY][RELATIVE_HR_BASE_KEY]
 
-    # iterate through the folders of the several days
-    for date_folder in os.listdir(SUBJECT_FOLDER_PATH):
+    # check if the metrics have already been extracted
+    # if not then len = 1 since it has only the relative HR base metrics
+    if len(oh_profile[SENSOR_METRICS_KEY][HEART_RATE_KEY] < 2):
 
-        print(f"Extracting heart rate metrics: {date_folder}")
+        # iterate through the folders of the several days
+        for date_folder in os.listdir(SUBJECT_FOLDER_PATH):
 
-        # get path to the data of the day
-        day_folder_path = os.path.join(SUBJECT_FOLDER_PATH, date_folder)
+            print(f"Extracting heart rate metrics: {date_folder}")
 
-        # get heart rate metrics for the day
-        metrics_dict = sm.get_heart_rate_metrics(day_folder_path, hr_min=global_metrics_dict['min_HR'],
-                                                 hr_max=global_metrics_dict['max_HR'], fs=FS, w_size=W_SIZE)
+            # get path to the data of the day
+            day_folder_path = os.path.join(SUBJECT_FOLDER_PATH, date_folder)
 
-        # write to oh profile
-        oh_profile = write_to_OH_profile(oh_profile, main_outer_key=SENSOR_METRICS_KEY,
-                                         main_inner_key=HEART_RATE_KEY, dict_to_write=metrics_dict)
+            # get heart rate metrics for the day
+            metrics_dict = sm.get_heart_rate_metrics(day_folder_path, hr_min=global_metrics_dict['min_HR'],
+                                                     hr_max=global_metrics_dict['max_HR'], fs=FS, w_size=W_SIZE)
 
-        # save to json
-        save_OH_profile(OH_PROFILE_PATH, subject_id, oh_profile)
+            # write to oh profile
+            oh_profile = write_to_OH_profile(oh_profile, main_outer_key=SENSOR_METRICS_KEY,
+                                             main_inner_key=HEART_RATE_KEY, dict_to_write=metrics_dict)
 
+            # save to json
+            save_OH_profile(OH_PROFILE_PATH, subject_id, oh_profile)
 
+    # cycle over the different days
+    for key, features in oh_profile[SENSOR_METRICS_KEY][HEART_RATE_KEY].items():
+
+        # get only the daily metrics - ignore key with the values of the daily proportions
+        if key != DAILY_PROPORTIONS:
+
+            # get inner dict for simplicity
+            daily_hr_metrics_dict = oh_profile[SENSOR_METRICS_KEY][HEART_RATE_KEY][key]
+
+            # plot hr timeline
+            sv.plot_hr_timeline_per_acquisition(daily_hr_metrics_dict, day=key, group=f"group {group}", subject=subject_id,
+                                                output_folder_path=PLOTS_OUTPUT_PATH)
 
 
 

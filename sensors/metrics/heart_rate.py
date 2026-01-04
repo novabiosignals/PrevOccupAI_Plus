@@ -45,13 +45,16 @@ POTENTIALLY_ABNORMAL_MARGIN = 5
 
 # HR classes
 NORMAL = 'normal'
-POTENTIALLY_ABNORMAL = 'potentially abnormal'
-ABNORMAL = 'abnormal'
+POTENTIALLY_ABNORMAL = 'ligeiramente elevado'
+ABNORMAL = 'elevado'
 
 # keys for the inner dictionaries with the HR features
 METRICS = 'metrics'
 PROPORTIONS = 'proportions'
 DAILY_PROPORTIONS = 'daily_proportions'
+TIMELINE_METRICS = 'timeline_metrics'
+HR_RATIO_STATS = 'HR_ratio_stats'
+HR_BPM_STATS = 'HR_BPM_stats'
 # ------------------------------------------------------------------------------------------------------------------- #
 # public functions
 # ------------------------------------------------------------------------------------------------------------------- #
@@ -144,14 +147,19 @@ def get_heart_rate_metrics(day_folder_path: str, hr_min: float, hr_max: float, f
     return day_metrics_dict
 
 
-
-
 # ------------------------------------------------------------------------------------------------------------------- #
 # private functions
 # ------------------------------------------------------------------------------------------------------------------- #
 
 def _calculate_hr_metrics_per_acquisition(acquisition_df: pd.DataFrame, hr_min: float, hr_max: float) \
         -> Tuple[Dict, Tuple[int, int, int, int]]:
+    """
+
+    :param acquisition_df:
+    :param hr_min:
+    :param hr_max:
+    :return:
+    """
 
     # calculate hr ratio and respective classification
     acquisitions_df = _calculate_hr_ratio(acquisition_df, hr_min, hr_max)
@@ -170,29 +178,53 @@ def _calculate_hr_metrics_per_acquisition(acquisition_df: pd.DataFrame, hr_min: 
 
 def _calculate_timeline_metrics(acquisition_df: pd.DataFrame) -> Dict[str, str]:
     """
-    Compress consecutive identical class labels into time ranges,
-    excluding 'no data' rows.
+    Compress consecutive identical class labels into time-range chunks, breaking
+    chunks if the class changes or if a temporal gap (discontinuity) is detected.
 
-    The DataFrame index is assumed to contain the timestamps.
+    The function identifies 'islands' of data by checking two conditions:
+    1. Label Continuity: The 'class' remains the same between rows.
+    2. Temporal Contiguity: The rows are physically adjacent in the original
+       DataFrame, ensuring that filtered 'no data' or missing timestamps
+       trigger a new range.
 
-    :param acquisition_df: pd.DataFrame. Must contain a 'class' column. Index values are timestamps.
-    :return:
+    :param acquisition_df: pd.DataFrame where the index contains string timestamps
+                           and a column (HR_CLASS_COLUMN_NAME) contains labels.
+    :return: A dictionary where keys are strings in the format 'start_end'
+             and values are the corresponding class labels.
     """
-    # Remove 'no data'
+    # create copy
+    acquisition_df = acquisition_df.copy()
+
+    # create a column of integers to later detect gaps
+    acquisition_df['_original_pos'] = range(len(acquisition_df))
+
+    # 2. Filter out 'no data'
     df = acquisition_df[acquisition_df[HR_CLASS_COLUMN_NAME] != "no data"].copy()
 
     if df.empty:
         return {}
 
-    # Create group ids for consecutive identical classes
-    df["group"] = (df[HR_CLASS_COLUMN_NAME] != df[HR_CLASS_COLUMN_NAME].shift()).cumsum()
+    # 3. Detect Class Change
+    class_changed = df[HR_CLASS_COLUMN_NAME] != df[HR_CLASS_COLUMN_NAME].shift()
 
+    # 4. Detect Timestamp Jumps (Contiguity)
+    # check if the current 'original_pos' is NOT exactly 1 greater than the previous
+    # If it's not, it means a "no data" row or a gap existed between these samples.
+    pos_jumped = df['_original_pos'] != df['_original_pos'].shift() + 1
+
+    # The first row shift() is NaN, so we ensure the first row doesn't trigger a jump
+    pos_jumped.iloc[0] = False
+
+    # 5. Create Block IDs
+    # A new block starts if Class Changed OR there was a Position Jump
+    df["block"] = (class_changed | pos_jumped).cumsum()
+
+    # 6. Group and Format Output
     timeline_dict = {}
-    for _, group in df.groupby("group"):
-        start = group.index[0]
-        end = group.index[-1]
-        label = group[HR_CLASS_COLUMN_NAME].iloc[0]
-
+    for _, block in df.groupby("block"):
+        start = block.index[0]
+        end = block.index[-1]
+        label = block[HR_CLASS_COLUMN_NAME].iloc[0]
         timeline_dict[f"{start}_{end}"] = label
 
     return timeline_dict
@@ -269,7 +301,7 @@ def _calculate_hr_ratio(df: pd.DataFrame, hr_min: float, hr_max: float) -> pd.Da
 def classify_hr_ratio(activity: int, hr_ratio: float) -> str:
     """
     Classifies heart rate ratio into 'normal', 'potentially abnormal', or 'abnormal'
-    based on the type of activity and defined normal ranges.
+    based on the type of activity and defined normal ranges. ONLY FOR SITTING! WALKING AND STANDING ARE CONSIDERED 'NO DATA'
 
     Source for the heart rate ratio range for light exercise (considered as walking):
     ACSM’s Guidelines for Exercise Testing and Prescription, 11th Editions - Chapter 5 "General
@@ -277,7 +309,7 @@ def classify_hr_ratio(activity: int, hr_ratio: float) -> str:
 
     Normal heart rate ratio ranges (%):
         Sitting: 0-20%
-        Standing: 20-30% # TODO REMOVE STANDING AND WALKING
+        Standing: 20-30% # TODO REMOVE STANDING AND WALKING - DONE BUT CHECK
         Walking: 30-39% # TODO CHANGE NAMING OF ABNORMAL
 
     Classification:
@@ -289,8 +321,8 @@ def classify_hr_ratio(activity: int, hr_ratio: float) -> str:
     :param hr_ratio: heart rate ratio value (float)
     :return: one of NORMAL, POTENTIALLY_ABNORMAL, ABNORMAL, or 'no data'
     """
-    # add 'no data' if values are Nan
-    if pd.isna(hr_ratio):
+    # add 'no data' if values are Nan or if the activity is not 0 (sitting)
+    if pd.isna(hr_ratio) or activity != 0:
 
         return 'no data'
 
@@ -381,13 +413,27 @@ def get_heart_rate_statistics(df: pd.DataFrame) -> Dict:
 
     # Return the features for the bpm and hr ratio columns
     return {
-        "heart_rate_bpm": _calculate_statistics(df, f"{HEART}{WATCH_SUFFIX}"),
-        "heart_rate_ratio": _calculate_statistics(df, HR_RATIO_COLUMN_NAME),
-        "timeline_metrics": _calculate_timeline_metrics(df),
+        HR_BPM_STATS: _calculate_statistics(df, f"{HEART}{WATCH_SUFFIX}"),
+        HR_RATIO_STATS: _calculate_statistics(df, HR_RATIO_COLUMN_NAME),
+        TIMELINE_METRICS: _calculate_timeline_metrics(df),
     }
 
 
 def _calculate_statistics(df: pd.DataFrame, column_name: str) -> Dict[str, float]:
+    """
+    Calculate summary statistics for a specified numeric column.
+
+    Computes the minimum, maximum, arithmetic mean, and standard deviation
+    of the data, rounding all results to two decimal places.
+
+    :param df: pd.DataFrame containing the data to analyze.
+    :param column_name: The name of the numeric column to process.
+    :return: A dictionary containing 'min', 'max', 'mean', and 'std' keys
+             with their respective float values.
+    :param df:
+    :param column_name:
+    :return:
+    """
 
     # Calculate min max, mean, and std
     minimum = round(float(df[column_name].min()), 2)
