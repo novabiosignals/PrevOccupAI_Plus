@@ -249,7 +249,8 @@ def _get_min_heart_rate(dfs: List[pd.DataFrame]) -> float:
     Q3 = all_hr.quantile(0.75)
     IQR = Q3 - Q1
     filtered_hr = all_hr[(all_hr >= Q1 - 1.5 * IQR) & (all_hr <= Q3 + 1.5 * IQR)]
-
+    # TODO REMOVE WRONG SAMPLES THAT ARE WRONG (TOO LOW) OUTSIDE
+    # TODO CAHNGE TO REMOVE OUTLIERS AND CLEAN THE DATAFRAME
     # Return the minimum of the filtered values
     return filtered_hr.min()
 
@@ -277,7 +278,7 @@ def _calculate_hr_ratio(df: pd.DataFrame, hr_min: float, hr_max: float) -> pd.Da
         heart_rate_ratio = ((HR(t) - HR_rest) / HRR) * 100
     where:
         HRR = HR_max - HR_rest
-
+    # TODO ADD LINKS AND WHAT IS HR_REST AND HR_MAX
     :param df: DataFrame containing a column 'heart_rate'
     :param hr_min: Resting heart rate (HR_min)
     :param hr_max: Maximum heart rate (HR_max)
@@ -303,7 +304,7 @@ def _calculate_hr_ratio(df: pd.DataFrame, hr_min: float, hr_max: float) -> pd.Da
 def classify_hr_ratio(activity: int, hr_ratio: float) -> str:
     """
     Classifies heart rate ratio into 'normal', 'potentially abnormal', or 'abnormal'
-    based on the type of activity and defined normal ranges. ONLY FOR SITTING! WALKING AND STANDING ARE CONSIDERED 'NO DATA'
+    based on the type of activity and defined normal ranges. # TODO ONLY FOR SITTING! WALKING AND STANDING ARE CONSIDERED 'NO DATA'
 
     Source for the heart rate ratio range for light exercise (considered as walking):
     ACSM’s Guidelines for Exercise Testing and Prescription, 11th Editions - Chapter 5 "General

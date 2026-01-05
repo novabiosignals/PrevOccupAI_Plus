@@ -1,5 +1,6 @@
+"""
 
-
+"""
 # ------------------------------------------------------------------------------------------------------------------- #
 # imports
 # ------------------------------------------------------------------------------------------------------------------- #
@@ -69,6 +70,7 @@ def plot_hr_timeline_per_acquisition(hr_metrics_dict: Dict, day: str, group: str
             # get timeline metrics
             timeline_metrics_dict = hr_features_dict[METRICS][TIMELINE_METRICS]
 
+            # raise error if there are no metrics to plot
             if len(timeline_metrics_dict) == 0:
 
                 raise ValueError(f"No timeline metrics to plot for acquisition time: {key}")

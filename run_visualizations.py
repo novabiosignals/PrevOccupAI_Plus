@@ -1,3 +1,6 @@
+# ------------------------------------------------------------------------------------------------------------------- #
+# imports
+# ------------------------------------------------------------------------------------------------------------------- #
 import os
 
 # internal imports
@@ -9,6 +12,7 @@ from utils import extract_group_from_path, extract_device_num_from_path
 from OH_profile.load import get_OH_profile
 from OH_profile.write import save_OH_profile, write_to_OH_profile
 from sensors.metrics.heart_rate import DAILY_PROPORTIONS, MIN_HR, MAX_HR
+
 # ------------------------------------------------------------------------------------------------------------------- #
 # flags
 # ------------------------------------------------------------------------------------------------------------------- #
