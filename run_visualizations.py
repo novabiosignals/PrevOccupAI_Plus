@@ -8,7 +8,7 @@ from OH_profile.constants import SENSOR_TIMELINE_KEY, SENSOR_METRICS_KEY, HEART_
 from utils import extract_group_from_path, extract_device_num_from_path
 from OH_profile.load import get_OH_profile
 from OH_profile.write import save_OH_profile, write_to_OH_profile
-from sensors.metrics.heart_rate import DAILY_PROPORTIONS
+from sensors.metrics.heart_rate import DAILY_PROPORTIONS, MIN_HR, MAX_HR
 # ------------------------------------------------------------------------------------------------------------------- #
 # flags
 # ------------------------------------------------------------------------------------------------------------------- #
@@ -90,8 +90,7 @@ if GENERATE_HEART_RATE_PLOTS:
 
         # calculate relative metrics
         age = 50
-        relative_HR_dict = sm.get_global_heart_rate_metrics(subject_data_folder=SUBJECT_FOLDER_PATH,
-                                                            subject_age = age)
+        relative_HR_dict = sm.get_global_heart_rate_metrics(subject_data_folder=SUBJECT_FOLDER_PATH, subject_age=age)
 
         # write to oh profile
         oh_profile = write_to_OH_profile(oh_profile, main_outer_key=SENSOR_METRICS_KEY,
@@ -113,8 +112,8 @@ if GENERATE_HEART_RATE_PLOTS:
             day_folder_path = os.path.join(SUBJECT_FOLDER_PATH, date_folder)
 
             # get heart rate metrics for the day
-            metrics_dict = sm.get_heart_rate_metrics(day_folder_path, hr_min=global_metrics_dict['min_HR'],
-                                                     hr_max=global_metrics_dict['max_HR'], fs=FS, w_size=W_SIZE)
+            metrics_dict = sm.get_heart_rate_metrics(day_folder_path, hr_min=global_metrics_dict[MIN_HR],
+                                                     hr_max=global_metrics_dict[MAX_HR], fs=FS, w_size=W_SIZE)
 
             # write to oh profile
             oh_profile = write_to_OH_profile(oh_profile, main_outer_key=SENSOR_METRICS_KEY,

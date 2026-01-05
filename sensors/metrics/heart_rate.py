@@ -22,7 +22,7 @@ from utils import extract_date_from_path
 import HAR
 import sensors.load as sl
 import sensors.process as sp
-from constants import ACTIVITY_COLUMN_NAME, HEART, HR_RATIO_COLUMN_NAME, HR_CLASS_COLUMN_NAME, WATCH_SUFFIX, ACC
+from constants import ACTIVITY_COLUMN_NAME, HEART, HR_RATIO_COLUMN_NAME, HR_CLASS_COLUMN_NAME, WATCH_SUFFIX, ACC, WATCH, HEART
 from OH_profile.constants import RELATIVE_HR_BASE_KEY
 # ------------------------------------------------------------------------------------------------------------------- #
 # constants
@@ -55,6 +55,8 @@ DAILY_PROPORTIONS = 'daily_proportions'
 TIMELINE_METRICS = 'timeline_metrics'
 HR_RATIO_STATS = 'HR_ratio_stats'
 HR_BPM_STATS = 'HR_BPM_stats'
+MIN_HR = 'min_HR'
+MAX_HR = 'max_HR'
 # ------------------------------------------------------------------------------------------------------------------- #
 # public functions
 # ------------------------------------------------------------------------------------------------------------------- #
@@ -74,10 +76,10 @@ def get_global_heart_rate_metrics(subject_data_folder: str, subject_age: int) ->
         day_folder_path = os.path.join(subject_data_folder, date_folder)
 
         # load_signals all acquisitions from the same day into a nested dictionary
-        df_dict = sl.load_daily_acquisitions(day_folder_path, load_devices={'watch': ['HEART']})
+        df_dict = sl.load_daily_acquisitions(day_folder_path, load_devices={WATCH: [HEART]})
 
         # iterate through all the acquisitions in the dictionary
-        for time_key, df in df_dict['watch'].items():
+        for time_key, df in df_dict[WATCH].items():
 
             # add acquisition to list
             dfs_list.append(df)
@@ -87,11 +89,11 @@ def get_global_heart_rate_metrics(subject_data_folder: str, subject_age: int) ->
 
     # calculate the minimum hr over all acquisitions of the week and add to dict
     min_HR = _get_min_heart_rate(dfs_list)
-    relative_HR_metrics_dict[RELATIVE_HR_BASE_KEY]['min_HR'] = min_HR
+    relative_HR_metrics_dict[RELATIVE_HR_BASE_KEY][MIN_HR] = min_HR
 
     # calculate max HR based on the age
     max_HR = _get_max_heart_rate(subject_age)
-    relative_HR_metrics_dict[RELATIVE_HR_BASE_KEY]['max_HR'] = max_HR
+    relative_HR_metrics_dict[RELATIVE_HR_BASE_KEY][MAX_HR] = max_HR
 
     return relative_HR_metrics_dict
 
