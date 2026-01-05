@@ -9,6 +9,8 @@ import sensors.load as sl
 import sensors.metrics as sm
 from OH_profile.constants import SENSOR_TIMELINE_KEY, SENSOR_METRICS_KEY, HEART_RATE_KEY, RELATIVE_HR_BASE_KEY, METADATA_KEY
 from utils import extract_group_from_path, extract_device_num_from_path
+from OH_profile.constants import SENSOR_TIMELINE_KEY, SENSOR_METRICS_KEY
+from utils import extract_group_from_path, has_matching_json, extract_device_num_from_path
 from OH_profile.load import get_OH_profile
 from OH_profile.write import save_OH_profile, write_to_OH_profile
 from sensors.metrics.heart_rate import DAILY_PROPORTIONS, MIN_HR, MAX_HR
@@ -25,7 +27,7 @@ GENERATE_HEART_RATE_PLOTS = True
 DRIVE = "E"
 SUBJECT_FOLDER_PATH = f"{DRIVE}:\\Backup PrevOccupAI_PLUS Data\\data\\group1\\sensors\\LIBPhys #001"
 OH_PROFILE_PATH = r"C:\Users\srale\Desktop\OH_profiles"
-PLOTS_OUTPUT_PATH = r"C:\Users\srale\Desktop\sensor_timeline_plots"
+PLOTS_OUTPUT_PATH = r"C:\Users\srale\Desktop\timeline_plots"
 FS = 100
 W_SIZE = 5.0
 
@@ -42,23 +44,30 @@ subject_id = sl.get_participant_id(sl.load_participants_info(), device_num, grou
 
 if GENERATE_SENSOR_TIMELINE:
 
-    for acquisition_date in os.listdir(SUBJECT_FOLDER_PATH):
+    # check if OH profile already exists
+    if not has_matching_json(OH_PROFILE_PATH, subject_id):
 
-        # generate path
-        day_folder_path = os.path.join(SUBJECT_FOLDER_PATH, acquisition_date)
+        # inform user
+        print(f"OH profile not found for subject {subject_id}. Generating new OH profile...")
 
-        # generate metrics dict
-        daily_metrics_dict = sm.get_sensor_timeline_metrics(day_folder_path, fs=FS)
+        # generate OH profile
+        for acquisition_date in os.listdir(SUBJECT_FOLDER_PATH):
 
-        # get oh profile
-        oh_profile = get_OH_profile(OH_PROFILE_PATH, subject_id)
+            # generate path
+            day_folder_path = os.path.join(SUBJECT_FOLDER_PATH, acquisition_date)
 
-        # write to json file
-        oh_profile = write_to_OH_profile(oh_profile, main_outer_key= SENSOR_METRICS_KEY,
-                                         main_inner_key=SENSOR_TIMELINE_KEY, dict_to_write=daily_metrics_dict)
+            # generate metrics dict
+            daily_metrics_dict = sm.get_sensor_timeline_metrics(day_folder_path, fs=FS)
 
-        # save to json
-        save_OH_profile(OH_PROFILE_PATH, subject_id, oh_profile)
+            # get oh profile
+            oh_profile = get_OH_profile(OH_PROFILE_PATH, subject_id)
+
+            # write to json file
+            oh_profile = write_to_OH_profile(oh_profile, main_outer_key= SENSOR_METRICS_KEY,
+                                             main_inner_key=SENSOR_TIMELINE_KEY, dict_to_write=daily_metrics_dict)
+
+            # save to json
+            save_OH_profile(OH_PROFILE_PATH, subject_id, oh_profile)
 
     # get oh profile
     oh_profile = get_OH_profile(OH_PROFILE_PATH, subject_id)

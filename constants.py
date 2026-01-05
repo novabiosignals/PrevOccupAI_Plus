@@ -2,7 +2,7 @@
 # file constants
 # ------------------------------------------------------------------------------------------------------------------- #
 CSV = ".csv"
-
+JSON = ".json"
 # ------------------------------------------------------------------------------------------------------------------- #
 # input constants
 # ------------------------------------------------------------------------------------------------------------------- #
@@ -94,10 +94,16 @@ MBAN_RIGHT = 'mBAN_right'
 CONFIG_FOLDER_NAME = 'config_files'
 RESULTS_FOLDER_NAME = 'results_questionnaires'
 
-PSICOSSOCIAL = 'psicosocial'
-AMBIENTE = 'ambiente'
-BIOMECANICO = 'biomecanico'
-PESSOAIS = 'pessoais'
+PSYCHOSOCIAL = 'psychosocial'
+ENVIRONMENT = 'environment'
+BIOMECHANICAL = 'biomechanical'
+PERSONAL = 'personal'
+WORKLOAD = 'workload'
+ROSA = 'rosa'
+COPSOQ = 'COPSOQ'
+MUEQ = 'MUEQ'
+POPULATION = 'population'
+WORK_TYPE = 'work_type'
 
-QUESTIONNAIRE_DOMAINS = [PSICOSSOCIAL, AMBIENTE, BIOMECANICO, PESSOAIS]
+QUESTIONNAIRE_DOMAINS = [PSYCHOSOCIAL, ENVIRONMENT, BIOMECHANICAL, PERSONAL, WORKLOAD]
 
