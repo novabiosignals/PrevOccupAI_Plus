@@ -8,8 +8,6 @@ import sensors.visualize as sv
 import sensors.load as sl
 import sensors.metrics as sm
 from OH_profile.constants import SENSOR_TIMELINE_KEY, SENSOR_METRICS_KEY, HEART_RATE_KEY, RELATIVE_HR_BASE_KEY, METADATA_KEY
-from utils import extract_group_from_path, extract_device_num_from_path
-from OH_profile.constants import SENSOR_TIMELINE_KEY, SENSOR_METRICS_KEY
 from utils import extract_group_from_path, has_matching_json, extract_device_num_from_path
 from OH_profile.load import get_OH_profile
 from OH_profile.write import save_OH_profile, write_to_OH_profile
