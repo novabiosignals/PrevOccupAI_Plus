@@ -17,6 +17,7 @@ import os
 from typing import Dict, List, Tuple
 import pandas as pd
 from utils import extract_date_from_path
+import numpy as np
 
 # internal imports
 import HAR
@@ -35,13 +36,13 @@ selected_sensors = {'phone': ['ACC', 'GYR', 'MAG'], # for HAR
 
 # heart rate ratio per activity
 NORMAL_RANGES = {
-    0: (0.0, 20),
+    0: (0.0, 30),
     1: (20, 30),
     2: (30, 39)
 }
 
 # Margin used to define "potentially abnormal" outside the normal range for heart rate ratio
-POTENTIALLY_ABNORMAL_MARGIN = 5
+POTENTIALLY_ABNORMAL_MARGIN = 9
 
 # HR classes
 NORMAL = 'normal'
@@ -57,11 +58,18 @@ HR_RATIO_STATS = 'HR_ratio_stats'
 HR_BPM_STATS = 'HR_BPM_stats'
 MIN_HR = 'min_HR'
 MAX_HR = 'max_HR'
+
 # ------------------------------------------------------------------------------------------------------------------- #
 # public functions
 # ------------------------------------------------------------------------------------------------------------------- #
 
 def get_global_heart_rate_metrics(subject_data_folder: str, subject_age: int) -> Dict:
+    """
+
+    :param subject_data_folder:
+    :param subject_age:
+    :return:
+    """
 
     # init dict for holding the relative HR global metrics
     relative_HR_metrics_dict = {}
@@ -87,7 +95,7 @@ def get_global_heart_rate_metrics(subject_data_folder: str, subject_age: int) ->
     # init inner dict
     relative_HR_metrics_dict[RELATIVE_HR_BASE_KEY] = {}
 
-    # calculate the minimum hr over all acquisitions of the week and add to dict
+    # calculate the minimum hr over all acquisitions and IQR bounds and add to dict
     min_HR = _get_min_heart_rate(dfs_list)
     relative_HR_metrics_dict[RELATIVE_HR_BASE_KEY][MIN_HR] = min_HR
 
@@ -99,6 +107,15 @@ def get_global_heart_rate_metrics(subject_data_folder: str, subject_age: int) ->
 
 
 def get_heart_rate_metrics(day_folder_path: str, hr_min: float, hr_max: float, fs: int, w_size: float) -> Dict:
+    """
+
+    :param day_folder_path:
+    :param hr_min:
+    :param hr_max:
+    :param fs:
+    :param w_size:
+    :return:
+    """
 
     # init dict
     day_metrics_dict = {}
@@ -153,8 +170,33 @@ def get_heart_rate_metrics(day_folder_path: str, hr_min: float, hr_max: float, f
 # private functions
 # ------------------------------------------------------------------------------------------------------------------- #
 
-def _calculate_hr_metrics_per_acquisition(acquisition_df: pd.DataFrame, hr_min: float, hr_max: float) \
-        -> Tuple[Dict, Tuple[int, int, int, int]]:
+def _calculate_IQR_bounds(hr_column: pd.Series) -> Tuple[float, float]:
+    """
+    Computes the IQR-based lower and upper bounds for heart rate data.
+    Existing NaNs are ignored when computing quartiles.
+
+    :param hr_column: 1D pandas Series of heart rate values
+    :return: Tuple (lower_bound, upper_bound)
+    """
+    # Drop NaNs for computation
+    hr_values = hr_column.dropna().to_numpy()
+
+    # Compute quartiles
+    q1 = np.percentile(hr_values, 25)
+    q3 = np.percentile(hr_values, 75)
+
+    # Compute IQR
+    iqr = q3 - q1
+
+    # Compute bounds
+    lower_bound = q1 - 1.5 * iqr
+    upper_bound = q3 + 1.5 * iqr
+
+    return lower_bound, upper_bound
+
+
+
+def _calculate_hr_metrics_per_acquisition(acquisition_df: pd.DataFrame, hr_min: float, hr_max: float) -> Tuple[Dict, Tuple[int, int, int, int]]:
     """
 
     :param acquisition_df:
@@ -234,25 +276,17 @@ def _calculate_timeline_metrics(acquisition_df: pd.DataFrame) -> Dict[str, str]:
 
 def _get_min_heart_rate(dfs: List[pd.DataFrame]) -> float:
     """
-    Calculates the minimum heart rate (HR) across all DataFrames in the list after removing outliers.
-
-    Outlier removal is performed using the IQR method on the combined 'HR' values from all DataFrames.
+    Calculates the minimum heart rate (HR) across all DataFrames, ignoring outliers. This is done by ignoring all values
+    bellow and above the lower and upper bounds calculated using the IQR method, respectively.
 
     :param dfs: List of DataFrames, each containing a 'HR' column
-    :return: Single minimum HR value from all DataFrames with outliers removed
+    :return: Single minimum HR value from all DataFrames
     """
     # Concatenate all HR values into a single Series
     all_hr = pd.concat([df[HEART] for df in dfs], ignore_index=True)
 
-    # Remove outliers using IQR
-    Q1 = all_hr.quantile(0.25)
-    Q3 = all_hr.quantile(0.75)
-    IQR = Q3 - Q1
-    filtered_hr = all_hr[(all_hr >= Q1 - 1.5 * IQR) & (all_hr <= Q3 + 1.5 * IQR)]
-    # TODO REMOVE WRONG SAMPLES THAT ARE WRONG (TOO LOW) OUTSIDE
-    # TODO CAHNGE TO REMOVE OUTLIERS AND CLEAN THE DATAFRAME
-    # Return the minimum of the filtered values
-    return filtered_hr.min()
+    # Return the minimum of the values
+    return all_hr.min()
 
 
 def _get_max_heart_rate(age: int) -> float:
@@ -262,6 +296,7 @@ def _get_max_heart_rate(age: int) -> float:
         HR_max = 208 - 0.7 * age
 
     DOI:  10.1016/s0735-1097(00)01054-8
+    https://pubmed.ncbi.nlm.nih.gov/11153730/
 
     :param age: Age of the individual in years (int or float)
     :return: Estimated maximum heart rate (HR_max)
@@ -272,13 +307,17 @@ def _get_max_heart_rate(age: int) -> float:
 def _calculate_hr_ratio(df: pd.DataFrame, hr_min: float, hr_max: float) -> pd.DataFrame:
     """
     Calculates the heart rate ratio (HR_ratio) for each heart rate measurement in a DataFrame
-    and adds it as a new column 'heart_rate_ratio'.
+    and adds it as a new column 'heart_rate_ratio', based on https://www.sciencedirect.com/science/article/abs/pii/S0031938418300179?via%3Dihub
 
     HR_ratio is calculated as:
         heart_rate_ratio = ((HR(t) - HR_rest) / HRR) * 100
     where:
         HRR = HR_max - HR_rest
-    # TODO ADD LINKS AND WHAT IS HR_REST AND HR_MAX
+        HR_max = 208 - 0.7 * age (DOI:  10.1016/s0735-1097(00)01054-8, link: https://pubmed.ncbi.nlm.nih.gov/11153730/)
+        HR_min is the minimum HR of the entire week of acquisitions
+
+    Outliers outside [lower_bound, upper_bound] are replaced with NaN before calculation.
+
     :param df: DataFrame containing a column 'heart_rate'
     :param hr_min: Resting heart rate (HR_min)
     :param hr_max: Maximum heart rate (HR_max)
@@ -309,11 +348,12 @@ def classify_hr_ratio(activity: int, hr_ratio: float) -> str:
     Source for the heart rate ratio range for light exercise (considered as walking):
     ACSM’s Guidelines for Exercise Testing and Prescription, 11th Editions - Chapter 5 "General
     Principles of Exercise Prescription"
+    (https://acsm.org/education-resources/books/guidelines-exercise-testing-prescription/)
 
     Normal heart rate ratio ranges (%):
         Sitting: 0-20%
         Standing: 20-30% # TODO REMOVE STANDING AND WALKING - DONE BUT CHECK
-        Walking: 30-39% # TODO CHANGE NAMING OF ABNORMAL
+        Walking: 30-39%
 
     Classification:
         - 'normal': within the normal range
@@ -389,10 +429,12 @@ def features_heart_rate(acquisition_df: pd.DataFrame) -> Dict:
 
     # Get acquisition start and end time
     start_time = acquisition_df.index[0]
-    end_time = acquisition_df.index[-1]
+
+    # Strip milliseconds
+    start_time_str = str(start_time).split(".")[0]
 
     # generate a key to identify which acquisition is being handled
-    key = f"{start_time}_{end_time}"
+    key = f"{start_time_str}"
 
     # get hr statistics and ratio proportions
     combined_stats = {
@@ -439,10 +481,10 @@ def _calculate_statistics(df: pd.DataFrame, column_name: str) -> Dict[str, float
     """
 
     # Calculate min max, mean, and std
-    minimum = round(float(df[column_name].min()), 2)
-    maximum = round(float(df[column_name].max()), 2)
-    mean = round(float(df[column_name].mean()), 2)
-    std = round(float(df[column_name].std()), 2)
+    minimum = round(float(df[column_name].min()), 4)
+    maximum = round(float(df[column_name].max()), 4)
+    mean = round(float(df[column_name].mean()), 4)
+    std = round(float(df[column_name].std()), 4)
 
     return {'min': minimum, 'max': maximum, 'mean': mean, 'std': std}
 
@@ -462,7 +504,7 @@ def _calculate_heart_rate_class_proportions(df: pd.DataFrame) -> Dict[str, float
     proportions = filtered_df[HR_CLASS_COLUMN_NAME].value_counts(normalize=True).to_dict()
 
     # round
-    proportions = {hr_class: round(proportion, 2) for hr_class, proportion in proportions.items()}
+    proportions = {hr_class: round(proportion, 4) for hr_class, proportion in proportions.items()}
 
     return proportions
 
@@ -515,7 +557,7 @@ def _calculate_daily_class_proportions(totals: List[Tuple[int, int, int, int]]) 
 
     # Calculate proportions and round
     return {
-        NORMAL: round((normal_total / total_count), 2),
-        POTENTIALLY_ABNORMAL: round((potentially_abnormal_total / total_count), 2),
-        ABNORMAL: round((abnormal_total / total_count), 2)
+        NORMAL: round((normal_total / total_count), 4),
+        POTENTIALLY_ABNORMAL: round((potentially_abnormal_total / total_count), 4),
+        ABNORMAL: round((abnormal_total / total_count), 4)
     }

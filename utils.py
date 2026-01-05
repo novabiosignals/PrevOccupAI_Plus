@@ -80,13 +80,9 @@ def extract_group_from_path(folder_path: str) -> str:
 
     # find group pattern
     # folder name starts with 'group' (i.e.: group1, group2, group3...)
-    match = re.search(r'group\d+', folder_path)
-
+    match = re.search(r'group(\d+)', folder_path)
     if match:
-
-        # get first and only match
-        return match.group()
-
+        return match.group(1)  # returns only the digits
     return 'no_group'
 
 

@@ -3,7 +3,6 @@
 # ------------------------------------------------------------------------------------------------------------------- #
 import os
 import re
-import pandas as pd
 
 # internal imports
 import questionnaires
@@ -21,7 +20,7 @@ PROCESS_PSYCHOSOCIAL = False
 PROCESS_PERSONAL = False
 PROCESS_ENVIRONMENT = False
 PROCESS_BIOMECHANICAL = False
-PROCESS_WORKLOAD = True
+PROCESS_WORKLOAD = False
 GENERATE_QUESTIONNAIRES_DATASET = False
 GENERATE_OH_PROFILE = True
 

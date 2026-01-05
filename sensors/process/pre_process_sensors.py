@@ -38,7 +38,7 @@ VALID_SENSORS = [ACC, GYR, MAG, ROT]
 def apply_pre_processing_pipeline(daily_data_dict: Dict[str, Dict[str, pd.DataFrame]], fs_android: int = 100,
                                   downsample_muscleban: bool = True) -> Dict[str, Dict[str, pd.DataFrame]]:
     """
-    This function pre-processes the inertial sensor data from the smartwatch and smartphone devices. For the muscleban,
+    This function pre-processes the inertial sensor data and Heart rate data from the smartwatch and smartphone devices. For the muscleban,
     this function applies the transfer functions for the EMG and ACC, filters the EMG, and downsamples the muscleban
     signals if downsample_muscleban is set to True.
 
@@ -116,7 +116,7 @@ def _pre_process_signals(subject_data: pd.DataFrame, fs: int) -> pd.DataFrame:
     return sensor_data
 
 
-def _pre_process_sensors(data_array: np.array, sensor_names: List[str], fs: int) -> np.array:
+def _pre_process_sensors(data_array: np.ndarray, sensor_names: List[str], fs: int) -> np.ndarray:
     """
     Pre-processes the sensors contained in data_array according to their sensor type.
     :param data_array: the loaded data
@@ -161,7 +161,7 @@ def _pre_process_sensors(data_array: np.array, sensor_names: List[str], fs: int)
     return processed_data
 
 
-def _pre_process_inertial_data(sensor_data: np.array, is_acc: bool = False, fs: int = 100, normalize: bool = False) -> np.array:
+def _pre_process_inertial_data(sensor_data: np.ndarray, is_acc: bool = False, fs: int = 100, normalize: bool = False) -> np.array:
     """
     Applies the pre-processing pipeline of "A Public Domain Dataset for Human Activity Recognition Using Smartphones"
     (https://www.esann.org/sites/default/files/proceedings/legacy/es2013-84.pdf). The pipeline consists of:
@@ -200,8 +200,8 @@ def _pre_process_inertial_data(sensor_data: np.array, is_acc: bool = False, fs: 
     return filtered_data
 
 
-def _slerp_smoothing(quaternion_array: np.array, smooth_factor: float = 0.5, scalar_first: bool = False,
-                     return_numpy: bool = True, return_scalar_first: bool = False) -> np.array:
+def _slerp_smoothing(quaternion_array: np.ndarray, smooth_factor: float = 0.5, scalar_first: bool = False,
+                     return_numpy: bool = True, return_scalar_first: bool = False) -> np.ndarray:
     """
     Smooths a quaternion time series using spherical linear interpolation (SLERP).
 
@@ -274,19 +274,3 @@ def _slerp_smoothing(quaternion_array: np.array, smooth_factor: float = 0.5, sca
         return smoothed_quaternion_series_numpy
 
     return smoothed_quaternion_array
-
-
-def trim_data(data: np.ndarray, w_size: float, fs: int) -> Tuple[np.ndarray, int]:
-    """
-    Function to get the amount that needs to be trimmed from the data to accommodate full windowing of the data
-    (i.e., not excluding samples at the end).
-    :param data: numpy.array containing the data
-    :param w_size: Window size in seconds
-    :param fs: Sampling rate
-    :return: the trimmed data and the amount of samples that needed to be trimmed.
-    """
-
-    # calculate the amount that has to be trimmed of the signal
-    to_trim = int(data.shape[0] % (w_size * fs))
-
-    return data[:-to_trim, :], to_trim

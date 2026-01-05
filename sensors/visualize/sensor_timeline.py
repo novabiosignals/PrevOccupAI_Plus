@@ -39,7 +39,7 @@ import sensors.load
 from constants import ACQUISITION_TIME_SECONDS, MBAN_RIGHT
 from OH_profile.constants import SENSOR_TIMELINE_MISSING_TIMES_KEY, SENSOR_TIMELINE_TIMES_KEY
 from sensors.impute.impute_sensor_timeline import compute_end_times
-from .utils import RefLine, HandlerRefLine, get_day_string
+from .plot_utils import RefLine, HandlerRefLine, get_day_string
 
 # ------------------------------------------------------------------------------------------------------------------- #
 # file specific constants

@@ -107,3 +107,11 @@ WORK_TYPE = 'work_type'
 
 QUESTIONNAIRE_DOMAINS = [PSYCHOSOCIAL, ENVIRONMENT, BIOMECHANICAL, PERSONAL, WORKLOAD]
 
+
+# ------------------------------------------------------------------------------------------------------------------- #
+# portuguese constants
+# ------------------------------------------------------------------------------------------------------------------- #
+
+WALKING_PT = 'Andar'
+SITTING_PT = 'Sentado'
+STANDING_PT = 'De pé'
