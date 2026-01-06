@@ -110,7 +110,7 @@ def calculate_personal_scores(folder_path: str, output_folder_path: str) -> None
     final_df.fillna(0, inplace=True)
 
     # save dataframe into a csv file
-    folder_path = create_dir(find_project_root(), os.path.join(output_folder_path, extract_group_from_path(folder_path)))
+    folder_path = create_dir(find_project_root(), os.path.join(output_folder_path, f"group{extract_group_from_path(folder_path)}"))
     final_df.to_csv(os.path.join(folder_path, f"results_personal{CSV}"))
 
 

@@ -134,7 +134,6 @@ def generate_sensor_timeline_plot(week_metadata_dict: Dict[str, Dict[str, Dict[s
     # Save figure
     plt.savefig(os.path.join(output_folder_path, filename), dpi=300, bbox_inches='tight')
 
-    plt.show()
 
 
 def get_daily_acquisitions_metadata(daily_folder_path: str, fs: int) -> Dict[str, Dict[str, list]]:

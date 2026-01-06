@@ -69,11 +69,8 @@ def calculate_rosa_scores(folder_path: str, output_folder_path: str) -> None:
     # get final rosa scores
     scores_df = rt.calc_final_rosa_score(df_a_scores, df_b_c_scores)
 
-    # keep only the final rosa scores
-    scores_df = scores_df[['final_rosa_score', 'final_rosa_score_normalized']]
-
     # save dataframe into a csv file
-    folder_path = create_dir(find_project_root(), os.path.join(output_folder_path, extract_group_from_path(folder_path)))
+    folder_path = create_dir(find_project_root(), os.path.join(output_folder_path, f"group{extract_group_from_path(folder_path)}"))
     scores_df.to_csv(os.path.join(folder_path, f"rosa_scores{CSV}"))
 
 
@@ -140,7 +137,7 @@ def calculate_biomechanical_scores(folder_path, pure_rosa: bool, output_folder_p
     final_df.fillna(0, inplace=True)
 
     # save dataframe into a csv file
-    folder_path = create_dir(find_project_root(), os.path.join(output_folder_path, extract_group_from_path(folder_path)))
+    folder_path = create_dir(find_project_root(), os.path.join(output_folder_path, f"group{extract_group_from_path(folder_path)}"))
     final_df.to_csv(os.path.join(folder_path, f"results_biomechanical{CSV}"))
 
 

@@ -16,11 +16,11 @@ from OH_profile.write import save_OH_profile, write_to_OH_profile
 # flags
 # ------------------------------------------------------------------------------------------------------------------- #
 GENERATE_SCORES = False
-PROCESS_PSYCHOSOCIAL = False
-PROCESS_PERSONAL = False
-PROCESS_ENVIRONMENT = False
-PROCESS_BIOMECHANICAL = False
-PROCESS_WORKLOAD = False
+PROCESS_PSYCHOSOCIAL = True
+PROCESS_PERSONAL = True
+PROCESS_ENVIRONMENT = True
+PROCESS_BIOMECHANICAL = True
+PROCESS_WORKLOAD = True
 GENERATE_QUESTIONNAIRES_DATASET = False
 GENERATE_OH_PROFILE = True
 
@@ -70,7 +70,7 @@ if GENERATE_SCORES:
                                                                output_folder_path=SCORES_OUT_PATH)
 
                     if PROCESS_ENVIRONMENT:
-                        questionnaires.calculate_linear_scores(QUEST_DATASET_PATH, domain='environment',
+                        questionnaires.calculate_linear_scores(domain_folder_path, domain='environment',
                                                                output_folder_path=SCORES_OUT_PATH)
 
                     if PROCESS_PERSONAL:

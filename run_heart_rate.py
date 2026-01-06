@@ -8,18 +8,18 @@ import sensors.visualize as sv
 import sensors.load as sl
 import sensors.metrics as sm
 import questionnaires
-from OH_profile.constants import SENSOR_METRICS_KEY, HEART_RATE_KEY, RELATIVE_HR_BASE_KEY, METADATA_KEY
+from OH_profile.constants import SENSOR_METRICS_KEY, HEART_RATE_KEY, HR_RELATIVE_BASE_KEY, METADATA_KEY
 from utils import extract_group_from_path, extract_device_num_from_path
 from OH_profile.load import get_OH_profile
 from OH_profile.write import save_OH_profile, write_to_OH_profile
-from sensors.metrics.heart_rate import DAILY_PROPORTIONS, MIN_HR, MAX_HR
+from sensors.metrics.heart_rate import HR_MIN, HR_MAX
 
 
 # ------------------------------------------------------------------------------------------------------------------- #
 # flags
 # ------------------------------------------------------------------------------------------------------------------- #
 GENERATE_HEART_RATE_PLOTS = True
-HEART_RATE_TIMELINE = False
+HEART_RATE_TIMELINE = True
 HEART_RATE_WEEK = True
 
 # ------------------------------------------------------------------------------------------------------------------- #
@@ -27,7 +27,7 @@ HEART_RATE_WEEK = True
 # ------------------------------------------------------------------------------------------------------------------- #
 DRIVE = "E"
 DATASET_PATH = "Backup PrevOccupAI_PLUS Data\\data"
-SUBJECT_FOLDER_PATH = f"{DRIVE}:\\{DATASET_PATH}\\group1\\sensors\\LIBPhys #001"
+SUBJECT_FOLDER_PATH = f"{DRIVE}:\\{DATASET_PATH}\\group2\\sensors\\LIBPhys #002"
 QUESTIONNAIRE_RESULTS_PATH = "C:\\Users\\srale\\Desktop\\carga de trabalho\\results"
 OH_PROFILE_PATH = r"C:\Users\srale\Desktop\OH_profiles"
 PLOTS_OUTPUT_PATH = r"C:\Users\srale\Desktop\timeline_plots"
@@ -53,7 +53,7 @@ if GENERATE_HEART_RATE_PLOTS:
     oh_profile = get_OH_profile(OH_PROFILE_PATH, subject_id)
 
     # check if the global metrics are not in the oh profile
-    if RELATIVE_HR_BASE_KEY not in oh_profile[SENSOR_METRICS_KEY][HEART_RATE_KEY]:
+    if HR_RELATIVE_BASE_KEY not in oh_profile[SENSOR_METRICS_KEY][HEART_RATE_KEY]:
 
         print(f"Extracting global heart rate metrics")
 
@@ -83,14 +83,14 @@ if GENERATE_HEART_RATE_PLOTS:
             age = oh_profile[METADATA_KEY]['idade']
 
         # calculate relative metrics
-        relative_HR_dict = sm.get_global_heart_rate_metrics(subject_data_folder=SUBJECT_FOLDER_PATH, subject_age=age)
+        relative_HR_dict = sm.get_global_heart_rate_metrics(subject_data_folder_path=SUBJECT_FOLDER_PATH, subject_age=age)
 
         # write to oh profile
         oh_profile = write_to_OH_profile(oh_profile, main_outer_key=SENSOR_METRICS_KEY,
                                          main_inner_key=HEART_RATE_KEY, dict_to_write=relative_HR_dict)
 
     # get global metrics from OH profile
-    global_metrics_dict = oh_profile[SENSOR_METRICS_KEY][HEART_RATE_KEY][RELATIVE_HR_BASE_KEY]
+    global_metrics_dict = oh_profile[SENSOR_METRICS_KEY][HEART_RATE_KEY][HR_RELATIVE_BASE_KEY]
 
     # check if the metrics have already been extracted
     # if not then len = 1 since it has only the relative HR base metrics
@@ -104,9 +104,12 @@ if GENERATE_HEART_RATE_PLOTS:
             # get path to the data of the day
             day_folder_path = os.path.join(SUBJECT_FOLDER_PATH, date_folder)
 
+            if date_folder == '2025-09-26':
+                date_folder = '2025-09-26'
+
             # get heart rate metrics for the day
-            metrics_dict = sm.get_heart_rate_metrics(day_folder_path, hr_min=global_metrics_dict[MIN_HR],
-                                                     hr_max=global_metrics_dict[MAX_HR], fs=FS, w_size=W_SIZE)
+            metrics_dict = sm.get_heart_rate_metrics(day_folder_path, hr_min=global_metrics_dict[HR_MIN],
+                                                     hr_max=global_metrics_dict[HR_MAX], fs=FS, w_size=W_SIZE)
 
             # write to oh profile
             oh_profile = write_to_OH_profile(oh_profile, main_outer_key=SENSOR_METRICS_KEY,
@@ -121,7 +124,7 @@ if GENERATE_HEART_RATE_PLOTS:
         for key, features in oh_profile[SENSOR_METRICS_KEY][HEART_RATE_KEY].items():
 
             # get only the daily metrics - ignore key with the values of the daily proportions
-            if key != DAILY_PROPORTIONS:
+            if key != HR_RELATIVE_BASE_KEY:
 
                 # get inner dict for simplicity
                 daily_hr_metrics_dict = oh_profile[SENSOR_METRICS_KEY][HEART_RATE_KEY][key]

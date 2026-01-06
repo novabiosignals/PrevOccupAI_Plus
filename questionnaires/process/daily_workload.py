@@ -59,5 +59,5 @@ def clean_daily_workload(folder_path: str, output_folder_path: str) -> None:
 
     # save dataframe into a csv file
     folder_path = create_dir(find_project_root(),
-                             os.path.join(output_folder_path, extract_group_from_path(folder_path)))
+                             os.path.join(output_folder_path, f"group{extract_group_from_path(folder_path)}"))
     results_df.to_csv(os.path.join(folder_path, f"workload{CSV}"))

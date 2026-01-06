@@ -39,6 +39,9 @@ KEY_DOMAIN_MAPPING = {PERSONAL: PERSONAL_DOMAIN_KEY,
 META_DATA_COLUMNS = ['idade', 'sexo', 'altura', 'peso', 'mao']
 
 DATE_FORMAT = "%d-%m-%Y"
+
+SCORING_KEY = 'scoring'
+SCORING_VALUE = '1_completely-disagree_5_completely-agree'
 # ------------------------------------------------------------------------------------------------------------------- #
 # public functions
 # ------------------------------------------------------------------------------------------------------------------- #
@@ -123,8 +126,8 @@ def get_daily_workload_metrics(scores_csv_file: str, subject_id: int) -> Dict:
         # add to metrics dictionary
         metrics_dict[date] = row_dict
 
-    # check if there are less than 5 entries - if so, add missing data
-    if len(metrics_dict) < 5:
+    # check if there are less than 6 entries (5 working days + scoring information) - if so, add missing data
+    if len(metrics_dict) < 6:
 
         # get start_date
         start_date = sl.get_participant_start_date(sl.load_participants_info(), subject_id)
@@ -138,6 +141,9 @@ def get_daily_workload_metrics(scores_csv_file: str, subject_id: int) -> Dict:
 
         # sort metrics_dict by date keys
         metrics_dict = dict(sorted(metrics_dict.items(), key=lambda x: datetime.strptime(x[0], DATE_FORMAT)))
+
+    # add scoring information
+    metrics_dict[SCORING_KEY] = SCORING_VALUE
 
     return metrics_dict
 

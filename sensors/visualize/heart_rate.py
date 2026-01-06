@@ -1,5 +1,23 @@
 """
+Functions for plotting heart rate class timelines and distributions from wearable sensor data.
 
+Available Functions
+-------------------
+[Public]
+plot_hr_timeline_per_acquisition(...): Plot HR class timelines for each acquisition.
+plot_weekly_hr_data(...): Generate weekly bar and circular HR distribution plots.
+
+-------------------
+[Private]
+_plot_hr_dist(...): Plot stacked bar charts of HR class distributions.
+plot_circular_hr_dist(...): Plot circular HR class distributions.
+_plot_circ_bars(...): Draw circular stacked bars.
+_dict_to_hr_percentage_df(...): Convert HR distribution dictionaries to DataFrames.
+_extract_date_time(...): Extract dates and times from DataFrame indices.
+_scale_data(...): Scale HR class proportions for circular visualization.
+_reconstruct_df_from_dict(...): Rebuild a DataFrame from compressed HR timelines.
+_handle_plot(...): Handle plot saving and display logic.
+-------------------
 """
 # ------------------------------------------------------------------------------------------------------------------- #
 # imports
@@ -14,7 +32,6 @@ import matplotlib.dates as mdates
 from matplotlib.ticker import MultipleLocator
 from babel.dates import format_datetime
 from matplotlib.lines import Line2D
-from matplotlib.ticker import FuncFormatter
 import copy
 import re
 import seaborn as sns
@@ -23,43 +40,40 @@ import datetime as dt
 
 
 # internal imports
-from sensors.metrics.heart_rate import DAILY_PROPORTIONS, METRICS, TIMELINE_METRICS, PROPORTIONS, NORMAL, POTENTIALLY_ABNORMAL, ABNORMAL
-from constants import HR_CLASS_COLUMN_NAME, WALKING_PT, SITTING_PT, STANDING_PT
+from sensors.metrics.heart_rate import (HR_DISTRIBUTIONS_DAY, HR_METRICS_SESSION, HR_TIMELINE, HR_PROPORTIONS_SESSION,
+                                        NORMAL, POTENTIALLY_ELEVATED, ELEVATED)
+from constants import HR_CLASS_COLUMN_NAME
 from utils import create_dir
 from .plot_utils import generate_grouped_legend, generate_acquisition_labels
-from OH_profile.constants import RELATIVE_HR_BASE_KEY
+from OH_profile.constants import HR_RELATIVE_BASE_KEY
 # ------------------------------------------------------------------------------------------------------------------- #
 # file specific constants
 # ------------------------------------------------------------------------------------------------------------------- #
 
 CLASS_COLORS = {
-    'normal': 'green',
-    'potentially abnormal': 'orange',
-    'abnormal': 'red',
+    NORMAL: '#A5D6A7',
+    POTENTIALLY_ELEVATED: '#FFCC80',
+    ELEVATED: '#EF9A9A',
     'no data': 'white'
 }
 
 HR_CLASS_COLORS = {
     NORMAL: "#A5D6A7",                # green
-    POTENTIALLY_ABNORMAL: "#FFCC80",  # orange
-    ABNORMAL: "#EF9A9A",              # red
+    POTENTIALLY_ELEVATED: "#FFCC80",  # orange
+    ELEVATED: "#EF9A9A",              # red
     "no data": "#E0E0E0"                 # light gray
 }
 
 LEGEND_PT = {
     NORMAL: NORMAL,
-    POTENTIALLY_ABNORMAL: POTENTIALLY_ABNORMAL,
-    ABNORMAL: ABNORMAL,
+    POTENTIALLY_ELEVATED: POTENTIALLY_ELEVATED,
+    ELEVATED: ELEVATED,
     "no data": "Sem dados"
 }
 
-DESIRED_ORDER = [NORMAL, POTENTIALLY_ABNORMAL, ABNORMAL,"no data"]
+DESIRED_ORDER = [NORMAL, POTENTIALLY_ELEVATED, ELEVATED, "no data"]
 
-ACTIVITY_NAMES_PT = {
-    "walking": WALKING_PT,
-    "sitting": SITTING_PT,
-    "standing": STANDING_PT
-}
+DATE_FORMAT = '%d-%m-%Y'
 
 # ------------------------------------------------------------------------------------------------------------------- #
 # public functions
@@ -68,11 +82,8 @@ ACTIVITY_NAMES_PT = {
 def plot_hr_timeline_per_acquisition(hr_metrics_dict: Dict, day: str, group: str, subject: str, output_folder_path: str,
     gap_threshold=timedelta(seconds=30), show=False) -> None:
     """
-    # TODO UPDATE THIS DOCSTRING
     Generates a heart rate timeline plot for each acquisition (each DataFrame) separately.
 
-    Folder structure:
-        {save_root}/{group}/{subject}/HEART_RATE/HEART_RATE_TIMELINE/hr_timeline_{day}_acq{idx}.png
 
     :param day:
     :param hr_metrics_dict: dict where keys are dates (YYYY-MM-DD) and values are lists of DataFrames
@@ -82,25 +93,25 @@ def plot_hr_timeline_per_acquisition(hr_metrics_dict: Dict, day: str, group: str
     :param gap_threshold: timedelta indicating the minimum gap between consecutive points to start a new block
                           (default = 30 seconds)
     :param output_folder_path: Path to the folder where plots will be saved.
-    :param show: boolean, if True displays the plots, if False closes them (default = True)
+    :param show: boolean, if True displays the plots, if False closes them (default = False)
     :return: None
     """
 
     # create output directory
-    output_path = create_dir(output_folder_path, os.path.join(str(group), str(subject), "heart_rate"))
+    output_path = create_dir(output_folder_path, os.path.join(str(group), str(subject), "HR_timeline"))
 
     # counter for the acquisitions
     acq_counter = 0
 
     for key, hr_features_dict in hr_metrics_dict.items():
 
-        if key != DAILY_PROPORTIONS:
+        if key != HR_DISTRIBUTIONS_DAY:
 
             # update counter
             acq_counter += 1
 
             # get timeline metrics
-            timeline_metrics_dict = hr_features_dict[METRICS][TIMELINE_METRICS]
+            timeline_metrics_dict = hr_features_dict[HR_METRICS_SESSION][HR_TIMELINE]
 
             # raise error if there are no metrics to plot
             if len(timeline_metrics_dict) == 0:
@@ -134,7 +145,7 @@ def plot_hr_timeline_per_acquisition(hr_metrics_dict: Dict, day: str, group: str
                 ax.hlines(y=0, xmin=x0, xmax=x1, color=CLASS_COLORS.get(cls, 'gray'), linewidth=6)
 
             weekday_label = format_datetime(
-                datetime.strptime(day, "%Y-%m-%d"),
+                datetime.strptime(day, DATE_FORMAT),
                 "dd-MM-yyyy (EEEE)",
                 locale="pt_PT"
             )
@@ -153,37 +164,36 @@ def plot_hr_timeline_per_acquisition(hr_metrics_dict: Dict, day: str, group: str
 
             # Legend
             legend_handles = [
-                Line2D([0], [0], color=CLASS_COLORS['normal'], lw=6, label='Normal'),
-                Line2D([0], [0], color=CLASS_COLORS['potentially abnormal'], lw=6, label='Potencialmente anormal'),
-                Line2D([0], [0], color=CLASS_COLORS['abnormal'], lw=6, label='Anormal'),
+                Line2D([0], [0], color=CLASS_COLORS[NORMAL], lw=6, label=NORMAL),
+                Line2D([0], [0], color=CLASS_COLORS[POTENTIALLY_ELEVATED], lw=6, label=POTENTIALLY_ELEVATED),
+                Line2D([0], [0], color=CLASS_COLORS[ELEVATED], lw=6, label=ELEVATED),
             ]
             ax.legend(handles=legend_handles, bbox_to_anchor=(1.04, 1), loc='lower center')
 
             plt.tight_layout()
 
             # Save figure
-            filename = f"hr_timeline_{day}_acq{acq_counter}.png"
+            filename = f"HR_timeline_{day}_acq_{acq_counter}.png"
             _handle_plot(save_dir=output_path,show=show,save=True,filename=filename)
 
 
 def plot_weekly_hr_data(oh_profile, group: str, subject: str, save_path: str, show_plot=False, save=True):
     """
-    Plots heart rate distributions for all individuals, grouping all days in one plot per subject.
+    Generates weekly plots (circular and bars) for one subject.
 
-    :param oh_profile: dict structured as:
-        oh_profile[SENSOR_METRICS_KEY][HEART_RATE_KEY] = {
-            'date': {time: {'metrics':..., 'proportions':...}, ...},
-            'date': {...}
-        }
-    :param show_plot: whether to display the plots
-    :param save: whether to save the plots
-    :param save_path: folder to save plots
+    :param oh_profile: Dictionary containing the metrics of the HR data
+    :param group: string with the group identifier
+    :param subject: string with the group identifier (subject ID)
+    :param save_path: Path to the folder where the plots will be saved
+    :param show_plot: boolean, if True displays the plots, if False closes them (default = False)
+    :param save: boolean, if True saves the plots as png, if False closes them (default = True)
+    :return:
     """
     # create copy
     oh_profile = copy.deepcopy(oh_profile)
 
     # delete relative HR base key for simplicity
-    del oh_profile[RELATIVE_HR_BASE_KEY]
+    del oh_profile[HR_RELATIVE_BASE_KEY]
 
     # get only the relevant data in the following format {'date': {'acquisition_time': {proportions}}} - modify in place
     # cycle over the dates in the profile
@@ -193,12 +203,12 @@ def plot_weekly_hr_data(oh_profile, group: str, subject: str, save_path: str, sh
         for time_key in list(day_data.keys()):
 
             # ignore total daily proportions
-            if time_key == DAILY_PROPORTIONS:
+            if time_key == HR_DISTRIBUTIONS_DAY:
 
                 del day_data[time_key]
             else:
                 # keep only the proportions and ignore the remaining metrics
-                day_data[time_key] = day_data[time_key][PROPORTIONS]
+                day_data[time_key] = day_data[time_key][HR_PROPORTIONS_SESSION]
 
     # generate weekly bar plot
     _plot_hr_dist(hr_percentage=oh_profile, group_num=group, subject=subject, show_plot=show_plot, save=save, save_path=save_path)
@@ -212,7 +222,7 @@ def plot_weekly_hr_data(oh_profile, group: str, subject: str, save_path: str, sh
 
 def _plot_hr_dist(hr_percentage, group_num, subject, show_plot=False,
                   show_acquisition_labels=True, save=False, save_path='',
-                  color_scheme=HR_CLASS_COLORS, locale_string='pt_PT.UTF-8', activity_name=None):
+                  color_scheme=HR_CLASS_COLORS, locale_string='pt_PT.UTF-8'):
     """
     Plots a stacked bar chart of heart rate class distribution for each acquisition per day.
 
@@ -225,14 +235,10 @@ def _plot_hr_dist(hr_percentage, group_num, subject, show_plot=False,
     :param save_path: Directory to save the plot. If empty, saves in the current project folder.
     :param color_scheme: Colors used for each heart rate class. Should match the number of classes. Default: HR_CLASS_COLORS
     :param locale_string: Locale string for weekday names (used in the legend). Default: 'pt_PT.UTF-8'
-    :param activity_name: Optional string to display below the title.
     :return: None
     """
     # Convert dictionary to DataFrame
     hr_percentage , activity_proportions = _dict_to_hr_percentage_df(hr_percentage)
-    if hr_percentage.empty:
-        print(f"[WARNING] No HR data available for Group {group_num}, Subject {subject}. Skipping plot.")
-        return
 
     # Ensure consistent column order
     hr_percentage = hr_percentage[DESIRED_ORDER]
@@ -273,7 +279,7 @@ def _plot_hr_dist(hr_percentage, group_num, subject, show_plot=False,
     ax.tick_params(axis='x', rotation=0)
 
     # Convert dates to day/month/year format
-    dates_fmt = [pd.to_datetime(d).strftime('%d/%m/%Y') for d in dates]
+    dates_fmt = [pd.to_datetime(d).strftime(DATE_FORMAT) for d in dates]
 
     # Title, axis labels, and color legend
     group_num_numeric = re.search(r'\d+', group_num).group()
@@ -346,8 +352,8 @@ def _plot_hr_dist(hr_percentage, group_num, subject, show_plot=False,
     # Save or show plot
     if save or show_plot:
 
-        out_dir = create_dir(save_path, os.path.join(f'{group_num}', f'{subject}', "HEART_RATE_PROPORTIONS"))
-        filename = f'hr_plot_dist{subject}.png'
+        out_dir = create_dir(save_path, os.path.join(f'{group_num}', f'{subject}', "HR_distributions"))
+        filename = f'HR_plot_distributions_{subject}.png'
         _handle_plot(save_dir=out_dir, show=show_plot, save=save, filename=filename)
 
 
@@ -373,9 +379,6 @@ def plot_circular_hr_dist(hr_percentage, group_num, subject, lower_limit=30, upp
 
     # Convert dictionary to a DataFrame
     hr_percentage , activity_proportions = _dict_to_hr_percentage_df(hr_percentage)
-    if hr_percentage.empty:
-        print(f"[WARNING] No HR data available for Group {group_num}, Subject {subject}. Skipping plot.")
-        return
 
     # Order the classes
     hr_percentage = hr_percentage[DESIRED_ORDER]
@@ -396,7 +399,7 @@ def plot_circular_hr_dist(hr_percentage, group_num, subject, lower_limit=30, upp
     dates, times = _extract_date_time(hr_percentage, date_to_weekday=False)
 
     # Convert dates to day/month/year format
-    dates_fmt = [pd.to_datetime(d).strftime('%d/%m/%Y') for d in dates]
+    dates_fmt = [pd.to_datetime(d).strftime(DATE_FORMAT) for d in dates]
 
     # Title
     group_num_numeric = re.search(r'\d+', group_num).group()
@@ -446,8 +449,8 @@ def plot_circular_hr_dist(hr_percentage, group_num, subject, lower_limit=30, upp
     # Save or show the plot
     if save or show_plot:
 
-        out_dir = create_dir(save_path, os.path.join(f'{group_num}', f'{subject}', "HEART_RATE_PROPORTIONS"))
-        filename = f'hr_plot_circular{subject}.png'
+        out_dir = create_dir(save_path, os.path.join(f'{group_num}', f'{subject}', "HR_distributions"))
+        filename = f'HR_plot_circular_{subject}.png'
         _handle_plot(save_dir=out_dir, show=show_plot, save=save, filename=filename)
 
 
@@ -584,7 +587,7 @@ def _get_day_string(date_string, locale_string):
     :return: the localized day name without '-feira' and properly encoded in UTF-8
     """
     # parse the date string into a datetime object
-    date_time = dt.datetime.strptime(date_string, '%Y-%m-%d')
+    date_time = dt.datetime.strptime(date_string, DATE_FORMAT)
 
     try:
         # set the locale for date formatting
@@ -660,7 +663,7 @@ def _get_bar_width_and_angles(hr_percentage_df):
     # subtracted to get a correct positioning
     angles = [(element * width) - width / 2 for element in indexes]
 
-    # add pi/2 for the plot to start at the top center of the circle (12 o-clock posiition)
+    # add pi/2 for the plot to start at the top center of the circle (12 o-clock position)
     angles = [angle + np.pi / 2 for angle in angles]
 
     # reverse the angles to have the bars ordered clock-wise

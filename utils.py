@@ -10,7 +10,6 @@ extract_group_from_path(...): Gets the group number from the data path.
 extract_device_num_from_path(...): Gets the device number from the data path.
 find_project_root(...): Gets the project root directory.
 extract_date_from_path(...): Gets the date from the data path.
-has_matching_json(...): Checks if json file with a given subject_id exists. Return True if it exists.
 -------------------
 
 [Private]
@@ -25,11 +24,9 @@ import json
 from typing import Dict, Any, Optional, Union
 import os
 import re
-import glob
 from pathlib import Path
 
 # internal imports
-from constants import JSON
 
 # ------------------------------------------------------------------------------------------------------------------- #
 # public functions
@@ -143,20 +140,3 @@ def extract_date_from_path(folder_path: str) -> Optional[str]:
     else:
         return None
 
-
-def has_matching_json(oh_profile_path: str, subject_id: str) -> bool:
-    """
-    Checks if json file with a given subject_id exists. Return True if it exists.
-
-    :param oh_profile_path: Path to the directory in which to search for JSON files.
-    :param subject_id: Substring to match within JSON filenames.
-    :return: True if at least one matching JSON file is found; False otherwise.
-    """
-
-    # Build a pattern like:  /path/to/dir/*subject_id*.json
-    pattern = os.path.join(oh_profile_path, f"*{subject_id}*{JSON}")
-
-    # get a list of matching file paths
-    matches = glob.glob(pattern)
-
-    return len(matches) > 0

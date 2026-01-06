@@ -1,13 +1,27 @@
 """
-Function to get sensor heart rate metrics
+Functions to extract, compute, and classify heart rate (HR) metrics from wearable sensor data.
 
 Available Functions
 -------------------
 [Public]
-get_sensor_heart_rate_metrics(...): Gets the metrics needed for the heart rate plots.
+get_global_heart_rate_metrics(...): Extract global HR reference metrics across all acquisitions.
+get_heart_rate_metrics(...): Extract daily and per-session HR metrics from a full day of data.
 -------------------
 
 [Private]
+_calculate_hr_metrics_per_acquisition(...): Compute HR metrics and class counts for one acquisition.
+_calculate_hr_ratio(...): Compute heart rate ratio (HRR) and HRR class labels.
+_classify_hr_ratio(...): Classify HRR values for sitting activity only.
+_calculate_timeline_metrics(...): Compress HR class labels into contiguous time ranges.
+_calculate_statistics(...): Compute summary statistics for a numeric column.
+_calculate_heart_rate_class_proportions(...): Compute HR class proportions ignoring 'no data'.
+_count_hr_classes(...): Count HR class occurrences per acquisition.
+_calculate_daily_class_proportions(...): Aggregate HR class proportions across acquisitions.
+_get_min_heart_rate(...): Compute minimum HR across all acquisitions.
+_get_max_heart_rate(...): Estimate maximum HR from subject age.
+_et_heart_rate_statistics(...): Compute basic HR and HRR statistics.
+_extract_features_heart_rate(...): Extract per-acquisition HR features and class proportions.
+_split_df_by_non_nan_blocks(...): Split a DataFrame into contiguous non-NaN acquisition blocks.
 -------------------
 """
 # ------------------------------------------------------------------------------------------------------------------- #
@@ -17,58 +31,68 @@ import os
 from typing import Dict, List, Tuple
 import pandas as pd
 from utils import extract_date_from_path
-import numpy as np
 
 # internal imports
 import HAR
 import sensors.load as sl
 import sensors.process as sp
-from constants import ACTIVITY_COLUMN_NAME, HEART, HR_RATIO_COLUMN_NAME, HR_CLASS_COLUMN_NAME, WATCH_SUFFIX, ACC, WATCH, HEART
-from OH_profile.constants import RELATIVE_HR_BASE_KEY
+from constants import (ACTIVITY_COLUMN_NAME, HR_RATIO_COLUMN_NAME, HR_CLASS_COLUMN_NAME, WATCH_SUFFIX, ACC, GYR, MAG,
+                       PHONE, WATCH, HEART)
+from OH_profile.constants import HR_RELATIVE_BASE_KEY
 # ------------------------------------------------------------------------------------------------------------------- #
 # constants
 # ------------------------------------------------------------------------------------------------------------------- #
 
 # sensors to be loaded which are strictly needed for the HR plot
-selected_sensors = {'phone': ['ACC', 'GYR', 'MAG'], # for HAR
-                    'watch': ['ACC','HEART']} # ACC to fill with NaN when the HR is not acquiring - do not remove ACC
+selected_sensors = {PHONE: [ACC, GYR, MAG], # for HAR
+                    WATCH: [ACC,HEART]} # ACC to fill with NaN when the HR is not acquiring - do not remove ACC
 
 
 # heart rate ratio per activity
 NORMAL_RANGES = {
     0: (0.0, 30),
-    1: (20, 30),
-    2: (30, 39)
 }
 
 # Margin used to define "potentially abnormal" outside the normal range for heart rate ratio
 POTENTIALLY_ABNORMAL_MARGIN = 9
 
 # HR classes
-NORMAL = 'normal'
-POTENTIALLY_ABNORMAL = 'ligeiramente elevado'
-ABNORMAL = 'elevado'
+NORMAL = 'Normal'
+POTENTIALLY_ELEVATED = 'Ligeiramente elevado'
+ELEVATED = 'Elevado'
 
 # keys for the inner dictionaries with the HR features
-METRICS = 'metrics'
-PROPORTIONS = 'proportions'
-DAILY_PROPORTIONS = 'daily_proportions'
-TIMELINE_METRICS = 'timeline_metrics'
+HR_METRICS_SESSION = 'HR_metrics_session'
+HR_PROPORTIONS_SESSION = 'HR_distributions_session'
+HR_DISTRIBUTIONS_DAY = 'HR_distributions_day'
+HR_TIMELINE = 'HR_timeline'
 HR_RATIO_STATS = 'HR_ratio_stats'
 HR_BPM_STATS = 'HR_BPM_stats'
-MIN_HR = 'min_HR'
-MAX_HR = 'max_HR'
+HR_MIN = 'HR_min'
+HR_MAX = 'HR_max'
 
 # ------------------------------------------------------------------------------------------------------------------- #
 # public functions
 # ------------------------------------------------------------------------------------------------------------------- #
 
-def get_global_heart_rate_metrics(subject_data_folder: str, subject_age: int) -> Dict:
+def get_global_heart_rate_metrics(subject_data_folder_path: str, subject_age: int) -> Dict:
     """
+    Extracts global heart rate (HR) metrics for one particular subject whose data from the entire week is in subject_data_folder_path.
 
-    :param subject_data_folder:
-    :param subject_age:
-    :return:
+    This function loads the HR data from the entire week and finds the minimum HR value detected. The maximum HR value
+    is calculated as follows:
+
+    HR_max = 208 - 0.7 * age -> DOI:  10.1016/s0735-1097(00)01054-8 (https://pubmed.ncbi.nlm.nih.gov/11153730/)
+
+    :param subject_data_folder_path: Path to the folder containing the subject data for the entire week
+    :param subject_age: Age of the subject (used for calculating the HR_max)
+    :return: A dictionary with the global relative metrics as follows:
+                {
+                  "HR_relative_base": {
+                    "HR_min": ...,
+                    "HR_max": ...
+                  }
+                }
     """
 
     # init dict for holding the relative HR global metrics
@@ -78,10 +102,10 @@ def get_global_heart_rate_metrics(subject_data_folder: str, subject_age: int) ->
     dfs_list = []
 
     # iterate through the folders of the several days
-    for date_folder in os.listdir(subject_data_folder):
+    for date_folder in os.listdir(subject_data_folder_path):
 
         # get path to the folder
-        day_folder_path = os.path.join(subject_data_folder, date_folder)
+        day_folder_path = os.path.join(subject_data_folder_path, date_folder)
 
         # load_signals all acquisitions from the same day into a nested dictionary
         df_dict = sl.load_daily_acquisitions(day_folder_path, load_devices={WATCH: [HEART]})
@@ -93,28 +117,42 @@ def get_global_heart_rate_metrics(subject_data_folder: str, subject_age: int) ->
             dfs_list.append(df)
 
     # init inner dict
-    relative_HR_metrics_dict[RELATIVE_HR_BASE_KEY] = {}
+    relative_HR_metrics_dict[HR_RELATIVE_BASE_KEY] = {}
 
     # calculate the minimum hr over all acquisitions and IQR bounds and add to dict
     min_HR = _get_min_heart_rate(dfs_list)
-    relative_HR_metrics_dict[RELATIVE_HR_BASE_KEY][MIN_HR] = min_HR
+    relative_HR_metrics_dict[HR_RELATIVE_BASE_KEY][HR_MIN] = min_HR
 
     # calculate max HR based on the age
     max_HR = _get_max_heart_rate(subject_age)
-    relative_HR_metrics_dict[RELATIVE_HR_BASE_KEY][MAX_HR] = max_HR
+    relative_HR_metrics_dict[HR_RELATIVE_BASE_KEY][HR_MAX] = max_HR
 
     return relative_HR_metrics_dict
 
 
 def get_heart_rate_metrics(day_folder_path: str, hr_min: float, hr_max: float, fs: int, w_size: float) -> Dict:
     """
+    Extracts the heart rate metrics for an entire day of acquisitions and returns a dictionary with daily and per session
+    metrics. If phone data is missing and no activity label is present in more than 50 % of the acquisition, the acquisition
+    is discarded.
 
-    :param day_folder_path:
-    :param hr_min:
-    :param hr_max:
-    :param fs:
-    :param w_size:
-    :return:
+    :param day_folder_path: Path to the folder containing the all the acquisitions from an entire day
+    :param hr_min: Minimum heart rate for the particular subject.
+    :param hr_max: Maximum heart rate for the particular subject.
+    :param fs: The sampling frequency with which the data was acquired and for resampling
+    :param w_size: The window size used for the human activity recognition model
+    :return: A dictionary with the daily and per session metrics for this subject as follows:
+    {"23-09-2025": {
+                    "HR_distributions_day": {...},
+                    "15-00-00": {
+                        "HR_metrics_session": {
+                            "HR_BPM_stats": {...},
+                            "HR_ratio_stats": {...},
+                            "HR_timeline": {...},
+                        }
+                        "HR_distributions_session": {...},
+                    }
+    }
     """
 
     # init dict
@@ -133,20 +171,30 @@ def get_heart_rate_metrics(day_folder_path: str, hr_min: float, hr_max: float, f
     sync_df = sync_df[[ACTIVITY_COLUMN_NAME, f"{HEART}{WATCH_SUFFIX}", f"y_{ACC}{WATCH_SUFFIX}"]]
 
     # split into dataframes with just the watch data
-    acquisitions_dfs = split_df_by_non_nan_blocks(sync_df, column_name=f"y_{ACC}{WATCH_SUFFIX}")
+    acquisitions_dfs = _split_df_by_non_nan_blocks(sync_df, column_name=f"y_{ACC}{WATCH_SUFFIX}")
 
     # get date from path
     date = extract_date_from_path(day_folder_path)
 
+    # reformat to dd-mm-yyyy
+    year, month, day = date.split('-')
+    date = f"{day}-{month}-{year}"
+
     # init the dict
     day_metrics_dict[date] = {}
-    day_metrics_dict[date][DAILY_PROPORTIONS] = {}
+    day_metrics_dict[date][HR_DISTRIBUTIONS_DAY] = {}
 
     # init list for holding the class counts for all acquisitions
     class_counts = []
 
     # extract metrics from the daily acquisitions
     for acquisitions_df in acquisitions_dfs:
+
+        # check if the activity column is nan in more than half of the acquisition - phone stopped acquiring before watch
+        if acquisitions_df[ACTIVITY_COLUMN_NAME].isna().mean() > 0.5:
+
+            print(f"No activity labels for this acquisition. Skipping...")
+            continue
 
         # get hr features
         acquisitions_metrics, nr_classes = _calculate_hr_metrics_per_acquisition(acquisitions_df, hr_min, hr_max)
@@ -161,7 +209,7 @@ def get_heart_rate_metrics(day_folder_path: str, hr_min: float, hr_max: float, f
     daily_proportions_dict = _calculate_daily_class_proportions(class_counts)
 
     # add to the metrics dictionary
-    day_metrics_dict[date][DAILY_PROPORTIONS] = daily_proportions_dict
+    day_metrics_dict[date][HR_DISTRIBUTIONS_DAY] = daily_proportions_dict
 
     return day_metrics_dict
 
@@ -170,39 +218,20 @@ def get_heart_rate_metrics(day_folder_path: str, hr_min: float, hr_max: float, f
 # private functions
 # ------------------------------------------------------------------------------------------------------------------- #
 
-def _calculate_IQR_bounds(hr_column: pd.Series) -> Tuple[float, float]:
-    """
-    Computes the IQR-based lower and upper bounds for heart rate data.
-    Existing NaNs are ignored when computing quartiles.
-
-    :param hr_column: 1D pandas Series of heart rate values
-    :return: Tuple (lower_bound, upper_bound)
-    """
-    # Drop NaNs for computation
-    hr_values = hr_column.dropna().to_numpy()
-
-    # Compute quartiles
-    q1 = np.percentile(hr_values, 25)
-    q3 = np.percentile(hr_values, 75)
-
-    # Compute IQR
-    iqr = q3 - q1
-
-    # Compute bounds
-    lower_bound = q1 - 1.5 * iqr
-    upper_bound = q3 + 1.5 * iqr
-
-    return lower_bound, upper_bound
-
-
-
 def _calculate_hr_metrics_per_acquisition(acquisition_df: pd.DataFrame, hr_min: float, hr_max: float) -> Tuple[Dict, Tuple[int, int, int, int]]:
     """
+    Calculates the heart rate metrics per acquisition.
 
-    :param acquisition_df:
-    :param hr_min:
-    :param hr_max:
-    :return:
+    This function assumes that acquisition_df has a column with the activity labels and a column with the heart rate data (BPM)
+    and calculates the heart rate ratio (HRR) for all data points and classifies the heart rate ratio into normal, potentially elevated,
+    and elevated for only the instances when the subject is sitting (other activities are ignored).
+    The HRR class distributions are also calculated for this dataframe.
+
+    :param acquisition_df: Dataframe with the HR and activity data
+    :param hr_min: minimum heart rate (used for calculating HRR)
+    :param hr_max: maximum heart rate (used for calculating HRR)
+    :return: A dictionary with the metrics extracted for this dataframe and a Tuple [int, int, int, int] with the total and class counts
+    for the HRR classes: [total_instances, nr_normal_class, nr_potentially_elevated_class, nr_potentially_elevated_class]
     """
 
     # calculate hr ratio and respective classification
@@ -215,7 +244,7 @@ def _calculate_hr_metrics_per_acquisition(acquisition_df: pd.DataFrame, hr_min: 
     nr_classes = _count_hr_classes(hr_class_df)
 
     # get dictionary with the HR features for the acquisition
-    acquisition_metrics = features_heart_rate(acquisitions_df)
+    acquisition_metrics = _extract_features_heart_rate(acquisitions_df)
 
     return acquisition_metrics, nr_classes
 
@@ -225,8 +254,8 @@ def _calculate_timeline_metrics(acquisition_df: pd.DataFrame) -> Dict[str, str]:
     Compress consecutive identical class labels into time-range chunks, breaking
     chunks if the class changes or if a temporal gap (discontinuity) is detected.
 
-    The function identifies 'islands' of data by checking two conditions:
-    1. Label Continuity: The 'class' remains the same between rows.
+    The function identifies 'blocks' of data by checking two conditions:
+    1. Label Continuity: The 'class' remains the same between consecutive rows.
     2. Temporal Contiguity: The rows are physically adjacent in the original
        DataFrame, ensuring that filtered 'no data' or missing timestamps
        trigger a new range.
@@ -276,8 +305,7 @@ def _calculate_timeline_metrics(acquisition_df: pd.DataFrame) -> Dict[str, str]:
 
 def _get_min_heart_rate(dfs: List[pd.DataFrame]) -> float:
     """
-    Calculates the minimum heart rate (HR) across all DataFrames, ignoring outliers. This is done by ignoring all values
-    bellow and above the lower and upper bounds calculated using the IQR method, respectively.
+    Calculates the minimum heart rate (HR) across all DataFrames containing a column with HR data.
 
     :param dfs: List of DataFrames, each containing a 'HR' column
     :return: Single minimum HR value from all DataFrames
@@ -316,7 +344,6 @@ def _calculate_hr_ratio(df: pd.DataFrame, hr_min: float, hr_max: float) -> pd.Da
         HR_max = 208 - 0.7 * age (DOI:  10.1016/s0735-1097(00)01054-8, link: https://pubmed.ncbi.nlm.nih.gov/11153730/)
         HR_min is the minimum HR of the entire week of acquisitions
 
-    Outliers outside [lower_bound, upper_bound] are replaced with NaN before calculation.
 
     :param df: DataFrame containing a column 'heart_rate'
     :param hr_min: Resting heart rate (HR_min)
@@ -334,35 +361,31 @@ def _calculate_hr_ratio(df: pd.DataFrame, hr_min: float, hr_max: float) -> pd.Da
     df[HR_RATIO_COLUMN_NAME] = ((df[f"{HEART}{WATCH_SUFFIX}"] - hr_min) / hrr) * 100
 
     # heart rate classification
-    df[HR_CLASS_COLUMN_NAME] = df.apply(lambda row: classify_hr_ratio(
+    df[HR_CLASS_COLUMN_NAME] = df.apply(lambda row: _classify_hr_ratio(
             row[ACTIVITY_COLUMN_NAME], row[HR_RATIO_COLUMN_NAME]), axis=1)
 
     return df
 
 
-def classify_hr_ratio(activity: int, hr_ratio: float) -> str:
+def _classify_hr_ratio(activity: int, hr_ratio: float) -> str:
     """
-    Classifies heart rate ratio into 'normal', 'potentially abnormal', or 'abnormal'
-    based on the type of activity and defined normal ranges. # TODO ONLY FOR SITTING! WALKING AND STANDING ARE CONSIDERED 'NO DATA'
+    Classifies heart rate ratio (HRR) when sitting into 'normal', 'potentially elevated', or 'elevated'.
+    It uses the HRR and activity at the same time point to assign a classification.
 
     Source for the heart rate ratio range for light exercise (considered as walking):
     ACSM’s Guidelines for Exercise Testing and Prescription, 11th Editions - Chapter 5 "General
     Principles of Exercise Prescription"
-    (https://acsm.org/education-resources/books/guidelines-exercise-testing-prescription/)
+    (https://acsm.org/education-resources/books/guidelines-exercise-testing-prescription/).
 
-    Normal heart rate ratio ranges (%):
-        Sitting: 0-20%
-        Standing: 20-30% # TODO REMOVE STANDING AND WALKING - DONE BUT CHECK
-        Walking: 30-39%
+    This function follows the following reasoning:
+        - A normal HRR for light exercise is between 30 % to 39 % (from the reference above)
+        - For the sitting class it is considered normal if HRR < 30 %, potentially elevated if 30 < HRR (%) < 39, and
+        elevated if HRR > 39 %.
+        - HRR values from activities such as walking or standing are classified as 'no data' as these are not relevant for this study.
 
-    Classification:
-        - 'normal': within the normal range
-        - 'potentially abnormal': up to POTENTIALLY_ABNORMAL_MARGIN outside the normal range
-        - 'abnormal': more than POTENTIALLY_ABNORMAL_MARGIN outside the normal range
-
-    :param activity: activity label
+    :param activity: activity label (0: sitting, 1: standing, 2: walking)
     :param hr_ratio: heart rate ratio value (float)
-    :return: one of NORMAL, POTENTIALLY_ABNORMAL, ABNORMAL, or 'no data'
+    :return: one of NORMAL, POTENTIALLY_ELEVATED, ELEVATED, or 'no data'
     """
     # add 'no data' if values are Nan or if the activity is not 0 (sitting)
     if pd.isna(hr_ratio) or activity != 0:
@@ -381,13 +404,13 @@ def classify_hr_ratio(activity: int, hr_ratio: float) -> str:
         low - POTENTIALLY_ABNORMAL_MARGIN <= hr_ratio < low
         or high < hr_ratio <= high + POTENTIALLY_ABNORMAL_MARGIN
     ):
-        return POTENTIALLY_ABNORMAL
+        return POTENTIALLY_ELEVATED
 
     # remaining is abnormal
-    return ABNORMAL
+    return ELEVATED
 
 
-def split_df_by_non_nan_blocks(df: pd.DataFrame, column_name: str) -> List[pd.DataFrame]:
+def _split_df_by_non_nan_blocks(df: pd.DataFrame, column_name: str) -> List[pd.DataFrame]:
     """
     Split a DataFrame into contiguous blocks where 'column' is not NaN.
 
@@ -411,7 +434,7 @@ def split_df_by_non_nan_blocks(df: pd.DataFrame, column_name: str) -> List[pd.Da
     return blocks
 
 
-def features_heart_rate(acquisition_df: pd.DataFrame) -> Dict:
+def _extract_features_heart_rate(acquisition_df: pd.DataFrame) -> Dict:
     """
     Extracts features such as min, max, mean, std, and heart rate ration proportions from one dataframe (one acquisition
      of the day) into a dictionary where:
@@ -434,12 +457,12 @@ def features_heart_rate(acquisition_df: pd.DataFrame) -> Dict:
     start_time_str = str(start_time).split(".")[0]
 
     # generate a key to identify which acquisition is being handled
-    key = f"{start_time_str}"
+    key = f"{start_time_str.replace(":", "-")}"
 
     # get hr statistics and ratio proportions
     combined_stats = {
-        METRICS: get_heart_rate_statistics(acquisition_df),
-        PROPORTIONS: _calculate_heart_rate_class_proportions(acquisition_df)
+        HR_METRICS_SESSION: get_heart_rate_statistics(acquisition_df),
+        HR_PROPORTIONS_SESSION: _calculate_heart_rate_class_proportions(acquisition_df)
     }
 
     acquisition_metrics[key] = combined_stats
@@ -460,7 +483,7 @@ def get_heart_rate_statistics(df: pd.DataFrame) -> Dict:
     return {
         HR_BPM_STATS: _calculate_statistics(df, f"{HEART}{WATCH_SUFFIX}"),
         HR_RATIO_STATS: _calculate_statistics(df, HR_RATIO_COLUMN_NAME),
-        TIMELINE_METRICS: _calculate_timeline_metrics(df),
+        HR_TIMELINE: _calculate_timeline_metrics(df),
     }
 
 
@@ -517,8 +540,8 @@ def _count_hr_classes(hr_class_df: pd.DataFrame) -> Tuple[int, int, int, int]:
     :return: Tuple[int, int, int, int]
         total_count (int): Number of instances excluding 'no data'
         normal_count (int): Number of 'NORMAL' instances
-        potentially_abnormal_count (int): Number of 'POTENTIALLY_ABNORMAL' instances
-        abnormal_count (int): Number of 'ABNORMAL' instances
+        potentially_abnormal_count (int): Number of 'POTENTIALLY_ELEVATED' instances
+        abnormal_count (int): Number of 'ELEVATED' instances
     """
     # Filter out 'no data'
     filtered = hr_class_df[hr_class_df.iloc[:, 0] != 'no data']
@@ -529,8 +552,8 @@ def _count_hr_classes(hr_class_df: pd.DataFrame) -> Tuple[int, int, int, int]:
     # count values
     total_count = counts.sum()
     normal_count = counts.get(NORMAL, 0)
-    potentially_abnormal_count = counts.get(POTENTIALLY_ABNORMAL, 0)
-    abnormal_count = counts.get(ABNORMAL, 0)
+    potentially_abnormal_count = counts.get(POTENTIALLY_ELEVATED, 0)
+    abnormal_count = counts.get(ELEVATED, 0)
 
     return total_count, normal_count, potentially_abnormal_count, abnormal_count
 
@@ -541,7 +564,7 @@ def _calculate_daily_class_proportions(totals: List[Tuple[int, int, int, int]]) 
 
     :param totals: List[Tuple[int, int, int, int]]
                 Each tuple contains:
-                (total_count, normal_count, potentially_abnormal_count, abnormal_count)
+                (total_count, normal_count, potentially_elevated_count, elevated_count)
     :return: Dict[str, float]
         Keys are class names, values are proportions (0-1)
     """
@@ -553,11 +576,11 @@ def _calculate_daily_class_proportions(totals: List[Tuple[int, int, int, int]]) 
 
     # Avoid division by zero
     if total_count == 0:
-        return {NORMAL: 0.0, POTENTIALLY_ABNORMAL: 0.0, ABNORMAL: 0.0}
+        return {NORMAL: 0.0, POTENTIALLY_ELEVATED: 0.0, ELEVATED: 0.0}
 
     # Calculate proportions and round
     return {
         NORMAL: round((normal_total / total_count), 4),
-        POTENTIALLY_ABNORMAL: round((potentially_abnormal_total / total_count), 4),
-        ABNORMAL: round((abnormal_total / total_count), 4)
+        POTENTIALLY_ELEVATED: round((potentially_abnormal_total / total_count), 4),
+        ELEVATED: round((abnormal_total / total_count), 4)
     }

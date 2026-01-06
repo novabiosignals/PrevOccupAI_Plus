@@ -9,7 +9,8 @@ HandlerRefLine(HandlerBase): overrides method in HandleBase for drawing horizont
 -------------------
 [Public]
 get_day_string(...): Gets the day as a string (i.e. Mon, Tue, Wednesday, etc.) from a date string in the language of the defined locale
-
+generate_acquisition_labels(...): Generates the labels of each acquisition as time (start-end) or as a roman numer (I, II, II, IV)
+generate_grouped_legend(...): Generate a grouped legend using Roman numerals and time intervals.
 -------------------
 [Private]
 
@@ -102,12 +103,13 @@ def generate_acquisition_labels(dates: List[str], times: List[str], mode="time_l
         labels = []
         for t in times:
             if t.startswith("missing_"):
-                idx = t.split("_")[1]
+
                 labels.append(f"Sem dados")
             else:
                 # start time in format H
-                # H:MM - string
-                start_str = t[:5]
+                # HH:MM - string
+                start_str = t[:5].replace("-", ":")
+
                 # parse start time
                 start_time = datetime.strptime(start_str, "%H:%M")
 
