@@ -33,7 +33,7 @@ import sensors.load as sl
 import sensors.process as sp
 from constants import (ACTIVITY_COLUMN_NAME, HR_RATIO_COLUMN_NAME, HR_CLASS_COLUMN_NAME, WATCH_SUFFIX, ACC, GYR, MAG,
                        PHONE, WATCH, HEART)
-from OH_profile.constants import HR_RELATIVE_BASE_KEY
+from OH_profile.constants import *
 from .metric_utils import calculate_statistics, calculate_class_distributions, calculate_timeline_metrics
 from utils import extract_date_from_path
 # ------------------------------------------------------------------------------------------------------------------- #
@@ -52,20 +52,6 @@ NORMAL_RANGES = {
 
 # Margin used to define "potentially abnormal" outside the normal range for heart rate ratio
 POTENTIALLY_ABNORMAL_MARGIN = 9
-
-# HR classes
-NORMAL = 'Normal'
-POTENTIALLY_ELEVATED = 'Ligeiramente elevado'
-ELEVATED = 'Elevado'
-
-# keys for the inner dictionaries with the HR features
-HR_DISTRIBUTIONS_DAY = 'HR_distributions_day'
-HR_DISTRIBUTIONS = 'HR_distributions'
-HR_TIMELINE = 'HR_timeline'
-HR_RATIO_STATS = 'HR_ratio_stats'
-HR_BPM_STATS = 'HR_BPM_stats'
-HR_MIN = 'HR_min'
-HR_MAX = 'HR_max'
 
 # ------------------------------------------------------------------------------------------------------------------- #
 # public functions
@@ -117,11 +103,11 @@ def get_global_heart_rate_metrics(subject_data_folder_path: str, subject_age: in
 
     # calculate the minimum hr over all acquisitions and IQR bounds and add to dict
     min_HR = _get_min_heart_rate(dfs_list)
-    relative_HR_metrics_dict[HR_RELATIVE_BASE_KEY][HR_MIN] = min_HR
+    relative_HR_metrics_dict[HR_RELATIVE_BASE_KEY][HR_MIN_KEY] = min_HR
 
     # calculate max HR based on the age
     max_HR = _get_max_heart_rate(subject_age)
-    relative_HR_metrics_dict[HR_RELATIVE_BASE_KEY][HR_MAX] = max_HR
+    relative_HR_metrics_dict[HR_RELATIVE_BASE_KEY][HR_MAX_KEY] = max_HR
 
     return relative_HR_metrics_dict
 
@@ -141,7 +127,6 @@ def get_heart_rate_metrics(day_folder_path: str, hr_min: float, hr_max: float, f
     {"23-09-2025": {
                     "HR_distributions_day": {...},
                     "15-00-00": {
-
                             "HR_BPM_stats": {...},
                             "HR_ratio_stats": {...},
                             "HR_timeline": {...},
@@ -177,7 +162,6 @@ def get_heart_rate_metrics(day_folder_path: str, hr_min: float, hr_max: float, f
 
     # init the dict
     day_metrics_dict[date] = {}
-    day_metrics_dict[date][HR_DISTRIBUTIONS_DAY] = {}
 
     # init list for holding the class counts for all acquisitions
     class_counts = []
@@ -200,11 +184,11 @@ def get_heart_rate_metrics(day_folder_path: str, hr_min: float, hr_max: float, f
         # add class counts to the list
         class_counts.append(nr_classes)
 
-    # calculate daily proportions
-    daily_proportions_dict = _calculate_daily_class_proportions(class_counts)
-
-    # add to the metrics dictionary
-    day_metrics_dict[date][HR_DISTRIBUTIONS_DAY] = daily_proportions_dict
+    # # calculate daily proportions
+    # daily_proportions_dict = _calculate_daily_class_proportions(class_counts)
+    #
+    # # add to the metrics dictionary
+    # day_metrics_dict[date][HR_DISTRIBUTIONS_DAY] = daily_proportions_dict
 
     return day_metrics_dict
 
@@ -338,17 +322,17 @@ def _classify_hr_ratio(activity: int, hr_ratio: float) -> str:
 
     # check normal range
     if low <= hr_ratio <= high:
-        return NORMAL
+        return HR_NORMAL_KEY
 
     # check potentially abnormal range
     if (
         low - POTENTIALLY_ABNORMAL_MARGIN <= hr_ratio < low
         or high < hr_ratio <= high + POTENTIALLY_ABNORMAL_MARGIN
     ):
-        return POTENTIALLY_ELEVATED
+        return HR_POTENTIALLY_ELEVATED_KEY
 
     # remaining is abnormal
-    return ELEVATED
+    return HR_ELEVATED_KEY
 
 
 def _split_df_by_non_nan_blocks(df: pd.DataFrame, column_name: str) -> List[pd.DataFrame]:
@@ -417,10 +401,10 @@ def get_heart_rate_statistics(df: pd.DataFrame) -> Dict:
 
     # Return the features for the bpm and hr ratio columns
     return {
-        HR_BPM_STATS: calculate_statistics(df, f"{HEART}{WATCH_SUFFIX}"),
-        HR_RATIO_STATS: calculate_statistics(df, HR_RATIO_COLUMN_NAME),
-        HR_TIMELINE: calculate_timeline_metrics(df, class_column_name=HR_CLASS_COLUMN_NAME, class_ignore='no data'),
-        HR_DISTRIBUTIONS: _calculate_heart_rate_class_distributions(df)
+        HR_BPM_STATS_KEY: calculate_statistics(df, f"{HEART}{WATCH_SUFFIX}"),
+        HR_RATIO_STATS_KEY: calculate_statistics(df, HR_RATIO_COLUMN_NAME),
+        HR_TIMELINE_KEY: calculate_timeline_metrics(df, class_column_name=HR_CLASS_COLUMN_NAME, class_ignore='no data'),
+        HR_DISTRIBUTIONS_KEY: _calculate_heart_rate_class_distributions(df)
     }
 
 
@@ -460,9 +444,9 @@ def _count_hr_classes(hr_class_df: pd.DataFrame) -> Tuple[int, int, int, int]:
 
     # count values
     total_count = counts.sum()
-    normal_count = counts.get(NORMAL, 0)
-    potentially_abnormal_count = counts.get(POTENTIALLY_ELEVATED, 0)
-    abnormal_count = counts.get(ELEVATED, 0)
+    normal_count = counts.get(HR_NORMAL_KEY, 0)
+    potentially_abnormal_count = counts.get(HR_POTENTIALLY_ELEVATED_KEY, 0)
+    abnormal_count = counts.get(HR_ELEVATED_KEY, 0)
 
     return total_count, normal_count, potentially_abnormal_count, abnormal_count
 
@@ -486,10 +470,10 @@ def _calculate_daily_class_proportions(totals: List[Tuple[int, int, int, int]]) 
 
     # Avoid division by zero
     if total_count == 0:
-        return {NORMAL: 0.0, POTENTIALLY_ELEVATED: 0.0, ELEVATED: 0.0}
+        return {HR_NORMAL_KEY: 0.0, HR_POTENTIALLY_ELEVATED_KEY: 0.0, HR_ELEVATED_KEY: 0.0}
 
     return {
-        NORMAL: round((normal_total / total_count), 4),
-        POTENTIALLY_ELEVATED: round((potentially_abnormal_total / total_count), 4),
-        ELEVATED: round((abnormal_total / total_count), 4)
+        HR_NORMAL_KEY: round((normal_total / total_count), 4),
+        HR_POTENTIALLY_ELEVATED_KEY: round((potentially_abnormal_total / total_count), 4),
+        HR_ELEVATED_KEY: round((abnormal_total / total_count), 4)
     }

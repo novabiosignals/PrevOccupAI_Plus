@@ -40,7 +40,6 @@ META_DATA_COLUMNS = ['idade', 'sexo', 'altura', 'peso', 'mao']
 
 DATE_FORMAT = "%d-%m-%Y"
 
-SCORING_KEY = 'scoring'
 SCORING_VALUE = '1_completely-disagree_5_completely-agree'
 # ------------------------------------------------------------------------------------------------------------------- #
 # public functions
@@ -143,7 +142,7 @@ def get_daily_workload_metrics(scores_csv_file: str, subject_id: int) -> Dict:
         metrics_dict = dict(sorted(metrics_dict.items(), key=lambda x: datetime.strptime(x[0], DATE_FORMAT)))
 
     # add scoring information
-    metrics_dict[SCORING_KEY] = SCORING_VALUE
+    metrics_dict[WORKLOAD_SCORING_KEY] = SCORING_VALUE
 
     return metrics_dict
 

@@ -25,31 +25,19 @@ import sensors.load as sl
 from constants import NOISE, NOISE_CLASS_COLUMN_NAME, PHONE
 from .metric_utils import calculate_statistics, calculate_class_distributions
 from utils import extract_date_from_path
+from OH_profile.constants import *
 
 # ------------------------------------------------------------------------------------------------------------------- #
 # file specific constants
 # ------------------------------------------------------------------------------------------------------------------- #
 
-# noise classes
-NEAR_SILENCE_NOISE = 'Silencioso'
-LOW_NOISE = 'Ruído baixo'
-DISTURBING_NOISE = 'Ruído incomodativo'
-HIGH_NOISE = 'Ruído elevado'
-
 # noise limits dBA
 SILENCE_NOISE_LIMIT_DBA = 40
 LOW_NOISE_LIMIT_DBA = 60
-DISTURBING_NOISE_LIMIT_DBA = 80
-
-# dictionary keys
-NOISE_STATISTICS = 'Noise_statistics'
-NOISE_DURATIONS = 'Noise_durations'
-NOISE_DISTRIBUTIONS = 'Noise_distributions'
-TOTAL_DURATION = 'total_duration'
-DURATION_SECONDS_SUFFIX = '_duration_sec'
+DISTURBING_NOISE_LIMIT_DBA = 8
 
 W_SIZE_MINUTES = 10
-NOISE_TIMELINE = f'Noise_timeline_wlen-{W_SIZE_MINUTES}'
+NOISE_TIMELINE_WLEN = f'{NOISE_TIMELINE_KEY}_wlen-{W_SIZE_MINUTES}'
 # ------------------------------------------------------------------------------------------------------------------- #
 # public functions
 # ------------------------------------------------------------------------------------------------------------------- #
@@ -130,10 +118,10 @@ def _calculate_noise_metrics(df: pd.DataFrame, fs: int, start_time: str, window_
     timeline_metrics = _calculate_windowed_timeline_metrics(df, NOISE_CLASS_COLUMN_NAME, start_time, fs, window_size_min=window_size_min)
 
     # add to the dict storing the metrics
-    metrics_dict.update({NOISE_STATISTICS: stats_dict})
-    metrics_dict.update({NOISE_DISTRIBUTIONS: class_distributions})
-    metrics_dict.update({NOISE_DURATIONS: class_durations})
-    metrics_dict.update({NOISE_TIMELINE: timeline_metrics})
+    metrics_dict.update({NOISE_STATISTICS_KEY: stats_dict})
+    metrics_dict.update({NOISE_DISTRIBUTIONS_NOISE: class_distributions})
+    metrics_dict.update({NOISE_DURATIONS_KEY: class_durations})
+    metrics_dict.update({NOISE_TIMELINE_WLEN: timeline_metrics})
 
     return metrics_dict
 
@@ -152,8 +140,8 @@ def _classify_noise(dba_value: float) -> str:
 
     Considering these two references, the following classes were derived:
         - ≤ 40 dBA: NEAR_SILENCE_NOISE -> Near-silent room
-        - 40-60 dBA: LOW_NOISE -> Normal non-disruptive noise [2]
-        - 60–80 dBA: DISRUPTIVE_NOISE -> Disruptive background that heavily impacts a worker's concentration and emotional arousal levels. [1, 2]
+        - 40-60 dBA: LOW_NOISE -> low, non-disruptive noise [2]
+        - 60–80 dBA: DISRUPTIVE_NOISE -> Disruptive background noise that heavily impacts a worker's concentration and emotional arousal levels. [2]
         - ≥ 80 dBA: HIGH_NOISE -> High noise level that may require preventive action to avoid hearing impairment during prolonged exposure. [1]
 
     :param dba_value: A-weighted decibel value (dBA).
@@ -161,19 +149,19 @@ def _classify_noise(dba_value: float) -> str:
     """
     # check for near silence noise values
     if dba_value < SILENCE_NOISE_LIMIT_DBA:
-        return NEAR_SILENCE_NOISE
+        return NOISE_NEAR_SILENCE_KEY
 
     # check for low noise limit
     elif dba_value <= LOW_NOISE_LIMIT_DBA:
-        return LOW_NOISE
+        return NOISE_LOW_KEY
 
      # check for disruptive noise values
     elif dba_value <= DISTURBING_NOISE_LIMIT_DBA:
-        return DISTURBING_NOISE
+        return NOISE_DISTURBING_KEY
 
     # else it's high noise ≥ 80
     else:
-        return HIGH_NOISE
+        return NOISE_HIGH_KEY
 
 
 def _calculate_class_durations(df: pd.DataFrame, fs: int, class_distributions: Dict[str, float]) -> Dict[str, float]:
@@ -191,9 +179,6 @@ def _calculate_class_durations(df: pd.DataFrame, fs: int, class_distributions: D
 
     # calculate the total duration in seconds of the noise data
     total_dur_s = len(df) / fs
-
-    # init dict to store the class durations
-    durations_dict.update({f"{TOTAL_DURATION}{DURATION_SECONDS_SUFFIX}": total_dur_s})
 
     # cycle over the dictionary with the class distributions
     for class_name, distribution in class_distributions.items():

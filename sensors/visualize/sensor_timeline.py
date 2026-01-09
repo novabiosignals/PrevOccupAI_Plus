@@ -37,7 +37,7 @@ import re
 # internal imports
 import sensors.load
 from constants import ACQUISITION_TIME_SECONDS, MBAN_RIGHT
-from OH_profile.constants import SENSOR_TIMELINE_MISSING_TIMES_KEY, SENSOR_TIMELINE_TIMES_KEY
+from OH_profile.constants import SENSOR_TIMELINE_MISSING_TIMES_KEY, SENSOR_TIMELINE_TIMES_KEY, SENSOR_TIMELINE_START_TIMES_KEY, SENSOR_TIMELINE_END_TIMES_KEY
 from sensors.impute.impute_sensor_timeline import compute_end_times
 from .plot_utils import RefLine, HandlerRefLine, get_weekday_name
 
@@ -45,9 +45,6 @@ from .plot_utils import RefLine, HandlerRefLine, get_weekday_name
 # file specific constants
 # ------------------------------------------------------------------------------------------------------------------- #
 LOGGER_FILENAME_PREFIX = 'opensignals_ACQUISITION_LOG_'
-LENGTH = 'length'
-START_TIMES = 'start_times'
-END_TIMES = 'end_times'
 TIME_FORMAT = "%H-%M-%S"
 COLOR_PALLETE = ['#f2b36f', "#F07A15", '#4D92D0', '#3C787E']
 
@@ -189,11 +186,11 @@ def get_daily_acquisitions_metadata(daily_folder_path: str, fs: int) -> Dict[str
         for device in length_dict:
             if device not in final_dict:
 
-                final_dict[device] = {END_TIMES: [], START_TIMES: []}
+                final_dict[device] = {SENSOR_TIMELINE_END_TIMES_KEY: [], SENSOR_TIMELINE_START_TIMES_KEY: []}
 
             # add the start time to the dictionary
             start_time = start_times_dict.get(device, None)
-            final_dict[device][START_TIMES].append(start_time)
+            final_dict[device][SENSOR_TIMELINE_START_TIMES_KEY].append(start_time)
 
             # compute duration in seconds from dataframe length
             length_samples = length_dict.get(device, 0)
@@ -201,7 +198,7 @@ def get_daily_acquisitions_metadata(daily_folder_path: str, fs: int) -> Dict[str
 
             # compute end time using helper
             end_time = compute_end_times([start_time], [duration_seconds])[0]
-            final_dict[device][END_TIMES].append(end_time)
+            final_dict[device][SENSOR_TIMELINE_END_TIMES_KEY].append(end_time)
 
     return final_dict
 
@@ -428,19 +425,19 @@ def _add_missing_device(data_dict: Dict[str, Dict[str, list]], missing_data_dict
         return missing_data_dict
 
     # (2) Collect reference times. If the device that was used for reference has no missing start times, use the ones in data_dict.
-    ref_times = data_dict[ref_device][START_TIMES].copy()
+    ref_times = data_dict[ref_device][SENSOR_TIMELINE_START_TIMES_KEY].copy()
 
     # If the reference device has missing start times, merge the ones on both data_dict and missing_data_dict
     if ref_device in missing_data_dict:
-        ref_times += missing_data_dict[ref_device][START_TIMES]
+        ref_times += missing_data_dict[ref_device][SENSOR_TIMELINE_START_TIMES_KEY]
 
     # (3) Add missing devices data to missing_data_dict, including the end times of the acquisitions
     for dev in missing_devices:
 
         missing_data_dict[dev] = {
-            START_TIMES: sorted(ref_times),
-            END_TIMES: [compute_end_times([t], [ACQUISITION_TIME_SECONDS])[0]
-                for t in sorted(ref_times)]
+            SENSOR_TIMELINE_START_TIMES_KEY: sorted(ref_times),
+            SENSOR_TIMELINE_END_TIMES_KEY: [compute_end_times([t], [ACQUISITION_TIME_SECONDS])[0]
+                                            for t in sorted(ref_times)]
         }
 
     return missing_data_dict
@@ -469,8 +466,8 @@ def _get_acquisition_time_range(acquisitions_dict: Dict[str, Dict[str, list]],
 
     for data_dict in (acquisitions_dict, missing_data_dict):
         for data in data_dict.values():
-            all_start_times.extend(data[START_TIMES])
-            all_end_times.extend(data[END_TIMES])
+            all_start_times.extend(data[SENSOR_TIMELINE_START_TIMES_KEY])
+            all_end_times.extend(data[SENSOR_TIMELINE_END_TIMES_KEY])
 
     min_start_time = min(datetime.strptime(t, TIME_FORMAT) for t in all_start_times)
     max_end_time = max(datetime.strptime(t, TIME_FORMAT) for t in all_end_times)
@@ -506,7 +503,7 @@ def _plot_device_bars(ax: Axes, data_dict: Dict[str, Dict[str, list]], device_to
         y_center = i * VERTICAL_SPACING
         y_bottom = y_center - BAR_HEIGHT / 2
 
-        for start_str, end_str in zip(data[START_TIMES], data[END_TIMES]):
+        for start_str, end_str in zip(data[SENSOR_TIMELINE_START_TIMES_KEY], data[SENSOR_TIMELINE_END_TIMES_KEY]):
             if not start_str or not end_str:
                 continue
             start_dt = datetime.strptime(start_str, TIME_FORMAT)
@@ -541,11 +538,11 @@ def _plot_reference_acquisition(ax, acquisitions_dict: Dict[str, Dict[str, list]
     # Try acquisitions first, fallback to missing data
     data_dict = acquisitions_dict.get(ref_device) or missing_data_dict.get(ref_device)
 
-    if not data_dict or not data_dict[START_TIMES]:
+    if not data_dict or not data_dict[SENSOR_TIMELINE_START_TIMES_KEY]:
         return  # nothing to plot
 
     # Sort by time instead of blindly using index 0
-    times = list(zip(data_dict[START_TIMES], data_dict[END_TIMES]))
+    times = list(zip(data_dict[SENSOR_TIMELINE_START_TIMES_KEY], data_dict[SENSOR_TIMELINE_END_TIMES_KEY]))
     times.sort(key=lambda t: datetime.strptime(t[0], TIME_FORMAT))
 
     # Earliest start time

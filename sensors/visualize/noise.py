@@ -27,26 +27,26 @@ from typing import Dict
 # internal imports
 from .plot_utils import handle_plot, get_weekday_name
 from utils import create_dir
-from sensors.metrics.noise import NEAR_SILENCE_NOISE, LOW_NOISE, DISTURBING_NOISE, HIGH_NOISE, NOISE_TIMELINE, NOISE_DISTRIBUTIONS, W_SIZE_MINUTES
+from sensors.metrics.noise import NOISE_NEAR_SILENCE_KEY, NOISE_LOW_KEY, NOISE_DISTURBING_KEY, NOISE_HIGH_KEY, NOISE_TIMELINE_WLEN, NOISE_DISTRIBUTIONS_NOISE, W_SIZE_MINUTES
 from constants import DATE_FORMAT
 from .constants import GREEN, PALE_GREEN, YELLOW, RED
 # ------------------------------------------------------------------------------------------------------------------- #
 # file specific constants
 # ------------------------------------------------------------------------------------------------------------------- #
-CLASS_COLORS = {NEAR_SILENCE_NOISE: GREEN,
-                LOW_NOISE: PALE_GREEN,
-                DISTURBING_NOISE: YELLOW,
-                HIGH_NOISE: RED
+CLASS_COLORS = {NOISE_NEAR_SILENCE_KEY: GREEN,
+                NOISE_LOW_KEY: PALE_GREEN,
+                NOISE_DISTURBING_KEY: YELLOW,
+                NOISE_HIGH_KEY: RED
                 }
 
 LEGEND_PATCHES = [
-            mpatches.Patch(color=CLASS_COLORS[NEAR_SILENCE_NOISE], label=f"{NEAR_SILENCE_NOISE}  ≤ 40 dBA"),
-            mpatches.Patch(color=CLASS_COLORS[LOW_NOISE], label=f"{LOW_NOISE} 40–60 dBA"),
-            mpatches.Patch(color=CLASS_COLORS[DISTURBING_NOISE], label=f"{DISTURBING_NOISE} 60–80 dBA"),
-            mpatches.Patch(color=CLASS_COLORS[HIGH_NOISE], label=f"{HIGH_NOISE} ≥ 80 dBA")
+            mpatches.Patch(color=CLASS_COLORS[NOISE_NEAR_SILENCE_KEY], label=f"{NOISE_NEAR_SILENCE_KEY}  ≤ 40 dBA"),
+            mpatches.Patch(color=CLASS_COLORS[NOISE_LOW_KEY], label=f"{NOISE_LOW_KEY} 40–60 dBA"),
+            mpatches.Patch(color=CLASS_COLORS[NOISE_DISTURBING_KEY], label=f"{NOISE_DISTURBING_KEY} 60–80 dBA"),
+            mpatches.Patch(color=CLASS_COLORS[NOISE_HIGH_KEY], label=f"{NOISE_HIGH_KEY} ≥ 80 dBA")
         ]
 
-CLASS_ORDER = [NEAR_SILENCE_NOISE, LOW_NOISE, DISTURBING_NOISE, HIGH_NOISE]
+CLASS_ORDER = [NOISE_NEAR_SILENCE_KEY, NOISE_LOW_KEY, NOISE_DISTURBING_KEY, NOISE_HIGH_KEY]
 
 # ------------------------------------------------------------------------------------------------------------------- #
 # public functions
@@ -80,8 +80,8 @@ def plot_noise_metrics_per_week(oh_profile: Dict, subject: str, output_folder_pa
         # cycle over the inner keys with the acquisition times
         for time_key, acquisition_data in day_data.items():
 
-            timeline_dict[date_key][time_key] = acquisition_data[NOISE_TIMELINE]
-            distributions_dict[date_key][time_key] = acquisition_data[NOISE_DISTRIBUTIONS]
+            timeline_dict[date_key][time_key] = acquisition_data[NOISE_TIMELINE_WLEN]
+            distributions_dict[date_key][time_key] = acquisition_data[NOISE_DISTRIBUTIONS_NOISE]
 
     # create directory to store the plots
     out_dir = create_dir(output_folder_path, os.path.join(f'{subject}', 'noise_plots'))

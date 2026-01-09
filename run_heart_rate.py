@@ -12,7 +12,7 @@ from OH_profile.constants import SENSOR_METRICS_KEY, HEART_RATE_KEY, HR_RELATIVE
 from utils import extract_group_from_path, extract_device_num_from_path
 from OH_profile.load import get_OH_profile
 from OH_profile.write import save_OH_profile, write_to_OH_profile
-from sensors.metrics.heart_rate import HR_MIN, HR_MAX
+from sensors.metrics.heart_rate import HR_MIN_KEY, HR_MAX_KEY
 
 # ------------------------------------------------------------------------------------------------------------------- #
 # flags
@@ -104,8 +104,8 @@ if GENERATE_HEART_RATE_OH_PROFILE:
             day_folder_path = os.path.join(SUBJECT_FOLDER_PATH, date_folder)
 
             # get heart rate metrics for the day
-            metrics_dict = sm.get_heart_rate_metrics(day_folder_path, hr_min=global_metrics_dict[HR_MIN],
-                                                     hr_max=global_metrics_dict[HR_MAX], fs=FS, w_size=W_SIZE)
+            metrics_dict = sm.get_heart_rate_metrics(day_folder_path, hr_min=global_metrics_dict[HR_MIN_KEY],
+                                                     hr_max=global_metrics_dict[HR_MAX_KEY], fs=FS, w_size=W_SIZE)
 
             # write to oh profile
             oh_profile = write_to_OH_profile(oh_profile, main_outer_key=SENSOR_METRICS_KEY,
@@ -137,4 +137,4 @@ if GENERATE_HEART_RATE_OH_PROFILE:
         sv.plot_weekly_hr_data(hr_proportions_dict, subject=subject_id, save_path=PLOTS_OUTPUT_PATH)
 
         # plot HR variability
-        sv.plot_hr_variability(hr_proportions_dict, subject=subject_id, output_folder_path=PLOTS_OUTPUT_PATH)
+        sv.plot_hr_ranges(hr_proportions_dict, subject=subject_id, output_folder_path=PLOTS_OUTPUT_PATH)
