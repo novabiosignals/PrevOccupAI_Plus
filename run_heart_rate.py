@@ -14,12 +14,11 @@ from OH_profile.load import get_OH_profile
 from OH_profile.write import save_OH_profile, write_to_OH_profile
 from sensors.metrics.heart_rate import HR_MIN, HR_MAX
 
-
 # ------------------------------------------------------------------------------------------------------------------- #
 # flags
 # ------------------------------------------------------------------------------------------------------------------- #
-GENERATE_HEART_RATE_PLOTS = True
-HEART_RATE_TIMELINE = True
+GENERATE_HEART_RATE_OH_PROFILE = True
+HEART_RATE_TIMELINE = False
 HEART_RATE_WEEK = True
 
 # ------------------------------------------------------------------------------------------------------------------- #
@@ -27,7 +26,7 @@ HEART_RATE_WEEK = True
 # ------------------------------------------------------------------------------------------------------------------- #
 DRIVE = "E"
 DATASET_PATH = "Backup PrevOccupAI_PLUS Data\\data"
-SUBJECT_FOLDER_PATH = f"{DRIVE}:\\{DATASET_PATH}\\group2\\sensors\\LIBPhys #002"
+SUBJECT_FOLDER_PATH = f"{DRIVE}:\\{DATASET_PATH}\\group1\\sensors\\LIBPhys #001"
 QUESTIONNAIRE_RESULTS_PATH = "C:\\Users\\srale\\Desktop\\carga de trabalho\\results"
 OH_PROFILE_PATH = r"C:\Users\srale\Desktop\OH_profiles"
 PLOTS_OUTPUT_PATH = r"C:\Users\srale\Desktop\timeline_plots"
@@ -45,7 +44,7 @@ device_num = str(extract_device_num_from_path(SUBJECT_FOLDER_PATH))
 # get subject id
 subject_id = sl.get_participant_id(sl.load_participants_info(), device_num, group)
 
-if GENERATE_HEART_RATE_PLOTS:
+if GENERATE_HEART_RATE_OH_PROFILE:
 
     print(f"Extracting heart rate metrics for subject: {subject_id}")
 
@@ -70,8 +69,8 @@ if GENERATE_HEART_RATE_PLOTS:
             # check if the results exist
             if not os.path.exists(personal_quest_results_path):
 
-                age = 50
-                print("Couldn't find personal questionnaire results. Using age = 50 years old...")
+                raise ValueError (f"Couldn't find personal questionnaire results. \nPlease run the questionnaire processing "
+                                  f"to generate the results or place them in the correct folder: \n{personal_quest_results_path}")
 
             # get metadata (age) from data and add it to OH profile
             metadata_dict = questionnaires.get_metadata_metrics(personal_quest_results_path, int(subject_id))
@@ -104,9 +103,6 @@ if GENERATE_HEART_RATE_PLOTS:
             # get path to the data of the day
             day_folder_path = os.path.join(SUBJECT_FOLDER_PATH, date_folder)
 
-            if date_folder == '2025-09-26':
-                date_folder = '2025-09-26'
-
             # get heart rate metrics for the day
             metrics_dict = sm.get_heart_rate_metrics(day_folder_path, hr_min=global_metrics_dict[HR_MIN],
                                                      hr_max=global_metrics_dict[HR_MAX], fs=FS, w_size=W_SIZE)
@@ -130,11 +126,15 @@ if GENERATE_HEART_RATE_PLOTS:
                 daily_hr_metrics_dict = oh_profile[SENSOR_METRICS_KEY][HEART_RATE_KEY][key]
 
                 # plot hr timeline
-                sv.plot_hr_timeline_per_acquisition(daily_hr_metrics_dict, day=key, group=f"group {group}", subject=subject_id,
+                sv.plot_hr_timeline_per_acquisition(daily_hr_metrics_dict, day=key, subject=subject_id,
                                                     output_folder_path=PLOTS_OUTPUT_PATH)
 
     if HEART_RATE_WEEK:
 
         hr_proportions_dict = oh_profile[SENSOR_METRICS_KEY][HEART_RATE_KEY]
 
-        sv.plot_weekly_hr_data(hr_proportions_dict, group=f"group {group}", subject=subject_id, save_path=PLOTS_OUTPUT_PATH)
+        # plot distributions
+        sv.plot_weekly_hr_data(hr_proportions_dict, subject=subject_id, save_path=PLOTS_OUTPUT_PATH)
+
+        # plot HR variability
+        sv.plot_hr_variability(hr_proportions_dict, subject=subject_id, output_folder_path=PLOTS_OUTPUT_PATH)

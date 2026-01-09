@@ -6,17 +6,23 @@ Available Functions
 [Public]
 plot_hr_timeline_per_acquisition(...): Plot HR class timelines for each acquisition.
 plot_weekly_hr_data(...): Generate weekly bar and circular HR distribution plots.
+plot_hr_variability(...): Generate HR variability plot per week
 
 -------------------
 [Private]
 _plot_hr_dist(...): Plot stacked bar charts of HR class distributions.
-plot_circular_hr_dist(...): Plot circular HR class distributions.
+_plot_circular_hr_dist(...): Plot circular HR class distributions.
 _plot_circ_bars(...): Draw circular stacked bars.
 _dict_to_hr_percentage_df(...): Convert HR distribution dictionaries to DataFrames.
 _extract_date_time(...): Extract dates and times from DataFrame indices.
 _scale_data(...): Scale HR class proportions for circular visualization.
-_reconstruct_df_from_dict(...): Rebuild a DataFrame from compressed HR timelines.
-_handle_plot(...): Handle plot saving and display logic.
+_prepare_plot_data(...): Prepare plot coordinates, items and day centers for HR bars.
+_set_y_limits(...): Set Y axis limits based on min/max of HR values.
+_draw_bars(...): Draw HR bars for each session, adding min/max labels.
+_set_x_labels(...): Set X axis ticks and labels for sessions.
+_add_weekday_labels(...): Add weekday labels below each group of sessions.
+_style_plot(...): Apply styling to plot, add title/labels.
+_extract_hr_min_max_by_subject_day_session(...): Extract HR min/max ranges per session (I–IV) per day
 -------------------
 """
 # ------------------------------------------------------------------------------------------------------------------- #
@@ -25,42 +31,39 @@ _handle_plot(...): Handle plot saving and display logic.
 import os
 import pandas as pd
 import numpy as np
-from datetime import datetime, timedelta
-from typing import Dict, List
+from typing import Dict
 import matplotlib.pyplot as plt
-import matplotlib.dates as mdates
 from matplotlib.ticker import MultipleLocator
-from babel.dates import format_datetime
 from matplotlib.lines import Line2D
+from matplotlib.patches import Circle
+from matplotlib.offsetbox import AnnotationBbox, DrawingArea
+import matplotlib.transforms as mtransforms
 import copy
-import re
 import seaborn as sns
-import locale
-import datetime as dt
-
+from collections import defaultdict
+from matplotlib.patches import FancyBboxPatch
 
 # internal imports
-from sensors.metrics.heart_rate import (HR_DISTRIBUTIONS_DAY, HR_METRICS_SESSION, HR_TIMELINE, HR_PROPORTIONS_SESSION,
-                                        NORMAL, POTENTIALLY_ELEVATED, ELEVATED)
-from constants import HR_CLASS_COLUMN_NAME
+from sensors.metrics.heart_rate import HR_DISTRIBUTIONS_DAY, HR_TIMELINE, HR_DISTRIBUTIONS,NORMAL, POTENTIALLY_ELEVATED, ELEVATED, HR_BPM_STATS
+from constants import DATE_FORMAT
 from utils import create_dir
-from .plot_utils import generate_grouped_legend, generate_acquisition_labels
+from .plot_utils import generate_grouped_legend, generate_acquisition_labels, handle_plot, plot_timeline_per_acquisition, get_weekday_name
 from OH_profile.constants import HR_RELATIVE_BASE_KEY
+from .constants import PALE_GREEN, YELLOW, RED, ROMAN_NUMBERS, LIGHT_RED, DEEP_RED
 # ------------------------------------------------------------------------------------------------------------------- #
 # file specific constants
 # ------------------------------------------------------------------------------------------------------------------- #
 
 CLASS_COLORS = {
-    NORMAL: '#A5D6A7',
-    POTENTIALLY_ELEVATED: '#FFCC80',
-    ELEVATED: '#EF9A9A',
+    NORMAL: PALE_GREEN,
+    POTENTIALLY_ELEVATED: YELLOW,
+    ELEVATED: RED,
     'no data': 'white'
 }
-
 HR_CLASS_COLORS = {
-    NORMAL: "#A5D6A7",                # green
-    POTENTIALLY_ELEVATED: "#FFCC80",  # orange
-    ELEVATED: "#EF9A9A",              # red
+    NORMAL: PALE_GREEN,                # green
+    POTENTIALLY_ELEVATED: YELLOW,  # orange
+    ELEVATED: RED,              # red
     "no data": "#E0E0E0"                 # light gray
 }
 
@@ -73,119 +76,104 @@ LEGEND_PT = {
 
 DESIRED_ORDER = [NORMAL, POTENTIALLY_ELEVATED, ELEVATED, "no data"]
 
-DATE_FORMAT = '%d-%m-%Y'
-
-# ------------------------------------------------------------------------------------------------------------------- #
-# public functions
-# ------------------------------------------------------------------------------------------------------------------- #
-
-def plot_hr_timeline_per_acquisition(hr_metrics_dict: Dict, day: str, group: str, subject: str, output_folder_path: str,
-    gap_threshold=timedelta(seconds=30), show=False) -> None:
-    """
-    Generates a heart rate timeline plot for each acquisition (each DataFrame) separately.
-
-
-    :param day:
-    :param hr_metrics_dict: dict where keys are dates (YYYY-MM-DD) and values are lists of DataFrames
-                            containing heart rate data for that day.
-    :param group: Group identifier (e.g., '001')
-    :param subject: Subject identifier (e.g., '001')
-    :param gap_threshold: timedelta indicating the minimum gap between consecutive points to start a new block
-                          (default = 30 seconds)
-    :param output_folder_path: Path to the folder where plots will be saved.
-    :param show: boolean, if True displays the plots, if False closes them (default = False)
-    :return: None
-    """
-
-    # create output directory
-    output_path = create_dir(output_folder_path, os.path.join(str(group), str(subject), "HR_timeline"))
-
-    # counter for the acquisitions
-    acq_counter = 0
-
-    for key, hr_features_dict in hr_metrics_dict.items():
-
-        if key != HR_DISTRIBUTIONS_DAY:
-
-            # update counter
-            acq_counter += 1
-
-            # get timeline metrics
-            timeline_metrics_dict = hr_features_dict[HR_METRICS_SESSION][HR_TIMELINE]
-
-            # raise error if there are no metrics to plot
-            if len(timeline_metrics_dict) == 0:
-
-                raise ValueError(f"No timeline metrics to plot for acquisition time: {key}")
-
-            # reconstruct dataframe with hr ratio class column and timestamp column
-            df = _reconstruct_df_from_dict(timeline_metrics_dict, fs = 100)
-
-            # convert timestamps into datetime objects
-            tmp = df.copy()
-
-            valid = tmp[tmp[HR_CLASS_COLUMN_NAME] != 'no data'].copy()
-
-            # Create figure
-            fig, ax = plt.subplots(figsize=(15, 3))
-
-            # Identify continuous blocks
-            valid['gap'] = valid['timestamp'].diff()
-            new_block = (
-                (valid[HR_CLASS_COLUMN_NAME] != valid[HR_CLASS_COLUMN_NAME].shift()) |
-                (valid['gap'].isna()) |
-                (valid['gap'] > gap_threshold)
-            )
-            block_id = new_block.cumsum()
-
-            for _, grp in valid.groupby(block_id, sort=False):
-                cls = grp[HR_CLASS_COLUMN_NAME].iloc[0]
-                x0 = grp['timestamp'].iloc[0]
-                x1 = grp['timestamp'].iloc[-1]
-                ax.hlines(y=0, xmin=x0, xmax=x1, color=CLASS_COLORS.get(cls, 'gray'), linewidth=6)
-
-            weekday_label = format_datetime(
-                datetime.strptime(day, DATE_FORMAT),
-                "dd-MM-yyyy (EEEE)",
-                locale="pt_PT"
-            )
-
-            # Axis config
-            ax.set_yticks([])
-            ax.xaxis.set_major_locator(mdates.AutoDateLocator())
-            ax.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M'))
-            for spine in ax.spines.values():
-                spine.set_visible(False)
-
-            ax.set_xlabel("Hora do Dia", fontsize=12)
-            group_num = ''.join(filter(str.isdigit, str(group)))
-            ax.set_title(
-                f"Grupo: {group_num} | Sujeito: {subject} | Dia: {weekday_label} | Aquisição: {acq_counter}",fontsize=14)
-
-            # Legend
-            legend_handles = [
+LEGEND_HANDLES = [
                 Line2D([0], [0], color=CLASS_COLORS[NORMAL], lw=6, label=NORMAL),
                 Line2D([0], [0], color=CLASS_COLORS[POTENTIALLY_ELEVATED], lw=6, label=POTENTIALLY_ELEVATED),
                 Line2D([0], [0], color=CLASS_COLORS[ELEVATED], lw=6, label=ELEVATED),
             ]
-            ax.legend(handles=legend_handles, bbox_to_anchor=(1.04, 1), loc='lower center')
 
-            plt.tight_layout()
-
-            # Save figure
-            filename = f"HR_timeline_{day}_acq_{acq_counter}.png"
-            _handle_plot(save_dir=output_path,show=show,save=True,filename=filename)
+BAR_COLOR = DEEP_RED
+# ------------------------------------------------------------------------------------------------------------------- #
+# public functions
+# ------------------------------------------------------------------------------------------------------------------- #
 
 
-def plot_weekly_hr_data(oh_profile, group: str, subject: str, save_path: str, show_plot=False, save=True):
+def plot_hr_timeline_per_acquisition(day_metrics_dict: Dict, day: str, subject: str, output_folder_path: str) -> None:
+    """
+    Generate HR timeline plots for a single day per subject.
+
+    This function is a wrapper around `plot_timeline_per_acquisition specifically configured to plot HR class labels over time. It
+    visualizes contiguous segments of HR classes as colored blocks along a horizontal timeline, with a legend
+    describing each category.
+
+    :param day_metrics_dict: Dictionary containing HR metrics for the day. Keys are acquisition identifiers and values
+                        contain timeline metric data.
+    :param day: Day of the recordings in DD-MM-YYYY format.
+    :param subject: Subject identifier.
+    :param output_folder_path: Path to the base folder where the generated plots will be saved.
+    :return: None
+    """
+
+    # delete relative HR base key for simplicity
+    del day_metrics_dict[HR_DISTRIBUTIONS_DAY]
+
+    plot_timeline_per_acquisition(
+        day_metrics_dict=day_metrics_dict,
+        day=day,
+        subject=subject,
+        output_folder_path=output_folder_path,
+        timeline_key=HR_TIMELINE,
+        class_colors=CLASS_COLORS,
+        legend_handles=LEGEND_HANDLES,
+        filename_prefix="HR",
+    )
+
+
+def plot_hr_variability(day_metrics_dict: Dict, subject: str, output_folder_path: str) -> None:
+    """
+    Plot vertical bars representing Heart Rate (HR) ranges per session (I–IV) for each day.
+
+    - X axis: session number (I–IV), grouped by weekday.
+    - Weekday labels are shown below the sessions.
+    - Y axis: BPM. Each bar spans from session min to session max.
+    - Missing sessions are displayed with a 'Sem dados' placeholder.
+
+    :param day_metrics_dict: dictionary containing HR metrics for one subject
+    :param subject: subject identifier
+    :param output_folder_path: root directory to save generated plots
+    :return: None
+    """
+
+    # delete relative HR base key for simplicity
+    del day_metrics_dict[HR_RELATIVE_BASE_KEY]
+
+    # extract the min and max HR values per session and per day
+    stats_dict = _extract_hr_min_max_by_subject_day_session(day_metrics_dict)
+
+    # Create figure and axis
+    fig, ax = plt.subplots(figsize=(max(10, len(stats_dict) * 4 * 0.6), 6))
+
+    # Prepare plot items and day centers
+    plot_items, day_centers, x_cursor = _prepare_plot_data(stats_dict, ROMAN_NUMBERS)
+
+    # Set Y axis limits
+    _set_y_limits(ax, plot_items)
+
+    # Draw HR bars
+    _draw_bars(ax, plot_items, BAR_COLOR)
+
+    # Set X axis ticks
+    _set_x_labels(ax, plot_items)
+
+    # Add weekday labels
+    _add_weekday_labels(ax, day_centers)
+
+    # Apply styling and set X axis limit
+    _style_plot(ax, x_cursor)
+
+    # Save plot
+    out_dir = os.path.join(output_folder_path, subject, "HR_variability")
+    filename = f"{subject}_HR_variability.png"
+    handle_plot(save_dir=out_dir, save=out_dir, filename=filename)
+
+
+def plot_weekly_hr_data(oh_profile, subject: str, save_path: str, save=True):
     """
     Generates weekly plots (circular and bars) for one subject.
 
     :param oh_profile: Dictionary containing the metrics of the HR data
-    :param group: string with the group identifier
     :param subject: string with the group identifier (subject ID)
     :param save_path: Path to the folder where the plots will be saved
-    :param show_plot: boolean, if True displays the plots, if False closes them (default = False)
     :param save: boolean, if True saves the plots as png, if False closes them (default = True)
     :return:
     """
@@ -208,28 +196,25 @@ def plot_weekly_hr_data(oh_profile, group: str, subject: str, save_path: str, sh
                 del day_data[time_key]
             else:
                 # keep only the proportions and ignore the remaining metrics
-                day_data[time_key] = day_data[time_key][HR_PROPORTIONS_SESSION]
+                day_data[time_key] = day_data[time_key][HR_DISTRIBUTIONS]
 
     # generate weekly bar plot
-    _plot_hr_dist(hr_percentage=oh_profile, group_num=group, subject=subject, show_plot=show_plot, save=save, save_path=save_path)
+    _plot_hr_dist(distributions_dict=oh_profile, subject=subject, save=save, save_path=save_path)
 
     # generate weekly circular plot
-    plot_circular_hr_dist(hr_percentage=oh_profile, group_num=group, subject=subject, show_plot=show_plot, save=save, save_path=save_path)
+    _plot_circular_hr_dist(hr_percentage=oh_profile, subject=subject, save=save, save_path=save_path)
 
 # ------------------------------------------------------------------------------------------------------------------- #
 # private functions
 # ------------------------------------------------------------------------------------------------------------------- #
 
-def _plot_hr_dist(hr_percentage, group_num, subject, show_plot=False,
-                  show_acquisition_labels=True, save=False, save_path='',
+def _plot_hr_dist(distributions_dict, subject, show_acquisition_labels=True, save=False, save_path='',
                   color_scheme=HR_CLASS_COLORS, locale_string='pt_PT.UTF-8'):
     """
     Plots a stacked bar chart of heart rate class distribution for each acquisition per day.
 
-    :param hr_percentage: Dictionary containing percentages of each heart rate class per acquisition.
-    :param group_num: Group identifier (e.g., 'group2'); only numeric part will be used in the title.
+    :param distributions_dict: Dictionary containing percentages of each heart rate class per acquisition.
     :param subject: Subject identifier extracted from the device number (e.g., '001').
-    :param show_plot: Whether to display the plot. Default: False
     :param show_acquisition_labels: Whether to show acquisition labels as Roman numerals below each bar. Default: True
     :param save: Whether to save the plot as a PNG. Default: False
     :param save_path: Directory to save the plot. If empty, saves in the current project folder.
@@ -238,16 +223,16 @@ def _plot_hr_dist(hr_percentage, group_num, subject, show_plot=False,
     :return: None
     """
     # Convert dictionary to DataFrame
-    hr_percentage , activity_proportions = _dict_to_hr_percentage_df(hr_percentage)
+    distributions_df , activity_proportions = _dict_to_hr_percentage_df(distributions_dict)
 
     # Ensure consistent column order
-    hr_percentage = hr_percentage[DESIRED_ORDER]
+    distributions_df = distributions_df[DESIRED_ORDER]
 
     # Create figure and axis
     fig, ax = plt.subplots(figsize=(16, 9))
 
     # Extract dates and times
-    dates, times = _extract_date_time(hr_percentage, date_to_weekday=False)
+    dates, times = _extract_date_time(distributions_df, date_to_weekday=False)
 
     # Create X positions with gaps
     x_positions = []
@@ -264,12 +249,12 @@ def _plot_hr_dist(hr_percentage, group_num, subject, show_plot=False,
                 x += 1 + gap_day
 
     # Prepare colors aligned with DataFrame columns
-    colors = [color_scheme.get(col, '#CCCCCC') for col in hr_percentage.columns]
+    colors = [color_scheme.get(col, '#CCCCCC') for col in distributions_df.columns]
 
     # Plot stacked bars manually
     bottom = np.zeros(len(x_positions))
-    for col, color in zip(hr_percentage.columns, colors):
-        values = hr_percentage[col].values
+    for col, color in zip(distributions_df.columns, colors):
+        values = distributions_df[col].values
         ax.bar(x_positions, values, bottom=bottom, color=color, edgecolor="#222E35",
                linewidth=0.2, width=0.9)
         bottom += values
@@ -282,16 +267,15 @@ def _plot_hr_dist(hr_percentage, group_num, subject, show_plot=False,
     dates_fmt = [pd.to_datetime(d).strftime(DATE_FORMAT) for d in dates]
 
     # Title, axis labels, and color legend
-    group_num_numeric = re.search(r'\d+', group_num).group()
-    title_base = f'Resumo Diário da Frequência Cardíaca - Grupo {group_num_numeric} | Sujeito {subject} | {dates_fmt[0]} a {dates_fmt[-1]}'
+    title_base = f'Resumo Diário da Frequência Cardíaca | Sujeito {subject} | {dates_fmt[0]} a {dates_fmt[-1]}'
 
     # set titles and labels
     ax.set_title(title_base, fontsize=12, fontweight='bold', pad=40)
     plt.ylabel('Distribuição da Frequência Cardíaca (%)')
 
     # Create legend
-    handles = [plt.Rectangle((0,0),1,1, color=color_scheme[col]) for col in hr_percentage.columns]
-    labels_pt = [LEGEND_PT.get(l, l) for l in hr_percentage.columns]
+    handles = [plt.Rectangle((0,0),1,1, color=color_scheme[col]) for col in distributions_df.columns]
+    labels_pt = [LEGEND_PT.get(l, l) for l in distributions_df.columns]
     ax.legend(handles, labels_pt, bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
 
     # Generate acquisition labels if requested
@@ -305,7 +289,7 @@ def _plot_hr_dist(hr_percentage, group_num, subject, show_plot=False,
         y_pos_day_label = -0.05
 
     # Convert dates to weekdays
-    dates_week = [_get_day_string(date, locale_string) for date in dates]
+    dates_week = [get_weekday_name(date, locale_string) for date in dates]
 
     # Add day labels below the bars
     dates_series = pd.Series(dates)
@@ -350,25 +334,23 @@ def _plot_hr_dist(hr_percentage, group_num, subject, show_plot=False,
     fig.tight_layout()
 
     # Save or show plot
-    if save or show_plot:
+    if save:
 
-        out_dir = create_dir(save_path, os.path.join(f'{group_num}', f'{subject}', "HR_distributions"))
+        out_dir = create_dir(save_path, os.path.join(f'{subject}', "HR_distributions"))
         filename = f'HR_plot_distributions_{subject}.png'
-        _handle_plot(save_dir=out_dir, show=show_plot, save=save, filename=filename)
+        handle_plot(save_dir=out_dir, save=save, filename=filename)
 
 
-def plot_circular_hr_dist(hr_percentage, group_num, subject, lower_limit=30, upper_limit=70,
-                          show_plot=False, show_acquisition_labels=True, save=False, save_path='',
-                          color_scheme=HR_CLASS_COLORS, locale_string='pt_PT.UTF-8'):
+def _plot_circular_hr_dist(hr_percentage, subject, lower_limit=30, upper_limit=70,
+                           show_acquisition_labels=True, save=False, save_path='',
+                           color_scheme=HR_CLASS_COLORS, locale_string='pt_PT.UTF-8'):
     """
     Plots a circular representation of heart rate class distribution for each acquisition per day.
 
     :param hr_percentage: Dictionary containing percentages of each heart rate class per acquisition.
-    :param group_num: Group identifier (e.g., 'group2'); only numeric part will be used in the title.
     :param subject: Subject identifier extracted from the device number (e.g., '001').
     :param lower_limit: Lower bound for scaling the bar lengths. Default: 30
     :param upper_limit: Upper bound for scaling the bar lengths. Default: 70
-    :param show_plot: Whether to display the plot. Default: False
     :param show_acquisition_labels: Whether to show acquisition labels as Roman numerals. Default: True
     :param save: Whether to save the plot as a PNG. Default: False
     :param save_path: Directory to save the plot. If empty, saves in the current project folder.
@@ -402,8 +384,7 @@ def plot_circular_hr_dist(hr_percentage, group_num, subject, lower_limit=30, upp
     dates_fmt = [pd.to_datetime(d).strftime(DATE_FORMAT) for d in dates]
 
     # Title
-    group_num_numeric = re.search(r'\d+', group_num).group()
-    plt.title('Distribuição circular das classes de Frequência Cardíaca - Grupo {} | Sujeito {} | {} a {}'.format(group_num_numeric, subject, dates_fmt[0], dates_fmt[-1]))
+    plt.title('Distribuição circular das classes de Frequência Cardíaca | Sujeito {} | {} a {}'.format(subject, dates_fmt[0], dates_fmt[-1]))
 
     # Add color legend
     handles, labels = ax.get_legend_handles_labels()
@@ -411,7 +392,7 @@ def plot_circular_hr_dist(hr_percentage, group_num, subject, lower_limit=30, upp
     ax.legend(handles, labels_pt, loc='center', fontsize=8)
 
     # Convert dates to weekdays
-    dates_week = [_get_day_string(date, locale_string) for date in dates]
+    dates_week = [get_weekday_name(date, locale_string) for date in dates]
 
     # Generate grouped acquisition legend (weekdays + acquisition times)
     legend_lines = generate_grouped_legend(dates_week, times)
@@ -447,11 +428,11 @@ def plot_circular_hr_dist(hr_percentage, group_num, subject, lower_limit=30, upp
     fig.tight_layout()
 
     # Save or show the plot
-    if save or show_plot:
+    if save:
 
-        out_dir = create_dir(save_path, os.path.join(f'{group_num}', f'{subject}', "HR_distributions"))
+        out_dir = create_dir(save_path, os.path.join(f'{subject}', "HR_distributions"))
         filename = f'HR_plot_circular_{subject}.png'
-        _handle_plot(save_dir=out_dir, show=show_plot, save=save, filename=filename)
+        handle_plot(save_dir=out_dir, save=save, filename=filename)
 
 
 def _plot_circ_bars(hr_percentage_df, color_scheme, lower_limit, ax):
@@ -558,7 +539,7 @@ def _extract_date_time(hr_percentage_df, date_to_weekday=True, locale_string='pt
 
     # transform dates to weekdays if needed
     if date_to_weekday:
-        dates = [_get_day_string(date, locale_string) for date in dates]
+        dates = [get_weekday_name(date, locale_string) for date in dates]
 
     return dates, times
 
@@ -576,36 +557,6 @@ def _show_acquisition_labels(angles, labels, ax, lower_limit):
     for angle, label in zip(angles, labels):
 
         ax.text(x=angle, y=lower_limit - 5, s=label, va='center', ha='center')
-
-
-def _get_day_string(date_string, locale_string):
-    """
-    Returns the name of the day for a given date string in a specified locale.
-
-    :param date_string: the date string in 'YYYY-MM-DD' format
-    :param locale_string: the locale string (e.g., 'pt_BR', 'en_US') used to localize the day name
-    :return: the localized day name without '-feira' and properly encoded in UTF-8
-    """
-    # parse the date string into a datetime object
-    date_time = dt.datetime.strptime(date_string, DATE_FORMAT)
-
-    try:
-        # set the locale for date formatting
-        locale.setlocale(locale.LC_TIME, locale_string)
-    except locale.Error:
-        # fallback if the locale is not installed
-        locale.setlocale(locale.LC_TIME, 'C')
-
-    # get the full name of the day
-    day_name = date_time.strftime('%A')
-
-    # remove '-feira' if present (specific to Portuguese)
-    day_name = day_name.replace('-feira', '')
-
-    # ensure the string is properly encoded in UTF-8
-    day_name = day_name.encode('latin1').decode('utf-8', errors='ignore')
-
-    return day_name
 
 
 def _change_transparency_for_category(ax, category, alpha=0.5):
@@ -692,7 +643,7 @@ def _show_day_labels(dates, sep_pos, ax, y_pos, fontweight='semibold'):
     adds day labels to the plot that are centered between the day separation lines
     :param dates: the dates/ weekdays of the acquisition
     :param sep_pos: the positions of the lines that visually separate the days on the plot
-    :param ax: the plot axis
+    :param ax: plot axis
     :return: none
     """
 
@@ -702,80 +653,274 @@ def _show_day_labels(dates, sep_pos, ax, y_pos, fontweight='semibold'):
                 clip_on=False, transform=ax.get_xaxis_transform(), fontweight=fontweight)
 
 
-def _reconstruct_df_from_dict(timeline_metrics_dict: Dict[str, str], fs: int = 100) -> pd.DataFrame:
+def _extract_hr_min_max_by_subject_day_session(hr_metrics: dict) -> Dict:
     """
-    Reconstruct the original DataFrame from a compressed timeline dictionary.
+    Extract HR min→max ranges per session (I–IV) for each day.
 
-    :param timeline_metrics_dict: Dictionary with the timeline metrics needed for generating the plots.
-        Keys: "startTimestamp_endTimestamp"
-        Values: class labels (e.g. 'normal', 'abnormal')
-        Must be ordered chronologically.
-    :param fs: Sampling frequency.
-    :return: DataFrame containing with the reconstructed timestamp and class label columns
+    - keys are date strings extracted from the session identifier
+    - values are dictionaries with session numbers in Roman numerals ("I", "II", "III", "IV")
+      mapped to (min_bpm, max_bpm) tuples.
+    - Missing or invalid sessions (None or NaN) are ignored.
+
+    :param hr_metrics: Containing the HR metrics for all available days
+    :return: dictionary: weekday → session → (min, max)
     """
 
-    # Convert sampling rate to pandas frequency string
-    # Example: 100 Hz -> 1/100 s = 0.01 s = 10 ms
-    freq_ms = 1000 / fs  # duration of one sample in milliseconds
-    freq = f"{freq_ms}ms"
+    # subject -> date (weekday) -> session_roman -> (min, max)
+    hr_stats_dict = defaultdict(lambda: defaultdict(dict))
 
-    # init list for holding the values of each row
-    rows = []
+    # cycle over the multiple days
+    for date_key, acquisition_metrics_dict in hr_metrics.items():
 
-    # cycle through the timeline metrics
-    for time_range, class_label in timeline_metrics_dict.items():
+        # delete key with daily
+        del acquisition_metrics_dict[HR_DISTRIBUTIONS_DAY]
 
-        # get start and end time from key name and convert to datetime
-        start_str, end_str = time_range.split("_")
-        start_ts = pd.to_datetime(start_str)
-        end_ts = pd.to_datetime(end_str)
+        # get day of the week from the date string
+        weekday = get_weekday_name(date_key, 'pt_PT.UTF-8')
 
-        # Add the current chunk timestamps
-        chunk_timestamps = pd.date_range(start=start_ts, end=end_ts, freq=freq, inclusive="both")
+        # get number of acquisition of the day
+        if len(acquisition_metrics_dict) > 4:
+            raise ValueError(f"Only a maximum of 4 acquisitions are allowed for this plot. Detected {len(acquisition_metrics_dict)}")
 
-        # fill with the class label
-        for ts in chunk_timestamps:
-            rows.append((ts, class_label))
+        # Initialize all four sessions as missing (I, II, III, IV)
+        for r in ROMAN_NUMBERS:
+            hr_stats_dict[weekday][r] = (None, None)
 
-    # Build the DataFrame
-    df = pd.DataFrame(rows, columns=["timestamp", HR_CLASS_COLUMN_NAME])
+        for i, (acquisition_time_key, metrics_dict) in enumerate(acquisition_metrics_dict.items()):
 
-    # Sort index just in case
-    df.sort_index(inplace=True)
+            # get bpm statistics
+            statistics_dict = metrics_dict[HR_BPM_STATS]
 
-    return df
+            # extract min and max values from the dictionary
+            min_hr = float(statistics_dict['min'])
+            max_hr = float(statistics_dict['max'])
+
+            # add to final dictionary
+            if min_hr is not None and max_hr is not None:
+
+                hr_stats_dict[weekday][ROMAN_NUMBERS[i]] = (min_hr, max_hr)
+
+    return hr_stats_dict
 
 
-def _handle_plot(save_dir:str, show=True, save=False, filename="plot.png")-> None:
+def _prepare_plot_data(days: dict, roman: list):
     """
-    Handles the display and saving of matplotlib plots based on user-defined options.
+    Prepare plot coordinates, items and day centers for HR bars.
 
-    This utility function centralizes logic for whether a plot should be shown on screen,
-    saved to disk, or both. If saving is enabled, the function ensures the output directory exists
-    and stores the plot using the specified filename.
-
-    :param save_dir: String specifying the directory path where the plot should be saved
-                     if `save=True`. The directory is created if it doesn't exist.
-
-    :param show: Boolean indicating whether to display the plot interactively on screen.
-                 If False, the plot is closed after saving. Default is True.
-
-    :param save: Boolean indicating whether to save the plot as an image file. Default is False.
-
-
-    :param filename: String specifying the name of the image file to save, including the extension
-                     (e.g., "my_plot.png"). Only relevant if `save=True`.
-                     Default is "plot.png".
-    :return: None
+    :param days: dictionary of day → session → (min, max)
+    :param roman: list of session labels ["I","II","III","IV"]
+    :return: tuple (plot_items, day_centers, x_cursor)
+        - plot_items: list of (x, session_label, min, max)
+        - day_centers: list of (x_center, weekday) for labeling
+        - x_cursor: final X position after last bar
     """
-    if save:
-        print(f"Saving plot to: {os.path.join(save_dir, filename)}")  # <--- debug
+    plot_items = []
+    day_centers = []
 
-        # Create the output directory if it doesn't exist
-        os.makedirs(save_dir, exist_ok=True)
-        # Save the current figure to the specified path
-        plt.savefig(os.path.join(save_dir, filename))
-    if show:
-        plt.show()
+    x_offset = 1  # initial X position
+    day_gap = 0.8  # gap between days
+    x_cursor = x_offset
+
+    # Loop through weekdays
+    for weekday in days.keys():
+        sessions = days[weekday]
+        day_start_x = x_cursor
+
+        # Loop through sessions I–IV
+        for r in roman:
+            mn, mx = sessions.get(r)
+            plot_items.append((x_cursor, r, mn, mx))
+            x_cursor += 1
+
+        day_end_x = x_cursor - 1
+        day_centers.append(((day_start_x + day_end_x) / 2, weekday))
+        x_cursor += day_gap
+
+    return plot_items, day_centers, x_cursor
+
+
+def _set_y_limits(ax, plot_items):
+    """
+    Set Y axis limits based on min/max of HR values.
+    - If data is available, sets limits with padding.
+    - If no data is available, sets default Y-axis from 0 to 100 BPM.
+
+    :param ax: matplotlib axis
+    :param plot_items: list of (x, session_label, min, max)
+    """
+    mins = [mn for (_, _, mn, _) in plot_items if mn is not None]
+    maxs = [mx for (_, _, _, mx) in plot_items if mx is not None]
+
+    if mins and maxs:
+        # Compute the overall minimum and maximum HR values
+        y_min = min(mins)
+        y_max = max(maxs)
+
+        # Calculate padding: 15% of the range or minimum of 1.0
+        y_pad = max(1.0, 0.15 * (y_max - y_min)) if y_max > y_min else 1.0
+
+        # Set Y-axis limits with padding, ensuring lower limit is not negative
+        ax.set_ylim(max(0, y_min - y_pad), y_max + y_pad)
     else:
-        plt.close()
+        # If no valid data is available, set default limits from 0 to 100 BPM
+        ax.set_ylim(0, 100)
+
+
+def _draw_bars(ax, plot_items, bar_color):
+    """
+    Draw HR bars for each session, adding min/max labels.
+    - If minimum or maximum heart rate data is not available for that session, displays a "Sem dados" placeholder.
+    :param ax: matplotlib axis
+    :param plot_items: list of (x, session_label, min, max)
+    :param bar_color: color for the bars
+        """
+    bar_width_pts = 18
+
+    for x, session_label, mn, mx in plot_items:
+
+        ylim = ax.get_ylim()
+
+        if mn is None or mx is None:
+            # No data
+            y_text = ylim[0] + 0.03 * (ylim[1] - ylim[0])
+            ax.text(x, y_text, "Sem dados", ha='center', va='bottom', fontsize=8)
+            continue
+
+        if mx <= mn:
+            mx = mn + 0.5
+
+        # Draw pill shaped vertical box
+        ax.plot([x, x], [mn, mx], color=bar_color, linewidth=bar_width_pts, solid_capstyle='round', zorder=2)
+
+        for y, value in [(mn, mn), (mx, mx)]:
+            # Create a fixed-size circle in points
+            da = DrawingArea(bar_width_pts, bar_width_pts, 0, 0)
+            circle = Circle(
+                (bar_width_pts / 2, bar_width_pts / 2),
+                radius=bar_width_pts / 2 - 1,
+                facecolor=LIGHT_RED,
+                edgecolor=bar_color,
+                linewidth=1.2
+            )
+            da.add_artist(circle)
+
+            # Place the circle at the bar end
+            ab = AnnotationBbox(da,(x, y), frameon=False, box_alignment=(0.5, 0.5), pad=0, zorder=3)
+            ax.add_artist(ab)
+
+            # Text centered in the circle
+            ax.text(x, y, f"{value:.0f}", ha='center', va='center',fontsize=7,zorder=4)
+    # circle_diameter_pts = bar_width_pts -2  # same as pill cap
+    #
+    # for x, session_label, mn, mx in plot_items:
+    #     if mn is None or mx is None:
+    #         y_text = ax.get_ylim()[0] + 0.03 * (ax.get_ylim()[1] - ax.get_ylim()[0])
+    #         ax.text(x, y_text, "Sem dados", ha='center', va='bottom', fontsize=8)
+    #         continue
+    #
+    #     if mx <= mn:
+    #         mx = mn + 0.5
+    #
+    #     # Pill bar
+    #     ax.plot(
+    #         [x, x],
+    #         [mn, mx],
+    #         color=bar_color,
+    #         linewidth=bar_width_pts,
+    #         solid_capstyle='round',
+    #         zorder=2
+    #     )
+    #
+    #     for y, value in [(mn, mn), (mx, mx)]:
+    #         # Drawing area in points
+    #         da = DrawingArea(circle_diameter_pts, circle_diameter_pts, 0, 0)
+    #
+    #         circle = Circle(
+    #             (circle_diameter_pts / 2, circle_diameter_pts / 2),
+    #             radius=circle_diameter_pts / 2,
+    #             facecolor=LIGHT_RED,
+    #             edgecolor=bar_color,
+    #             linewidth=1.2
+    #         )
+    #         da.add_artist(circle)
+    #
+    #         ab = AnnotationBbox(
+    #             da,
+    #             (x, y),
+    #             frameon=False,
+    #             box_alignment=(0.5, 0.5),
+    #             zorder=3
+    #         )
+    #         ax.add_artist(ab)
+    #
+    #         # Text centered on top
+    #         ax.text(
+    #             x,
+    #             y,
+    #             f"{value:.0f}",
+    #             ha='center',
+    #             va='center',
+    #             fontsize=7,
+    #             zorder=4
+    #         )
+
+
+def _set_x_labels(ax, plot_items):
+    """
+    Set X axis ticks and labels for sessions.
+
+    :param ax: matplotlib axis
+    :param plot_items: list of (x, session_label, min, max)
+    """
+    # Extract X positions for each session to use as tick locations
+    x_ticks = [x for (x, _, _, _) in plot_items]
+
+    # Extract session labels (I, II, III, IV) for each X position
+    x_labels = [lbl for (_, lbl, _, _) in plot_items]
+
+    # Set the X-axis ticks at the specified positions
+    ax.set_xticks(x_ticks)
+
+    # Set the corresponding labels for each tick
+    ax.set_xticklabels(x_labels)
+
+
+def _add_weekday_labels(ax, day_centers):
+    """
+    Add weekday labels below each group of sessions.
+
+    :param ax: matplotlib axis
+    :param day_centers: list of (x_center, weekday)
+    """
+    # Calculate the Y position below the bottom of the plot
+    y_text = ax.get_ylim()[0] - 0.08 * (ax.get_ylim()[1] - ax.get_ylim()[0])
+
+    # Loop through each day center and add the corresponding weekday label
+    for x_center, weekday in day_centers:
+        ax.text(x_center, y_text, weekday, ha='center', va='top', fontsize=9)
+
+
+def _style_plot(ax, x_cursor):
+    """
+    Apply styling to plot, add title/labels.
+
+    :param ax: matplotlib axis
+    :param x_cursor: final X position after last bar
+    """
+    # set y label
+    ax.set_ylabel("Ritmo Cardíaco (BPM)")
+
+    # Set plot title
+    ax.set_title(f"Intervalo de Ritmo Cardíaco")
+
+    # Enable horizontal grid lines for Y-axis
+    ax.yaxis.grid(True, linestyle='--', linewidth=0.5, alpha=0.7)
+
+    # Hide all spines
+    for spine in ax.spines.values():
+        spine.set_visible(False)
+
+    # Fix last bar cutoff
+    ax.set_xlim(0, x_cursor + 0.1)
+
+    plt.tight_layout()

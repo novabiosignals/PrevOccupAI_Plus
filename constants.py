@@ -68,10 +68,12 @@ TIME_COLUMN_NAME = 't'
 ACTIVITY_COLUMN_NAME = 'activity'
 HR_RATIO_COLUMN_NAME ="HR_ratio"
 HR_CLASS_COLUMN_NAME = "HR_class"
+NOISE_CLASS_COLUMN_NAME = "Noise_class"
 
 ACQUISITION_TIME_SECONDS = 20*60 # 20 minute acquisitions
 
 TIME_FORMAT = '%H-%M-%S'
+DATE_FORMAT = '%d-%m-%Y'
 # ------------------------------------------------------------------------------------------------------------------- #
 # MuscleBan constants
 # ------------------------------------------------------------------------------------------------------------------- #

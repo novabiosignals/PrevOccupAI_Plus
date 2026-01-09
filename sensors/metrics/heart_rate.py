@@ -12,14 +12,10 @@ get_heart_rate_metrics(...): Extract daily and per-session HR metrics from a ful
 _calculate_hr_metrics_per_acquisition(...): Compute HR metrics and class counts for one acquisition.
 _calculate_hr_ratio(...): Compute heart rate ratio (HRR) and HRR class labels.
 _classify_hr_ratio(...): Classify HRR values for sitting activity only.
-_calculate_timeline_metrics(...): Compress HR class labels into contiguous time ranges.
-_calculate_statistics(...): Compute summary statistics for a numeric column.
-_calculate_heart_rate_class_proportions(...): Compute HR class proportions ignoring 'no data'.
 _count_hr_classes(...): Count HR class occurrences per acquisition.
 _calculate_daily_class_proportions(...): Aggregate HR class proportions across acquisitions.
 _get_min_heart_rate(...): Compute minimum HR across all acquisitions.
 _get_max_heart_rate(...): Estimate maximum HR from subject age.
-_et_heart_rate_statistics(...): Compute basic HR and HRR statistics.
 _extract_features_heart_rate(...): Extract per-acquisition HR features and class proportions.
 _split_df_by_non_nan_blocks(...): Split a DataFrame into contiguous non-NaN acquisition blocks.
 -------------------
@@ -30,7 +26,6 @@ _split_df_by_non_nan_blocks(...): Split a DataFrame into contiguous non-NaN acqu
 import os
 from typing import Dict, List, Tuple
 import pandas as pd
-from utils import extract_date_from_path
 
 # internal imports
 import HAR
@@ -39,6 +34,8 @@ import sensors.process as sp
 from constants import (ACTIVITY_COLUMN_NAME, HR_RATIO_COLUMN_NAME, HR_CLASS_COLUMN_NAME, WATCH_SUFFIX, ACC, GYR, MAG,
                        PHONE, WATCH, HEART)
 from OH_profile.constants import HR_RELATIVE_BASE_KEY
+from .metric_utils import calculate_statistics, calculate_class_distributions, calculate_timeline_metrics
+from utils import extract_date_from_path
 # ------------------------------------------------------------------------------------------------------------------- #
 # constants
 # ------------------------------------------------------------------------------------------------------------------- #
@@ -62,9 +59,8 @@ POTENTIALLY_ELEVATED = 'Ligeiramente elevado'
 ELEVATED = 'Elevado'
 
 # keys for the inner dictionaries with the HR features
-HR_METRICS_SESSION = 'HR_metrics_session'
-HR_PROPORTIONS_SESSION = 'HR_distributions_session'
 HR_DISTRIBUTIONS_DAY = 'HR_distributions_day'
+HR_DISTRIBUTIONS = 'HR_distributions'
 HR_TIMELINE = 'HR_timeline'
 HR_RATIO_STATS = 'HR_ratio_stats'
 HR_BPM_STATS = 'HR_BPM_stats'
@@ -145,12 +141,11 @@ def get_heart_rate_metrics(day_folder_path: str, hr_min: float, hr_max: float, f
     {"23-09-2025": {
                     "HR_distributions_day": {...},
                     "15-00-00": {
-                        "HR_metrics_session": {
+
                             "HR_BPM_stats": {...},
                             "HR_ratio_stats": {...},
                             "HR_timeline": {...},
-                        }
-                        "HR_distributions_session": {...},
+                            "HR_distributions": {...},
                     }
     }
     """
@@ -247,60 +242,6 @@ def _calculate_hr_metrics_per_acquisition(acquisition_df: pd.DataFrame, hr_min: 
     acquisition_metrics = _extract_features_heart_rate(acquisitions_df)
 
     return acquisition_metrics, nr_classes
-
-
-def _calculate_timeline_metrics(acquisition_df: pd.DataFrame) -> Dict[str, str]:
-    """
-    Compress consecutive identical class labels into time-range chunks, breaking
-    chunks if the class changes or if a temporal gap (discontinuity) is detected.
-
-    The function identifies 'blocks' of data by checking two conditions:
-    1. Label Continuity: The 'class' remains the same between consecutive rows.
-    2. Temporal Contiguity: The rows are physically adjacent in the original
-       DataFrame, ensuring that filtered 'no data' or missing timestamps
-       trigger a new range.
-
-    :param acquisition_df: pd.DataFrame where the index contains string timestamps
-                           and a column (HR_CLASS_COLUMN_NAME) contains labels.
-    :return: A dictionary where keys are strings in the format 'start_end'
-             and values are the corresponding class labels.
-    """
-    # create copy
-    acquisition_df = acquisition_df.copy()
-
-    # create a column of integers to later detect gaps
-    acquisition_df['_original_pos'] = range(len(acquisition_df))
-
-    # 2. Filter out 'no data'
-    df = acquisition_df[acquisition_df[HR_CLASS_COLUMN_NAME] != "no data"].copy()
-
-    if df.empty:
-        return {}
-
-    # 3. Detect Class Change
-    class_changed = df[HR_CLASS_COLUMN_NAME] != df[HR_CLASS_COLUMN_NAME].shift()
-
-    # 4. Detect Timestamp Jumps (Contiguity)
-    # check if the current 'original_pos' is NOT exactly 1 greater than the previous
-    # If it's not, it means a "no data" row or a gap existed between these samples.
-    pos_jumped = df['_original_pos'] != df['_original_pos'].shift() + 1
-
-    # The first row shift() is NaN, so we ensure the first row doesn't trigger a jump
-    pos_jumped.iloc[0] = False
-
-    # 5. Create Block IDs
-    # A new block starts if Class Changed OR there was a Position Jump
-    df["block"] = (class_changed | pos_jumped).cumsum()
-
-    # 6. Group and Format Output
-    timeline_dict = {}
-    for _, block in df.groupby("block"):
-        start = block.index[0]
-        end = block.index[-1]
-        label = block[HR_CLASS_COLUMN_NAME].iloc[0]
-        timeline_dict[f"{start}_{end}"] = label
-
-    return timeline_dict
 
 
 def _get_min_heart_rate(dfs: List[pd.DataFrame]) -> float:
@@ -459,13 +400,8 @@ def _extract_features_heart_rate(acquisition_df: pd.DataFrame) -> Dict:
     # generate a key to identify which acquisition is being handled
     key = f"{start_time_str.replace(":", "-")}"
 
-    # get hr statistics and ratio proportions
-    combined_stats = {
-        HR_METRICS_SESSION: get_heart_rate_statistics(acquisition_df),
-        HR_PROPORTIONS_SESSION: _calculate_heart_rate_class_proportions(acquisition_df)
-    }
-
-    acquisition_metrics[key] = combined_stats
+    # get statistics and distributions and add it to the dictionary
+    acquisition_metrics[key] = get_heart_rate_statistics(acquisition_df)
 
     return acquisition_metrics
 
@@ -481,38 +417,14 @@ def get_heart_rate_statistics(df: pd.DataFrame) -> Dict:
 
     # Return the features for the bpm and hr ratio columns
     return {
-        HR_BPM_STATS: _calculate_statistics(df, f"{HEART}{WATCH_SUFFIX}"),
-        HR_RATIO_STATS: _calculate_statistics(df, HR_RATIO_COLUMN_NAME),
-        HR_TIMELINE: _calculate_timeline_metrics(df),
+        HR_BPM_STATS: calculate_statistics(df, f"{HEART}{WATCH_SUFFIX}"),
+        HR_RATIO_STATS: calculate_statistics(df, HR_RATIO_COLUMN_NAME),
+        HR_TIMELINE: calculate_timeline_metrics(df, class_column_name=HR_CLASS_COLUMN_NAME, class_ignore='no data'),
+        HR_DISTRIBUTIONS: _calculate_heart_rate_class_distributions(df)
     }
 
 
-def _calculate_statistics(df: pd.DataFrame, column_name: str) -> Dict[str, float]:
-    """
-    Calculate summary statistics for a specified numeric column.
-
-    Computes the minimum, maximum, arithmetic mean, and standard deviation
-    of the data, rounding all results to two decimal places.
-
-    :param df: pd.DataFrame containing the data to analyze.
-    :param column_name: The name of the numeric column to process.
-    :return: A dictionary containing 'min', 'max', 'mean', and 'std' keys
-             with their respective float values.
-    :param df:
-    :param column_name:
-    :return:
-    """
-
-    # Calculate min max, mean, and std
-    minimum = round(float(df[column_name].min()), 4)
-    maximum = round(float(df[column_name].max()), 4)
-    mean = round(float(df[column_name].mean()), 4)
-    std = round(float(df[column_name].std()), 4)
-
-    return {'min': minimum, 'max': maximum, 'mean': mean, 'std': std}
-
-
-def _calculate_heart_rate_class_proportions(df: pd.DataFrame) -> Dict[str, float]:
+def _calculate_heart_rate_class_distributions(df: pd.DataFrame) -> Dict[str, float]:
     """
     Compute the proportions of each heart rate class in a DataFrame,
     ignoring rows labeled as 'no data'.
@@ -523,13 +435,10 @@ def _calculate_heart_rate_class_proportions(df: pd.DataFrame) -> Dict[str, float
     # get only the rows that have HR data
     filtered_df = df[df[HR_CLASS_COLUMN_NAME] != "no data"]
 
-    # count the class values
-    proportions = filtered_df[HR_CLASS_COLUMN_NAME].value_counts(normalize=True).to_dict()
+    # calculate class distributions
+    distributions = calculate_class_distributions(filtered_df, HR_CLASS_COLUMN_NAME)
 
-    # round
-    proportions = {hr_class: round(proportion, 4) for hr_class, proportion in proportions.items()}
-
-    return proportions
+    return distributions
 
 
 def _count_hr_classes(hr_class_df: pd.DataFrame) -> Tuple[int, int, int, int]:
@@ -568,6 +477,7 @@ def _calculate_daily_class_proportions(totals: List[Tuple[int, int, int, int]]) 
     :return: Dict[str, float]
         Keys are class names, values are proportions (0-1)
     """
+
     # Sum totals across all acquisitions
     total_count = sum(t[0] for t in totals)
     normal_total = sum(t[1] for t in totals)
@@ -578,7 +488,6 @@ def _calculate_daily_class_proportions(totals: List[Tuple[int, int, int, int]]) 
     if total_count == 0:
         return {NORMAL: 0.0, POTENTIALLY_ELEVATED: 0.0, ELEVATED: 0.0}
 
-    # Calculate proportions and round
     return {
         NORMAL: round((normal_total / total_count), 4),
         POTENTIALLY_ELEVATED: round((potentially_abnormal_total / total_count), 4),
