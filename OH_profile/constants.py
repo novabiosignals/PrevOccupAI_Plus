@@ -28,6 +28,7 @@ POSTURE_KEY = 'posture'
 NOISE_KEY = 'noise'
 EMG_KEY = 'emg'
 WRIST_KEY = 'wrist_activities'
+ENVIRONMENT_KEY = 'environment'
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # METADATA SUB-KEYS
@@ -55,6 +56,7 @@ SENSOR_TIMELINE_TIMES_KEY = 'sensor_times'
 SENSOR_TIMELINE_MISSING_TIMES_KEY = 'missing_sensor_times'
 SENSOR_TIMELINE_START_TIMES_KEY = 'start_times'
 SENSOR_TIMELINE_END_TIMES_KEY = 'end_times'
+
 # -------------------------------------------------------------------------------------------------------------------- #
 # HUMAN ACTIVITY SUB-KEYS
 # -------------------------------------------------------------------------------------------------------------------- #
@@ -105,3 +107,17 @@ NOISE_TIMELINE_KEY = 'Noise_timeline'
 # -------------------------------------------------------------------------------------------------------------------- #
 # WRIST ACTIVITIES SUB-KEYS
 # -------------------------------------------------------------------------------------------------------------------- #
+
+
+# -------------------------------------------------------------------------------------------------------------------- #
+# ENVIRONMENT SUB-KEYS
+# -------------------------------------------------------------------------------------------------------------------- #
+
+ENV_ILLUMINANCE_KEY = 'Mean_illuminance_lux'
+ENV_CO2_KEY = 'CO2_ppm'
+ENV_CO_KEY = 'CO_ppm'
+ENV_COV_KEY = 'COV_ppm'
+ENV_PM10_KEY = 'Particles_PM10_ug/m3'
+ENV_PM025_KEY = 'Particles_PM2.5_ug/m3'
+ENV_TEMPERATURE_KEY = 'Temperature_Celsius'
+ENV_REL_HUMIDITY_KEY = 'Relative_Humidity_percentage'

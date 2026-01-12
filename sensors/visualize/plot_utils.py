@@ -343,7 +343,7 @@ def get_weekday_name(date_string, locale_string):
     """
     Returns the name of the day for a given date string in a specified locale.
 
-    :param date_string: the date string in 'YYYY-MM-DD' format
+    :param date_string: the date string in 'DD-MM-YYYY' format
     :param locale_string: the locale string (e.g., 'pt_BR', 'en_US') used to localize the day name
     :return: the localized day name without '-feira' and properly encoded in UTF-8
     """

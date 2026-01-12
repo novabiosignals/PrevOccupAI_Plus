@@ -10,6 +10,7 @@ get_participant_id(...): gets the subject id based on the device number and grou
 get_ids_per_group(...): Return a list of subject_ids belonging to a specific group.
 get_participant_work_type(...): Gets the work type based on the subject id
 get_participant_start_date(...): Gets the start date based on the subject id
+get_participant_ids_list(...): Gets a list of all subject ids
 ------------------
 [Private]
 
@@ -108,3 +109,12 @@ def get_participant_start_date(participants_info_df: pd.DataFrame, subject_id: i
     """
     # filter dataframe by the given subject_id (index) and get the start date
     return participants_info_df.loc[subject_id, 'start_date']
+
+
+def get_participant_ids_list(participants_info_df: pd.DataFrame) -> List[str]:
+    """
+    Return the list of subject ids present in the participants_info_df.
+    :param participants_info_df: A dataframe with the participants info
+    :return: list of subject ids
+    """
+    return participants_info_df.index.tolist()
