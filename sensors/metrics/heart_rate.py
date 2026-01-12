@@ -53,6 +53,8 @@ NORMAL_RANGES = {
 # Margin used to define "potentially abnormal" outside the normal range for heart rate ratio
 POTENTIALLY_ABNORMAL_MARGIN = 9
 
+NO_DATA = 'no data'
+
 # ------------------------------------------------------------------------------------------------------------------- #
 # public functions
 # ------------------------------------------------------------------------------------------------------------------- #
@@ -315,7 +317,7 @@ def _classify_hr_ratio(activity: int, hr_ratio: float) -> str:
     # add 'no data' if values are Nan or if the activity is not 0 (sitting)
     if pd.isna(hr_ratio) or activity != 0:
 
-        return 'no data'
+        return NO_DATA
 
     # get range based on activity
     low, high = NORMAL_RANGES[activity]
@@ -403,7 +405,7 @@ def get_heart_rate_statistics(df: pd.DataFrame) -> Dict:
     return {
         HR_BPM_STATS_KEY: calculate_statistics(df, f"{HEART}{WATCH_SUFFIX}"),
         HR_RATIO_STATS_KEY: calculate_statistics(df, HR_RATIO_COLUMN_NAME),
-        HR_TIMELINE_KEY: calculate_timeline_metrics(df, class_column_name=HR_CLASS_COLUMN_NAME, class_ignore='no data'),
+        HR_TIMELINE_KEY: calculate_timeline_metrics(df, class_column_name=HR_CLASS_COLUMN_NAME, class_ignore=NO_DATA),
         HR_DISTRIBUTIONS_KEY: _calculate_heart_rate_class_distributions(df)
     }
 
@@ -417,7 +419,7 @@ def _calculate_heart_rate_class_distributions(df: pd.DataFrame) -> Dict[str, flo
     :return: dict with class proportions (values sum to 1.0)
     """
     # get only the rows that have HR data
-    filtered_df = df[df[HR_CLASS_COLUMN_NAME] != "no data"]
+    filtered_df = df[df[HR_CLASS_COLUMN_NAME] != NO_DATA]
 
     # calculate class distributions
     distributions = calculate_class_distributions(filtered_df, HR_CLASS_COLUMN_NAME)
@@ -437,7 +439,7 @@ def _count_hr_classes(hr_class_df: pd.DataFrame) -> Tuple[int, int, int, int]:
         abnormal_count (int): Number of 'ELEVATED' instances
     """
     # Filter out 'no data'
-    filtered = hr_class_df[hr_class_df.iloc[:, 0] != 'no data']
+    filtered = hr_class_df[hr_class_df.iloc[:, 0] != NO_DATA]
 
     # Count occurrences of each class
     counts = filtered.iloc[:, 0].value_counts()

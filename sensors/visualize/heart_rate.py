@@ -40,7 +40,8 @@ import seaborn as sns
 from collections import defaultdict
 
 # internal imports
-from sensors.metrics.heart_rate import HR_TIMELINE_KEY, HR_DISTRIBUTIONS_KEY,HR_NORMAL_KEY, HR_POTENTIALLY_ELEVATED_KEY, HR_ELEVATED_KEY, HR_BPM_STATS_KEY
+from sensors.metrics.heart_rate import (HR_TIMELINE_KEY, HR_DISTRIBUTIONS_KEY,HR_NORMAL_KEY, HR_POTENTIALLY_ELEVATED_KEY,
+                                        HR_ELEVATED_KEY, HR_BPM_STATS_KEY, NO_DATA)
 from constants import DATE_FORMAT
 from utils import create_dir
 from .plot_utils import generate_grouped_legend, generate_acquisition_labels, handle_plot, plot_timeline_per_acquisition, get_weekday_name
@@ -54,23 +55,23 @@ CLASS_COLORS = {
     HR_NORMAL_KEY: PALE_GREEN,
     HR_POTENTIALLY_ELEVATED_KEY: YELLOW,
     HR_ELEVATED_KEY: RED,
-    'no data': 'white'
+    NO_DATA: 'white'
 }
 HR_CLASS_COLORS = {
     HR_NORMAL_KEY: PALE_GREEN,                # green
     HR_POTENTIALLY_ELEVATED_KEY: YELLOW,  # orange
     HR_ELEVATED_KEY: RED,              # red
-    "no data": LIGHT_GRAY                 # light gray
+    NO_DATA: LIGHT_GRAY                 # light gray
 }
 
 LEGEND_PT = {
     HR_NORMAL_KEY: HR_NORMAL_KEY,
     HR_POTENTIALLY_ELEVATED_KEY: HR_POTENTIALLY_ELEVATED_KEY,
     HR_ELEVATED_KEY: HR_ELEVATED_KEY,
-    "no data": "Sem dados"
+    NO_DATA: "Sem dados"
 }
 
-DESIRED_ORDER = [HR_NORMAL_KEY, HR_POTENTIALLY_ELEVATED_KEY, HR_ELEVATED_KEY, "no data"]
+DESIRED_ORDER = [HR_NORMAL_KEY, HR_POTENTIALLY_ELEVATED_KEY, HR_ELEVATED_KEY, NO_DATA]
 
 LEGEND_HANDLES = [
                 Line2D([0], [0], color=CLASS_COLORS[HR_NORMAL_KEY], lw=6, label=HR_NORMAL_KEY),
@@ -310,7 +311,7 @@ def _plot_hr_dist(distributions_dict: Dict, subject: str, show_acquisition_label
     ax.set_ylim(ymin=0)
 
     # Make 'no data' bars slightly transparent
-    _change_transparency_for_category(ax, 'no data')
+    _change_transparency_for_category(ax, NO_DATA)
 
     # Y-axis ticks and grid
     ax.yaxis.set_major_locator(MultipleLocator(20))
@@ -405,7 +406,7 @@ def _plot_circular_hr_dist(hr_percentage_dict: Dict, subject: str, lower_limit: 
     _show_day_labels(dates_week, pos, ax, 1.03)
 
     # Make 'no data' bars slightly transparent
-    _change_transparency_for_category(ax, 'no data')
+    _change_transparency_for_category(ax, NO_DATA)
 
     # Adjust layout
     fig.tight_layout()
@@ -487,7 +488,7 @@ def _dict_to_hr_percentage_df(summary_dict):
             missing = 4 - num_acq
             for i in range(missing):
                 missing_row = {cls: 0 for cls in DESIRED_ORDER}
-                missing_row['no data'] = 1
+                missing_row[NO_DATA] = 1
                 index.append(f"{date_str}/missing_{i + 1}")
                 records.append(missing_row)
 
@@ -549,10 +550,10 @@ def _change_transparency_for_category(ax, category, alpha=0.5):
     :return:
     '''
 
-    # 3. Make 'no data' bars slightly transparent
+    # 3. Make 'category' bars slightly transparent
     for container in ax.containers:  # ax.containers returns the containers for each class
 
-        # check if the label of the container is 'no data'
+        # check if the label of the container is 'category'
         if container.get_label() == category:
 
             # cycle through all the children and check where the height = 100.0
@@ -789,7 +790,7 @@ def _draw_bars(ax: plt.Axes, plot_items: list, bar_color: str) -> None:
                 ax.text(x, y,f"{value:.0f}",ha='center',va='center',fontsize=7,fontweight='bold',zorder=4)
         else:
             # Vertical "Sem dados" label
-            ax.text(x,(mn_plot + mx_plot) / 2,"Sem dados",rotation=90,ha='center',va='center',fontsize=8,fontweight='bold',
+            ax.text(x,(mn_plot + mx_plot) / 2,"Sem dados",rotation=90,ha='center',va='center',fontsize=8,fontweight=600,
                 color='white',zorder=4)
 
 
