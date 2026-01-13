@@ -22,6 +22,7 @@ from typing import Dict
 # -------------------------------------------------------------------------------------------------------------------- #
 # constants
 # -------------------------------------------------------------------------------------------------------------------- #
+# TODO: this has to be deleted in the future as it is already in OH_profile.constants.py
 # file suffix
 JSON_FILE_SUFFIX = '_OH_profile.json'
 

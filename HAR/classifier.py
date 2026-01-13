@@ -37,7 +37,7 @@ from constants import ACC, GYR, MAG, ACTIVITY_COLUMN_NAME
 SENSORS_TO_LOAD = [ACC, GYR, MAG] # sensors to extract features from
 
 HAR_MODEL = "HAR_model_500.joblib"
-BLOCK_ID = 'block_id'
+BLOCK_ID_COLUMN_NAME = 'block_id'  # TODO move this to constants
 
 CLASS_WALK = 2
 CLASS_STAND = 1
@@ -102,7 +102,7 @@ def classify_human_activities(phone_data_dict: Dict[str, pd.DataFrame], w_size: 
         df[ACTIVITY_COLUMN_NAME] = y_pred_exp
 
         # add block IDs based on changes in activity
-        df[BLOCK_ID] =  (df[ACTIVITY_COLUMN_NAME] != df[ACTIVITY_COLUMN_NAME].shift()).cumsum()
+        df[BLOCK_ID_COLUMN_NAME] =  (df[ACTIVITY_COLUMN_NAME] != df[ACTIVITY_COLUMN_NAME].shift()).cumsum()
 
         # add to dict
         classified_dict[acquisition_time] = df

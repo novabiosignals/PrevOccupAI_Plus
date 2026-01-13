@@ -5,4 +5,5 @@ from .classifier import CLASS_SIT, CLASS_WALK, CLASS_STAND
 
 __all__ = ['classify_human_activities',
            'classify_and_synchronise_predictions',
-           'create_time_column_from_initial_time']
+           'create_time_column_from_initial_time',
+           'CLASS_WALK', 'CLASS_STAND', 'CLASS_SIT']
