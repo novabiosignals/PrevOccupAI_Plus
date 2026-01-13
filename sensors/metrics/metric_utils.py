@@ -4,6 +4,7 @@ Helper functions for extracting sensor metrics
 Available Functions
 -------------------
 [Public]
+split_df_by_non_nan_blocks(...): Split a DataFrame into contiguous non-NaN acquisition blocks.
 calculate_statistics(...): Compute summary statistics for a numeric column.
 calculate_class_distributions(...): Calculate class distributions for a specified column containing the class labels.
 -------------------
@@ -15,11 +16,35 @@ calculate_class_distributions(...): Calculate class distributions for a specifie
 # imports
 # ------------------------------------------------------------------------------------------------------------------- #
 import pandas as pd
-from typing import Dict
+from typing import Dict, List
 
 # ------------------------------------------------------------------------------------------------------------------- #
 # public functions
 # ------------------------------------------------------------------------------------------------------------------- #
+
+def split_df_by_non_nan_blocks(df: pd.DataFrame, column_name: str) -> List[pd.DataFrame]:
+    """
+    Split a DataFrame into contiguous blocks where 'column' is not NaN.
+
+    :param df: pandas DataFrame to be split
+    :param column_name: nameof the column to be used as reference
+    :return: List of DataFrames, each corresponding to a continuous non-NaN block of 'column'
+    """
+    # Boolean mask: True where column is not NaN
+    mask = df[column_name].notna()
+
+    # Identify block changes (each time mask changes value)
+    block_id = mask.ne(mask.shift()).cumsum()
+
+    # Keep only blocks where mask is True
+    blocks = [
+        group.copy()
+        for key, group in df.groupby(block_id)
+        if mask[group.index].iloc[0]
+    ]
+
+    return blocks
+
 
 def calculate_statistics(df: pd.DataFrame, column_name: str) -> Dict[str, float]:
     """

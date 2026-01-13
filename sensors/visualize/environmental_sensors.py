@@ -19,6 +19,8 @@ from typing import Tuple, Dict
 from matplotlib.axes import Axes
 import matplotlib.pyplot as plt
 import os
+import math
+import numpy as np
 
 # internal imports
 from OH_profile.constants import *
@@ -134,8 +136,10 @@ def _plot_environmental_lines(data_dict: Dict[str, float], output_folder_path: s
     :param reference_dict: Dictionary of reference values or intervals
     :return: None
     """
+    data_dict = _remove_nan_values(data_dict)
+
     if not data_dict:
-        raise ValueError("Data dictionary is empty.")
+        return None
 
     # if no reference dict is passed, init empty dict
     reference_dict = reference_dict or {}
@@ -164,10 +168,10 @@ def _plot_environmental_lines(data_dict: Dict[str, float], output_folder_path: s
         y_val = value
 
         # Plot actual value line
-        actual_line = ax.axhline(y=y_val,color=LIGHT_PREVOCCUPAI_BLUE,linewidth=2,zorder=2,label=MEASURED_VALUE)
+        actual_line = ax.axhline(y=y_val,color=LIGHT_PREVOCCUPAI_BLUE,linewidth=2,zorder=2,label=MEASURED_VALUE, clip_on=False)
 
         # add dot in the middle
-        ax.scatter(0.5, y_val, color=LIGHT_PREVOCCUPAI_BLUE, s=50, zorder=3)
+        ax.scatter(0.5, y_val, color=LIGHT_PREVOCCUPAI_BLUE, s=50, zorder=3, clip_on=False)
 
         # add arrows
         # ax.text(0.0, y_val, ">", fontsize=13, va="center", ha="left", fontweight="bold", color=LIGHT_PREVOCCUPAI_BLUE, zorder=3)
@@ -199,9 +203,6 @@ def _plot_environmental_lines(data_dict: Dict[str, float], output_folder_path: s
         for spine in ax.spines.values():
             spine.set_visible(False)
 
-        # Remove y-ticks but keep **reference ticks**
-        ax.tick_params(axis='y', which='both', length=0)
-
         # Get the reference associated with this key (may be None, a number, or a range)
         ref_val = reference_dict.get(key)
 
@@ -216,21 +217,36 @@ def _plot_environmental_lines(data_dict: Dict[str, float], output_folder_path: s
         elif isinstance(ref_val, (int, float)):
             ref_values = [ref_val]
 
-        # Combine the actual value with all reference values so axis limits cover everything that is drawn
+        # Combine the actual value with all reference values
         all_values = ref_values + [value]
 
-        # Determine the minimum and maximum y-values to display
+        # Compute raw min/max
         ymin, ymax = min(all_values), max(all_values)
 
-        # Add vertical padding (10%) so lines and labels do not touch the top or bottom of the plot
-        # If ymin == ymax, fall back to a fixed padding of 1
-        padding = (ymax - ymin) * 0.1 if ymax != ymin else 1
+        # The padding is only for the axis limits, not for ticks
+        line_padding = (ymax - ymin) * 0.03 if ymax != ymin else 1e-3
+        ax.set_ylim(ymin - line_padding, ymax + line_padding)
 
-        # Apply the final y-axis limits with padding
-        ax.set_ylim(ymin - padding, ymax + padding)
+        # Generate nice y-ticks based on exact values (without padding)
+        y_ticks = _generate_yticks(ymin=ymin, ymax=ymax)
 
-        # Only show **y-ticks for references**
-        ax.set_yticks(sorted(set(ref_values)))
+        # Include reference values
+        all_ticks = sorted(set(y_ticks).union(ref_values))
+
+        # Remove any ticks outside the actual/reference range
+        all_ticks = [tick for tick in all_ticks if ymin <= tick <= ymax]
+
+        # Set y-limits to exactly the min/max of actual value and references
+        ax.set_ylim(ymin, ymax)
+
+        # Set the ticks on the y-axis
+        ax.set_yticks(all_ticks)
+
+        # Remove the tick marks (small dashes) but keep labels
+        ax.tick_params(axis='y', which='both', length=0)
+
+        # add grid lines behind the dashed lines
+        ax.grid(axis='y', linestyle='--', alpha=0.6, zorder=1)
 
     # leave some space at the top
     plt.tight_layout(rect=[0, 0, 1, 0.94])
@@ -310,45 +326,61 @@ def _plot_reference(ax: Axes, ref) -> list:
 
     return handles
 
-#
-# def _generate_yticks(ymin: float, ymax: float, n_ticks: int = 6) -> np.ndarray:
-#     """
-#     Compute exactly `n_ticks` nicely rounded y-ticks starting from ymin.
-#     The top tick is the next "nice" multiple above the maximum of the value or reference.
-#
-#     :param ymin: Minimum y-value (usually 0)
-#     :param ymax: Maximum y-value (highest bar or reference)
-#     :param n_ticks: Desired number of ticks (including ymin and top)
-#     :return: np.ndarray of tick positions
-#     """
-#
-#     if ymax <= ymin:
-#         # Default linear spacing if ymax <= ymin
-#         return np.linspace(ymin, ymin + 1, n_ticks)
-#
-#     # Step size (raw)
-#     raw_step = (ymax - ymin) / (n_ticks - 1)
-#
-#     # Order of magnitude
-#     magnitude = 10 ** math.floor(math.log10(raw_step))
-#
-#     # Round step to a "nice" number: 1, 2, 5, 10 multiples of magnitude
-#     nice_steps = np.array([1, 2, 5, 10])
-#     possible_steps = nice_steps * magnitude
-#     nice_step = min(possible_steps[possible_steps >= raw_step]) if any(possible_steps >= raw_step) else possible_steps[-1]
-#
-#     # Top tick: one step above ymax
-#     top_tick = math.ceil(ymax / nice_step) * nice_step
-#
-#     # Generate exactly n_ticks from ymin to top_tick
-#     ticks = np.linspace(ymin, top_tick, n_ticks)
-#
-#     # Round ticks to reasonable precision
-#     if top_tick < 1:
-#         ticks = np.round(ticks, 2)
-#     elif top_tick < 10:
-#         ticks = np.round(ticks, 1)
-#     else:
-#         ticks = np.round(ticks, 0)
-#
-#     return ticks
+
+def _remove_nan_values(data: dict) -> dict:
+    """
+    Remove entries from a dictionary where the value is NaN.
+
+    :param data: Dictionary of values to check
+    :return: New dictionary without NaN values
+    """
+    return {
+        key: value for key, value in data.items()
+        if value is not None and not (isinstance(value, (int, float)) and math.isnan(value))
+    }
+
+
+def _generate_yticks(ymin: float, ymax: float) -> np.ndarray:
+    """
+    Generate nicely rounded y-ticks based on the range (ymax - ymin) and number of digits.
+
+    - For ranges < 100: step = 5 or 10
+    - For ranges < 1000: step = 100 or 500
+    - Always includes ymin and ymax
+    - Returns a numpy array of tick positions
+
+    :param ymin: Minimum y-value (usually 0 or reference)
+    :param ymax: Maximum y-value (actual value or reference)
+    :return: np.ndarray of tick positions
+    """
+
+    if ymax <= ymin:
+        return np.array([ymin, ymax + 1])
+
+    # Compute the range
+    value_range = ymax - ymin
+
+    # Determine order of magnitude
+    magnitude = 10 ** math.floor(math.log10(value_range))
+
+    # Decide a step based on range magnitude
+    if value_range < 100:
+        step_candidates = np.array([5, 10])
+    elif value_range < 1000:
+        step_candidates = np.array([100, 500])
+    else:
+        # For very large numbers, scale by magnitude
+        step_candidates = np.array([1, 2, 5, 10]) * magnitude
+
+    # Pick the smallest step that gives at least 2 ticks
+    step = min([s for s in step_candidates if s >= value_range / 5], default=step_candidates[-1])
+
+    # Compute the first tick below or equal to ymin
+    first_tick = math.floor(ymin / step) * step
+    # Compute the last tick above or equal to ymax
+    last_tick = math.ceil(ymax / step) * step
+
+    # Generate ticks
+    ticks = np.arange(first_tick, last_tick + step/2, step)  # add step/2 to include last_tick
+
+    return ticks

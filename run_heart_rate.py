@@ -26,7 +26,7 @@ HEART_RATE_WEEK = True
 # ------------------------------------------------------------------------------------------------------------------- #
 DRIVE = "E"
 DATASET_PATH = "Backup PrevOccupAI_PLUS Data\\data"
-SUBJECT_FOLDER_PATH = f"{DRIVE}:\\{DATASET_PATH}\\group1\\sensors\\LIBPhys #001"
+SUBJECT_FOLDER_PATH = f"{DRIVE}:\\{DATASET_PATH}\\group1\\sensors\\LIBPhys #004"
 QUESTIONNAIRE_RESULTS_PATH = "C:\\Users\\srale\\Desktop\\carga de trabalho\\results"
 OH_PROFILE_PATH = r"C:\Users\srale\Desktop\OH_profiles"
 PLOTS_OUTPUT_PATH = r"C:\Users\srale\Desktop\timeline_plots"

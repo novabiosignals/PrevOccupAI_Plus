@@ -17,7 +17,6 @@ _calculate_daily_class_proportions(...): Aggregate HR class proportions across a
 _get_min_heart_rate(...): Compute minimum HR across all acquisitions.
 _get_max_heart_rate(...): Estimate maximum HR from subject age.
 _extract_features_heart_rate(...): Extract per-acquisition HR features and class proportions.
-_split_df_by_non_nan_blocks(...): Split a DataFrame into contiguous non-NaN acquisition blocks.
 -------------------
 """
 # ------------------------------------------------------------------------------------------------------------------- #
@@ -34,7 +33,7 @@ import sensors.process as sp
 from constants import (ACTIVITY_COLUMN_NAME, HR_RATIO_COLUMN_NAME, HR_CLASS_COLUMN_NAME, WATCH_SUFFIX, ACC, GYR, MAG,
                        PHONE, WATCH, HEART)
 from OH_profile.constants import *
-from .metric_utils import calculate_statistics, calculate_class_distributions, calculate_timeline_metrics
+from .metric_utils import calculate_statistics, calculate_class_distributions, calculate_timeline_metrics, split_df_by_non_nan_blocks
 from utils import extract_date_from_path
 # ------------------------------------------------------------------------------------------------------------------- #
 # constants
@@ -152,7 +151,7 @@ def get_heart_rate_metrics(day_folder_path: str, hr_min: float, hr_max: float, f
     sync_df = sync_df[[ACTIVITY_COLUMN_NAME, f"{HEART}{WATCH_SUFFIX}", f"y_{ACC}{WATCH_SUFFIX}"]]
 
     # split into dataframes with just the watch data
-    acquisitions_dfs = _split_df_by_non_nan_blocks(sync_df, column_name=f"y_{ACC}{WATCH_SUFFIX}")
+    acquisitions_dfs = split_df_by_non_nan_blocks(sync_df, column_name=f"y_{ACC}{WATCH_SUFFIX}")
 
     # get date from path
     date = extract_date_from_path(day_folder_path)
@@ -334,30 +333,6 @@ def _classify_hr_ratio(activity: int, hr_ratio: float) -> str:
 
     # remaining is abnormal
     return HR_ELEVATED_KEY
-
-
-def _split_df_by_non_nan_blocks(df: pd.DataFrame, column_name: str) -> List[pd.DataFrame]:
-    """
-    Split a DataFrame into contiguous blocks where 'column' is not NaN.
-
-    :param df: pandas DataFrame to be split
-    :param column_name: nameof the column to be used as reference
-    :return: List of DataFrames, each corresponding to a continuous non-NaN block of 'column'
-    """
-    # Boolean mask: True where column is not NaN
-    mask = df[column_name].notna()
-
-    # Identify block changes (each time mask changes value)
-    block_id = mask.ne(mask.shift()).cumsum()
-
-    # Keep only blocks where mask is True
-    blocks = [
-        group.copy()
-        for key, group in df.groupby(block_id)
-        if mask[group.index].iloc[0]
-    ]
-
-    return blocks
 
 
 def _extract_features_heart_rate(acquisition_df: pd.DataFrame) -> Dict:
