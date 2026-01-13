@@ -31,6 +31,7 @@ import math
 
 # internal imports
 from constants import PHONE, WATCH, VALID_MBAN_DATA, NSEQ, IMU_SENSORS, TIME_COLUMN_NAME, ROT, NOISE, HEART, MBAN
+from utils import extract_date_from_path
 from .path_handler import get_sensor_paths_per_device
 from .parser import extract_sensor_from_filename
 from sensors.process.interpolate import cubic_spline_interpolation, slerp_interpolation, zero_order_hold_interpolation, \
@@ -89,6 +90,12 @@ def load_daily_acquisitions(folder_path: str, load_devices: Dict[str, List[str]]
 
     # get paths for all loaded devices/sensors sorted by device and acquisition time
     paths_dict = get_sensor_paths_per_device(folder_path, load_devices)
+
+    # inform user
+    print("\n# ------------------------------------------------------------------------ #")
+    print(f"# ------------------ loading data for date: {extract_date_from_path(folder_path)} ------------------- #")
+    print("# ------------------------------------------------------------------------ #")
+
 
     # if all nested dictionaries are empty
     if paths_dict and not all(not v for v in paths_dict.values()):

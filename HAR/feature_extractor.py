@@ -71,6 +71,9 @@ def extract_features(sensor_df: pd.DataFrame, sensors_to_load: List[str], w_size
     # trim data to accommodate full windowing of the signals
     sensor_data, _ = trim_data(sensor_data, w_size=w_size, fs=fs)
 
+    # inform user
+    print("-> extracting features")
+
     # window the signals and extract features using TSFEL
     features_df = tsfel.time_series_features_extractor(features_dict, sensor_data, window_size=int(w_size * fs), fs=fs,
                                                     header_names=sensor_names)

@@ -54,10 +54,15 @@ def apply_pre_processing_pipeline(daily_data_dict: Dict[str, Dict[str, pd.DataFr
     # make a copy to not overwrite the original dictionary
     processed_dict = copy.deepcopy(daily_data_dict)
 
+    # inform user
+    print(f"\n# ------------------------------------------------------------------------ #")
+    print(f"# ------------------- applying pre-processing pipeline ------------------- #")
+    print(f"# ------------------------------------------------------------------------ #")
+
     # cycle over the outer dict with the device names and acquisition data
     for device_name, acquisitions_dict in processed_dict.items():
 
-        print(f"\n-------------------Preprocessing {device_name}-------------------\n")
+        print(f"\n# ------------------- pre-processing {device_name} ------------------- #")
 
         # check if it is android device
         if device_name == PHONE or device_name == WATCH:
@@ -65,7 +70,7 @@ def apply_pre_processing_pipeline(daily_data_dict: Dict[str, Dict[str, pd.DataFr
             # cycle over the inner dict with the acquisition times and dataframes
             for acquisition_time, df in acquisitions_dict.items():
 
-                print(f"Acquisition time: {acquisition_time}\n")
+                print(f"\nAcquisition time: {acquisition_time}")
 
                 # preprocess signals and add to dictionary
                 processed_dict[device_name][acquisition_time] = _pre_process_signals(df, fs_android)
