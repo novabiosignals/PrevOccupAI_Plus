@@ -37,7 +37,6 @@ from constants import ACC, GYR, MAG, ACTIVITY_COLUMN_NAME
 SENSORS_TO_LOAD = [ACC, GYR, MAG] # sensors to extract features from
 
 HAR_MODEL = "HAR_model_500.joblib"
-ACTIVITY_COLUMN_NAME = 'activity'
 BLOCK_ID = 'block_id'
 
 CLASS_WALK = 2
