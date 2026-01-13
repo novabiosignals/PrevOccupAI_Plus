@@ -1,3 +1,17 @@
+"""
+Function to load raw questionnaire answers
+
+Available Functions
+-------------------
+[Public]
+load_questionnaire_answers(...):  Loads the answers of all questionnaires from a given domain into a
+Dictionary where the keys are the questionnaire ids and the values are the dataframes with the loaded answers.
+-------------------
+
+[Private]
+_check_valid_domain(...): checks if the input domain is valid.
+-------------------
+"""
 # ------------------------------------------------------------------------------------------------------------------- #
 # imports
 # ------------------------------------------------------------------------------------------------------------------- #
@@ -6,7 +20,7 @@ import os
 from typing import Dict
 
 # internal imports
-from constants import CSV
+from constants import CSV, QUESTIONNAIRE_DOMAINS
 
 # ------------------------------------------------------------------------------------------------------------------- #
 # constants
@@ -19,7 +33,7 @@ RESULTS_FILE_PREFIX = 'results_'
 
 def load_questionnaire_answers(folder_path: str, domain: str) -> Dict[str, pd.DataFrame]:
     """
-    Loads the answers of all questionnaires from a given domain (Psicossocial, Biomecanico, Ambiente, or Pessoais) into a
+    Loads the answers of all questionnaires from a given domain (psychosocial, biomechanical, environment, or personal) into a
     Dictionary where the keys are the questionnaire ids and the values are the dataframes with the loaded answers.
     The columns 1 through 8 (inclusive) are removed so that the dataframe contains only the columns correspondent to the
     id and the questionnaire items.
@@ -28,6 +42,8 @@ def load_questionnaire_answers(folder_path: str, domain: str) -> Dict[str, pd.Da
     :param domain: The domain of the questionnaires, which should be the name of the folder that contains the csv files
     :return: A dictionary with where the keys are the questionnaire ids and the values are the pandas dataframes.
     """
+    # check if domain is valid
+    _check_valid_domain(domain)
 
     # init dictionary to hold all results_questionnaires from the questionnaires of the given domain
     results_dict: Dict[str, pd.DataFrame] = {}
@@ -49,4 +65,19 @@ def load_questionnaire_answers(folder_path: str, domain: str) -> Dict[str, pd.Da
 
     return results_dict
 
-# TODO CHECK IF DOMAIN EXISTS
+
+# ------------------------------------------------------------------------------------------------------------------- #
+# private functions
+# ------------------------------------------------------------------------------------------------------------------- #
+
+def _check_valid_domain(domain: str) -> None:
+    """
+    Checks that the given domain is valid.
+    :param domain: the input domain
+    :return: None
+    """
+
+    if domain not in QUESTIONNAIRE_DOMAINS:
+        raise ValueError(
+            f"Invalid domain '{domain}'. Expected one of: {', '.join(QUESTIONNAIRE_DOMAINS)}."
+        )

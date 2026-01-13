@@ -1,11 +1,32 @@
+"""
+Utility Functions
+
+Available Functions
+-------------------
+[Public]
+load_json_file(...): Loads a json file to a dictionary.
+create_dir(...): Creates a new directory in the specified path.
+extract_group_from_path(...): Gets the group number from the data path.
+extract_device_num_from_path(...): Gets the device number from the data path.
+find_project_root(...): Gets the project root directory.
+extract_date_from_path(...): Gets the date from the data path.
+-------------------
+
+[Private]
+None
+-------------------
+"""
+
 # ------------------------------------------------------------------------------------------------------------------- #
 # imports
 # ------------------------------------------------------------------------------------------------------------------- #
 import json
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Union
 import os
 import re
 from pathlib import Path
+
+# internal imports
 
 # ------------------------------------------------------------------------------------------------------------------- #
 # public functions
@@ -15,7 +36,7 @@ def load_json_file(json_path: str) -> Dict[Any, Any]:
     """
     Loads a json file.
     :param json_path: str
-        Path to the json file
+            Path to the json file
     :return: Dict[Any,Any]
     Dictionary containing the features from TSFEL
     """
@@ -27,7 +48,7 @@ def load_json_file(json_path: str) -> Dict[Any, Any]:
     return json_dict
 
 
-def create_dir(path, folder_name):
+def create_dir(path: Union[str, Path], folder_name: str) -> str:
     """
     creates a new directory in the specified path
     :param path: the path in which the folder_name should be created
@@ -46,16 +67,19 @@ def create_dir(path, folder_name):
     return new_path
 
 
-def get_group_from_path(folder_path: str) -> str:
+def extract_group_from_path(folder_path: str) -> str:
+    """
+    Extracts the group number as a string from a path.
+    Assumes that in this path there has to be a folder with the following format: 'group1'
+    :param folder_path: Path to the folder
+    :return: The group number
+    """
 
     # find group pattern
-    match = re.search(r'group\d+', folder_path)
-
+    # folder name starts with 'group' (i.e.: group1, group2, group3...)
+    match = re.search(r'group(\d+)', folder_path)
     if match:
-
-        # get first and only match
-        return match.group()
-
+        return match.group(1)  # returns only the digits
     return 'no_group'
 
 
@@ -83,26 +107,17 @@ def find_project_root(path: Path = Path(__file__)) -> Path:
 
 
 def extract_device_num_from_path(folder_path: str) -> Optional[str]:
-    # returns #001
-    # folder name starts with 'group' (i.e.: group1, group2, group3...)
+    """
+    Extracts the device number from a path.
+    Assumes that in this path there has to be a folder with the following format: 'LIBPhys #001'
+    :param folder_path: Path to the folder
+    :return: a str with the device number (example: #001)
+    """
+
+    # folder name starts with 'LIBPhys' (i.e.: LIBPhys #001, LIBPhys #002, LIBPhys #003...)
     if match := re.search(r'LIBPhys (#\d+)', folder_path):
 
-        return match.group(1)
-
-    else:
-        return None
-
-
-def extract_group_from_path(folder_path: str) -> Optional[str]:
-    """
-
-    :param folder_path:
-    :return:
-    """
-
-    # find the group in the folder path (group1, group2, group3 ...)
-    if match := re.search(r'group(\d+)', folder_path):
-
+        # returns #001
         return match.group(1)
 
     else:
@@ -111,15 +126,17 @@ def extract_group_from_path(folder_path: str) -> Optional[str]:
 
 def extract_date_from_path(folder_path: str) -> Optional[str]:
     """
-
-    :param folder_path:
-    :return:
+    Extracts the date from a path.
+    Assumes that in this path there has to be a folder with the following format: '2025-09-24'
+    :param folder_path: Path to the folder
+    :return: a str with the date (example: 2025-09-24)
     """
 
-    # find the group in the folder path (group1, group2, group3 ...)
+    # find the date in the folder path (yyyy-mm-dd)
     if match := re.search(r'\b(\d{4}-\d{2}-\d{2})\b', folder_path):
 
         return match.group(1)
 
     else:
         return None
+

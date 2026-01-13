@@ -2,7 +2,7 @@
 # file constants
 # ------------------------------------------------------------------------------------------------------------------- #
 CSV = ".csv"
-
+JSON = ".json"
 # ------------------------------------------------------------------------------------------------------------------- #
 # input constants
 # ------------------------------------------------------------------------------------------------------------------- #
@@ -29,6 +29,12 @@ ROT = 'ROT'
 NOISE = 'NOISE'
 HEART = 'HEART'
 EMG = 'EMG'
+
+# suffixes
+WATCH_SUFFIX = '_WEAR'
+MBAN_L_SUFFIX = '_MBAN_L'
+MBAN_R_SUFFIX = '_MBAN_R'
+
 
 # define valid sensors for the three devices
 PHONE_SENSORS = [ACC, GYR, MAG, ROT, NOISE]
@@ -57,12 +63,17 @@ AVAILABLE_ANDROID_PREFIXES = [ACC_PREFIX, GYR_PREFIX, MAG_PREFIX, HEART_PREFIX, 
 AVAILABLE_ANDROID_SENSORS = [ACC, GYR, MAG, HEART, ROT, NOISE]
 
 
-# definition of time column
+# definition of column names
 TIME_COLUMN_NAME = 't'
+ACTIVITY_COLUMN_NAME = 'activity'
+HR_RATIO_COLUMN_NAME ="HR_ratio"
+HR_CLASS_COLUMN_NAME = "HR_class"
+NOISE_CLASS_COLUMN_NAME = "Noise_class"
 
 ACQUISITION_TIME_SECONDS = 20*60 # 20 minute acquisitions
 
 TIME_FORMAT = '%H-%M-%S'
+DATE_FORMAT = '%d-%m-%Y'
 # ------------------------------------------------------------------------------------------------------------------- #
 # MuscleBan constants
 # ------------------------------------------------------------------------------------------------------------------- #
@@ -85,10 +96,16 @@ MBAN_RIGHT = 'mBAN_right'
 CONFIG_FOLDER_NAME = 'config_files'
 RESULTS_FOLDER_NAME = 'results_questionnaires'
 
-PSICOSSOCIAL = 'psicosocial'
-AMBIENTE = 'ambiente'
-BIOMECANICO = 'biomecanico'
-PESSOAIS = 'pessoais'
+PSYCHOSOCIAL = 'psychosocial'
+ENVIRONMENT = 'environment'
+BIOMECHANICAL = 'biomechanical'
+PERSONAL = 'personal'
+WORKLOAD = 'workload'
+ROSA = 'rosa'
+COPSOQ = 'COPSOQ'
+MUEQ = 'MUEQ'
+POPULATION = 'population'
+WORK_TYPE = 'work_type'
 
-QUESTIONNAIRE_DOMAINS = [PSICOSSOCIAL, AMBIENTE, BIOMECANICO, PESSOAIS]
+QUESTIONNAIRE_DOMAINS = [PSYCHOSOCIAL, ENVIRONMENT, BIOMECHANICAL, PERSONAL, WORKLOAD]
 

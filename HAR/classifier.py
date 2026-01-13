@@ -29,7 +29,7 @@ import os
 # internal imports
 from .feature_extractor import extract_features, trim_data
 from .load import load_production_model
-from constants import ACC, GYR, MAG
+from constants import ACC, GYR, MAG, ACTIVITY_COLUMN_NAME
 
 # ------------------------------------------------------------------------------------------------------------------- #
 # constants

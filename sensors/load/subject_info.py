@@ -7,6 +7,9 @@ Available Functions
 load_participants_info(...): loads the meta-data contained in subjects_info.csv into a pandas.DataFrame.
 get_muscleban_side(...): get the muscleban side based on the mac address.
 get_participant_id(...): gets the subject id based on the device number and group.
+get_ids_per_group(...): Return a list of subject_ids belonging to a specific group.
+get_participant_work_type(...): Gets the work type based on the subject id
+get_participant_start_date(...): Gets the start date based on the subject id
 ------------------
 [Private]
 
@@ -16,6 +19,7 @@ get_participant_id(...): gets the subject id based on the device number and grou
 # imports
 # ------------------------------------------------------------------------------------------------------------------- #
 import pandas as pd
+from typing import List
 
 # internal imports
 from constants import MBAN_LEFT, MBAN_RIGHT
@@ -67,3 +71,40 @@ def get_participant_id(participants_info_df: pd.DataFrame, device_num: str, grou
 
     # get the id which corresponds to the index of the row
     return str(row.index[0])
+
+
+def get_ids_per_group(participants_info_df: pd.DataFrame, group: str) -> List[str]:
+    """
+    Return a list of subject_ids belonging to a specific group.
+
+    :param participants_info_df: DataFrame containing the participants info
+    :param group: group number to search for in the df
+    :return: List of subject_ids (as strings) belonging to the given group.
+    """
+    # Filter rows by group
+    filtered = participants_info_df[participants_info_df["group"].astype(str) == str(group)]
+
+    # Extract index values (subject_ids) and convert each to string
+    return filtered.index.astype(str).tolist()
+
+
+def get_participant_work_type(participants_info_df: pd.DataFrame, subject_id: int) -> str:
+    """
+    Gets the work type based on the subject_id.
+    :param participants_info_df: DataFrame containing the participants info
+    :param subject_id: Subject ID to search for in the dataframe
+    :return: the string containing the work type
+    """
+    # filter dataframe by the given subject_id (index) and get the work_type
+    return participants_info_df.loc[subject_id, 'work_type']
+
+
+def get_participant_start_date(participants_info_df: pd.DataFrame, subject_id: int) -> str:
+    """
+    Gets the start date based on the subject_id.
+    :param participants_info_df: DataFrame containing the participants info
+    :param subject_id: Subject ID to search for in the dataframe
+    :return: the string containing the work type
+    """
+    # filter dataframe by the given subject_id (index) and get the start date
+    return participants_info_df.loc[subject_id, 'start_date']
