@@ -1,6 +1,7 @@
 from .sensor_timeline import generate_sensor_timeline_plot, get_daily_acquisitions_metadata
 from .heart_rate import plot_hr_timeline_per_acquisition, plot_weekly_hr_data, plot_hr_ranges
 from .noise import plot_noise_metrics_per_week
+from .environmental_sensors import plot_environment_data
 
 __all__ = [
     'generate_sensor_timeline_plot',
@@ -8,6 +9,7 @@ __all__ = [
     'plot_hr_timeline_per_acquisition',
     'plot_weekly_hr_data',
     'plot_noise_metrics_per_week',
-    'plot_hr_ranges'
+    'plot_hr_ranges',
+    'plot_environment_data'
 
 ]

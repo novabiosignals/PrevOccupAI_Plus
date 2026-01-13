@@ -112,12 +112,12 @@ NOISE_TIMELINE_KEY = 'Noise_timeline'
 # -------------------------------------------------------------------------------------------------------------------- #
 # ENVIRONMENT SUB-KEYS
 # -------------------------------------------------------------------------------------------------------------------- #
-
-ENV_ILLUMINANCE_KEY = 'Mean_illuminance_lux'
+# these constants should have the following format: f'{physical_quantity}_....._{unit}'
+ENV_ILLUMINANCE_KEY = 'Illuminance_mean_lux'
 ENV_CO2_KEY = 'CO2_ppm'
 ENV_CO_KEY = 'CO_ppm'
 ENV_COV_KEY = 'COV_ppm'
-ENV_PM10_KEY = 'Particles_PM10_ug/m3'
-ENV_PM025_KEY = 'Particles_PM2.5_ug/m3'
+ENV_PM10_KEY = 'PM10_particles_ug/m3'
+ENV_PM025_KEY = 'PM2.5_particles_ug/m3'
 ENV_TEMPERATURE_KEY = 'Temperature_Celsius'
-ENV_REL_HUMIDITY_KEY = 'Relative_Humidity_percentage'
+ENV_REL_HUMIDITY_KEY = 'Humidity_relative_percentage'

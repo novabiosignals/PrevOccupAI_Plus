@@ -22,7 +22,7 @@ GENERATE_PLOTS = True
 # ------------------------------------------------------------------------------------------------------------------- #
 DRIVE = "E"
 DATASET_PATH = "Backup PrevOccupAI_PLUS Data\\data"
-SUBJECT_FOLDER_PATH = f"{DRIVE}:\\{DATASET_PATH}\\group1\\sensors\\LIBPhys #004"
+SUBJECT_FOLDER_PATH = f"{DRIVE}:\\{DATASET_PATH}\\group1\\sensors\\LIBPhys #001"
 OH_PROFILE_PATH = r"C:\Users\srale\Desktop\OH_profiles"
 PLOTS_OUTPUT_PATH = r"C:\Users\srale\Desktop\timeline_plots"
 FS = 100
@@ -50,7 +50,7 @@ if GENERATE_NOISE_OH_PROFILE:
 
         # iterate through the folders of the several days
         for date_folder in os.listdir(SUBJECT_FOLDER_PATH):
-            print(f"Extracting heart rate metrics: {date_folder}")
+            print(f"Extracting noise metrics: {date_folder}")
 
             # get path to the data of the day
             day_folder_path = os.path.join(SUBJECT_FOLDER_PATH, date_folder)

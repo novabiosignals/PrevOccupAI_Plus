@@ -127,7 +127,6 @@ def get_heart_rate_metrics(day_folder_path: str, hr_min: float, hr_max: float, f
     :param w_size: The window size used for the human activity recognition model
     :return: A dictionary with the daily and per session metrics for this subject as follows:
     {"23-09-2025": {
-                    "HR_distributions_day": {...},
                     "15-00-00": {
                             "HR_BPM_stats": {...},
                             "HR_ratio_stats": {...},

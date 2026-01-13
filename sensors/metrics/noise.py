@@ -183,7 +183,7 @@ def _calculate_class_durations(df: pd.DataFrame, fs: int, class_distributions: D
     # cycle over the dictionary with the class distributions
     for class_name, distribution in class_distributions.items():
 
-        durations_dict[f"{class_name}{DURATION_SECONDS_SUFFIX}"] = round(distribution * total_dur_s, 4)
+        durations_dict[f"{class_name}{NOISE_DURATION_SECONDS_SUFFIX_KEY}"] = round(distribution * total_dur_s, 4)
 
     return durations_dict
 

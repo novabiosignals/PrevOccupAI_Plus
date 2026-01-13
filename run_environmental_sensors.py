@@ -33,13 +33,12 @@ if GENERATE_ENV_OH_PROFILE:
     # cycle over the subject id's
     for subject_id in subject_id_list:
 
-        print(f"Extracting environment metrics for subject: {subject_id}")
-
         # get oh profile
         oh_profile = get_OH_profile(OH_PROFILE_PATH, subject_id)
 
         # check if the metrics have already been extracted, if not, extract metrics
         if len(oh_profile[SENSOR_METRICS_KEY][ENVIRONMENT_KEY]) < 1:
+            print(f"Extracting environmental metrics for subject: {subject_id}")
 
             # extract environment metrics
             env_metrics_dict = sm.get_environmental_sensors_metrics(subject_id=int(subject_id))
@@ -50,3 +49,7 @@ if GENERATE_ENV_OH_PROFILE:
 
             # save to json
             save_OH_profile(OH_PROFILE_PATH, subject_id, oh_profile)
+
+        if GENERATE_PLOTS:
+            print(f"Generating environment plots for subject: {subject_id}")
+            sv.plot_environment_data(oh_profile[SENSOR_METRICS_KEY][ENVIRONMENT_KEY], str(subject_id), PLOTS_OUTPUT_PATH)
