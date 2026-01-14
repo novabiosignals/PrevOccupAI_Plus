@@ -31,18 +31,50 @@ __all__ = [
 
 
 # ---------------------------------------------------------------------------
+# Constants
+# ---------------------------------------------------------------------------
+# Threshold for flagging potential MVC calibration issues
+# Sessions with mean %MVC > this value likely have underestimated MVC peaks
+MVC_QUALITY_THRESHOLD_PERCENT = 50.0
+
+
+# ---------------------------------------------------------------------------
 # Table building
 # ---------------------------------------------------------------------------
+def _add_mvc_quality_flags(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Add MVC quality flag column to identify sessions with potential calibration issues.
+    
+    Sessions where mean_percent_mvc > 50% are flagged as 'mvc_underestimated',
+    indicating the MVC calibration peak was likely too low.
+    
+    :param df: DataFrame with session metrics including 'mean_percent_mvc'.
+    :returns: DataFrame with 'mvc_quality_flag' column added.
+    """
+    if 'mean_percent_mvc' not in df.columns:
+        df['mvc_quality_flag'] = None
+        return df
+    
+    df['mvc_quality_flag'] = df['mean_percent_mvc'].apply(
+        lambda x: 'mvc_underestimated' if x > MVC_QUALITY_THRESHOLD_PERCENT else None
+    )
+    return df
+
+
 def build_tables(session_metrics: List[dict]) -> Dict[str, pd.DataFrame]:
     """
     Convert raw session dictionaries into tidy DataFrames with aggregates/deltas.
     
     Uses Active APDF metrics (intensity when working) and rest metrics.
+    Adds MVC quality flags to identify sessions with potential calibration issues.
 
     :param session_metrics: List of per-session metric dicts returned by ``compute_session_metrics``.
     :returns: Dict with DataFrames (sessions, daily/weekly aggregates, and change tables).
     """
     session_df = pd.DataFrame(session_metrics)
+    
+    # Add MVC quality flags (mean %MVC > 50% indicates underestimated MVC)
+    session_df = _add_mvc_quality_flags(session_df)
 
     # Columns for daily aggregation using weighted averages (intensity/percentage metrics)
     mean_value_cols = [
@@ -175,4 +207,49 @@ def persist_quality_report(
     path = output_root / "data_quality_report.csv"
     write_quality_report(reports, path)
     print(f"[emg_metrics_export] Data-quality report written to {path} ({len(reports)} issue(s))")
+    return path
+
+
+# ---------------------------------------------------------------------------
+# MVC quality summary export
+# ---------------------------------------------------------------------------
+def export_mvc_quality_summary(
+    tables: Dict[str, pd.DataFrame],
+    output_root: Path,
+) -> Path | None:
+    """
+    Export a summary of sessions flagged with MVC quality issues.
+
+    Creates a CSV listing all sessions where mean %MVC exceeded the threshold,
+    indicating likely MVC underestimation during calibration.
+
+    :param tables: Tables dict from :func:`build_tables` containing ``session_metrics``.
+    :param output_root: Directory where the report will be written.
+    :returns: Path to the CSV or ``None`` if no sessions were flagged.
+    """
+    session_df = tables.get("session_metrics")
+    if session_df is None or "mvc_quality_flag" not in session_df.columns:
+        return None
+
+    flagged = session_df[session_df["mvc_quality_flag"].notna()].copy()
+    if flagged.empty:
+        return None
+
+    # Select relevant columns for the summary
+    summary_cols = [
+        "subject_id", "group", "side", "date", "session_label",
+        "mean_percent_mvc", "mvc_peak", "mvc_quality_flag"
+    ]
+    # Only keep columns that exist
+    summary_cols = [c for c in summary_cols if c in flagged.columns]
+    summary_df = flagged[summary_cols].sort_values(
+        ["subject_id", "side", "date"], ignore_index=True
+    )
+
+    path = output_root / "mvc_quality_summary.csv"
+    summary_df.to_csv(path, index=False)
+    print(
+        f"[emg_metrics_export] MVC quality summary written to {path} "
+        f"({len(summary_df)} session(s) flagged with mean %MVC > {MVC_QUALITY_THRESHOLD_PERCENT}%)"
+    )
     return path

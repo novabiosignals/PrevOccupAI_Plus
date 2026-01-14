@@ -1,20 +1,22 @@
 # EMG Pipeline Changes Documentation
 
-**Last Updated:** December 30, 2025  
+**Last Updated:** January 12, 2026  
 **Purpose:** Document all significant changes made to the EMG processing pipeline for continuity across chat sessions.
 
 ---
 
 ## Table of Contents
 1. [Overview](#overview)
-2. [Active APDF + Rest Time Framework](#active-apdf--rest-time-framework)
-3. [MVC Peak Computation (Hybrid Approach)](#mvc-peak-computation-hybrid-approach)
-4. [Metrics Implementation](#metrics-implementation)
-5. [OH Profile JSON Structure](#oh-profile-json-structure)
-6. [Visualization System](#visualization-system)
-7. [Recent Findings: 0.5% Rest Threshold Analysis](#recent-findings-05-rest-threshold-analysis)
-8. [Key Files Modified](#key-files-modified)
-9. [Pipeline Execution](#pipeline-execution)
+2. [Package Architecture](#package-architecture)
+3. [Active APDF + Rest Time Framework](#active-apdf--rest-time-framework)
+4. [MVC Peak Computation (Hybrid Approach)](#mvc-peak-computation-hybrid-approach)
+5. [Quality Assessment System](#quality-assessment-system)
+6. [Metrics Implementation](#metrics-implementation)
+7. [OH Profile JSON Structure](#oh-profile-json-structure)
+8. [Visualization System](#visualization-system)
+9. [Recent Findings: 0.5% Rest Threshold Analysis](#recent-findings-05-rest-threshold-analysis)
+10. [Key Files Reference](#key-files-reference)
+11. [Pipeline Execution](#pipeline-execution)
 
 ---
 
@@ -30,6 +32,68 @@ The EMG pipeline was significantly refactored to implement a physiologically mea
 | **Rest Time** | Percentage of time spent below 0.5% MVC (true muscular relaxation) |
 | **Gap Analysis** | Micro-breaks detection (rest periods ≥ 0.25s) |
 | **Relative Intensity Bins** | Session activity classified relative to subject's weekly baseline |
+
+---
+
+## Package Architecture
+
+The EMG pipeline was refactored into a clean package structure under `sensors/`. The `signal_processing/` module now serves as a **backward compatibility layer** that re-exports from `sensors/`.
+
+### Package Structure
+
+```
+sensors/                           # Canonical EMG implementation
+├── __init__.py                    # Exports: PreprocessConfig, create_preprocess_config, run_emg_pipeline
+├── emg_pipeline.py                # Main pipeline orchestration (1031 lines)
+├── types.py                       # Shared type definitions (PreprocessConfig)
+├── load/                          # Data loading and quality assessment
+│   ├── dataset_loader.py          # Subject/day discovery
+│   ├── daily_data_loader.py       # Load mBAN session files
+│   ├── emg_filesystem.py          # File path utilities
+│   ├── emg_quality.py             # PSD noise detection, ADC saturation, faulty sensor checks (915 lines)
+│   ├── data_quality.py            # Quality report data structures
+│   └── ...
+├── process/                       # Signal processing
+│   ├── emg_preprocessing.py       # Filtering, envelope, transfer function
+│   ├── emg_mvc.py                 # MVC segment detection, peak computation
+│   ├── filters.py                 # Bandpass, notch filters
+│   └── ...
+├── metrics/                       # Metric computation
+│   ├── emg_metrics.py             # Active APDF, rest metrics, session metrics
+│   ├── emg_metrics_export.py      # CSV export, aggregation
+│   ├── emg_session.py             # Session-level metric helpers
+│   └── ...
+└── visualize/                     # Plotting
+    ├── emg_visuals.py             # APDF, histogram, envelope plots
+    ├── emg_timeline.py            # Session timeline visualization
+    ├── oh_profile_plots.py        # OH profile visualizations
+    └── ...
+
+signal_processing/                 # BACKWARD COMPATIBILITY LAYER
+├── __init__.py                    # Re-exports from sensors/ package
+├── filters.py                     # Legacy filter implementations
+└── archive/                       # Archived older implementations
+    ├── emg_mvc_original.py
+    └── emg_mvc_hybrid_scoring.py
+
+OH_profile/                        # OH profile persistence
+├── constants.py                   # JSON key definitions
+├── emg_oh_helper.py               # EMG-specific OH profile functions
+├── load/                          # Profile loading utilities
+└── write/                         # Profile writing utilities
+```
+
+### Import Patterns
+
+```python
+# Preferred: Import from sensors package
+from sensors.emg_pipeline import run_emg_pipeline, create_preprocess_config
+from sensors.load.emg_quality import detect_psd_noise, detect_adc_saturation
+from sensors.metrics.emg_metrics import compute_session_metrics
+
+# Backward compatible: Still works via re-exports
+from signal_processing import run_emg_pipeline  # Re-exported from sensors
+```
 
 ---
 
@@ -74,7 +138,7 @@ The pipeline uses a two-pass approach for relative intensity binning:
    - **Typical-high:** P50 to P90
    - **High for you:** > P90
 
-**File:** `signal_processing/emg_pipeline.py` → `_add_relative_intensity_bins()`
+**File:** `sensors/emg_pipeline.py` → `_add_relative_intensity_bins()`
 
 ---
 
@@ -88,7 +152,7 @@ Original approach used max of smoothed envelope, which:
 
 ### Solution: Peak-Centered RMS
 
-**File:** `signal_processing/emg_preprocessing.py`
+**File:** `sensors/process/emg_preprocessing.py`
 
 ```python
 def compute_mvc_peak_rms(
@@ -117,7 +181,7 @@ def compute_mvc_peak_rms(
 
 ### Hybrid MVC Segment Detection
 
-**File:** `signal_processing/emg_preprocessing.py`
+**File:** `sensors/process/emg_mvc.py`
 
 The `detect_mvc_segments_hybrid()` function uses TKEO (Teager-Kaiser Energy Operator) with evidence-driven threshold selection:
 
@@ -143,6 +207,83 @@ def detect_mvc_segments_hybrid(
         - debug_info: Dictionary with threshold method used, values, etc.
     """
 ```
+
+---
+
+## Quality Assessment System
+
+The pipeline includes comprehensive quality checks at multiple processing stages, implemented in `sensors/load/emg_quality.py` (915 lines).
+
+### Quality Check Hierarchy
+
+| Stage | Check | Fatal? | Description |
+|-------|-------|--------|-------------|
+| Loading | ADC Saturation | Yes | >1% samples at ADC limits (0 or 65520) |
+| Loading | Recording too short | Yes | <8s for MVC, <60s for sessions |
+| MVC | Faulty sensor | Yes | All values same sign (hardware failure) |
+| MVC | PSD noise | Yes | 50 Hz powerline or 200/400 Hz hardware harmonics |
+| MVC | Low amplitude | Yes | Peak <0.05 mV |
+| Session | Faulty sensor | Yes | All values same sign |
+| Session | PSD noise | Yes | Significant noise peaks detected |
+
+### PSD Noise Detection
+
+**File:** `sensors/load/emg_quality.py` → `detect_psd_noise()`
+
+Uses Welch's method PSD analysis to detect:
+- **20 Hz noise**: Unknown artifact (rare)
+- **50 Hz powerline**: European mains interference
+- **200/400 Hz harmonics**: MuscleBAN hardware artifacts
+
+#### PSD Constants (Empirically Tuned)
+
+```python
+# Target frequencies
+PEAK_20_HZ = 20
+PEAK_50_HZ = 50
+PEAK_200_HZ = 200
+PEAK_400_HZ = 400
+
+# Peak detection
+PEAK_PROMINENCE_LOW_FREQ = 0.1    # 10% for 20/50 Hz
+PEAK_PROMINENCE_HIGH_FREQ = 0.05  # 5% for 200/400 Hz
+FREQ_TOLERANCE_LOW = 4.0          # ±4 Hz for 20/50 Hz
+FREQ_TOLERANCE_HIGH = 10.0        # ±10 Hz for 200/400 Hz
+
+# 200 Hz power threshold (empirical: 0.30 gives ~50 exclusions)
+MIN_200HZ_POWER_FOR_NOISE = 0.30
+
+# Area thresholds (0-180 Hz normalized PSD)
+AREA_MIN = 45.0          # Below = poor signal quality
+AREA_MAX = 115.0         # Above = unusual power concentration
+AREA_CRITICAL = 20.0     # Below with 50 Hz peak = definite discard
+
+# Peak width factor (narrow = interference, not muscle)
+PEAK_WIDTH_FACTOR = 4.0  # Width < 4 * freq_resolution = too narrow
+```
+
+#### PSD Analysis Logic
+
+```python
+def detect_psd_noise(emg_filtered: np.ndarray, fs: float = 1000.0) -> Tuple[bool, Optional[QualityIssue]]:
+    """
+    Detect noise peaks in filtered EMG signal via PSD analysis.
+    
+    Algorithm:
+    1. Compute Welch PSD (nperseg=1024 → ~1 Hz resolution at 1000 Hz)
+    2. Normalize PSD to 0-180 Hz band (excludes high-freq where EMG is weak)
+    3. Check for prominent peaks at 20, 50, 200, 400 Hz
+    4. Validate peaks: narrow width + high prominence = interference
+    5. Return (should_discard, QualityIssue or None)
+    """
+```
+
+### Quality Diagnostic Plots
+
+When a session fails quality checks, diagnostic plots are saved to `{plots_root}/qa_flagged/`:
+- ADC saturation histograms
+- PSD plots with marked noise peaks
+- MVC segment detection visualizations
 
 ---
 
@@ -179,17 +320,17 @@ def detect_mvc_segments_hybrid(
 **Files modified:**
 - `sensors/metrics/emg_metrics.py`
 - `OH_profile/constants.py`
-- `signal_processing/emg_oh_helper.py`
-- `signal_processing/emg_metrics_export.py`
-- `visualize/oh_profile_plots.py`
+- `OH_profile/emg_oh_helper.py`
+- `sensors/metrics/emg_metrics_export.py`
+- `sensors/visualize/oh_profile_plots.py`
 
 ---
 
 ## OH Profile JSON Structure
 
-**File:** `signal_processing/emg_oh_helper.py`
+**File:** `OH_profile/emg_oh_helper.py`
 
-The EMG data is saved to OH profiles with this nested structure:
+The EMG data is saved to OH profiles with a **nested grouped structure**:
 
 ```json
 {
@@ -197,32 +338,80 @@ The EMG data is saved to OH profiles with this nested structure:
     "emg": {
       "2025-09-22": {
         "14-30-00": {
-          "left": { /* session metrics */ },
-          "right": { /* session metrics */ }
+          "left": {
+            "EMG_session": {
+              "duration_s": 1800.0,
+              "mvc_peak": 0.45,
+              "active_duration_s": 1750.0
+            },
+            "EMG_intensity": {
+              "mean_percent_mvc": 15.2,
+              "max_percent_mvc": 85.0,
+              "min_percent_mvc": 0.1,
+              "iemg_percent_seconds": 27360.0
+            },
+            "EMG_apdf": {
+              "full": {"p10": 2.1, "p50": 12.5, "p90": 35.0},
+              "active": {"p10": 3.2, "p50": 14.8, "p90": 38.5}
+            },
+            "EMG_rest_recovery": {
+              "rest_percent": 2.8,
+              "gap_frequency_per_minute": 1.5,
+              "max_sustained_activity_s": 180.0,
+              "gap_count": 45
+            },
+            "EMG_relative_bins": {
+              "below_usual_pct": 15.0,
+              "typical_low_pct": 35.0,
+              "typical_high_pct": 35.0,
+              "high_for_you_pct": 15.0
+            }
+          },
+          "right": { /* same structure */ }
         },
-        "16-00-00": { /* ... */ },
-        "daily_aggregate": {
-          "left": { /* daily aggregated metrics */ },
-          "right": { /* daily aggregated metrics */ }
+        "EMG_daily_metrics": {
+          "left": { /* aggregated daily metrics */ },
+          "right": { /* aggregated daily metrics */ }
         }
       },
-      "2025-09-23": { /* ... */ },
-      "weekly_aggregate": {
+      "EMG_weekly_metrics": {
         "left": {
           "day_count": 4,
           "duration_s": 16940.888,
           "active_apdf_p10": 2.87,
           "active_apdf_p50": 10.68,
           "active_apdf_p90": 30.29,
-          "rest_percent": 0.0,
-          "gap_frequency_per_minute": 0.0,
-          /* ... other metrics ... */
+          /* ... */
         },
         "right": { /* ... */ }
       }
     }
   }
 }
+```
+
+### OH Profile Constant Keys
+
+**File:** `OH_profile/constants.py`
+
+```python
+# Group keys
+EMG_SESSION_GROUP_KEY = 'EMG_session'
+EMG_INTENSITY_GROUP_KEY = 'EMG_intensity'
+EMG_APDF_GROUP_KEY = 'EMG_apdf'
+EMG_REST_GROUP_KEY = 'EMG_rest_recovery'
+EMG_RELATIVE_BINS_GROUP_KEY = 'EMG_relative_bins'
+
+# APDF nested keys
+EMG_APDF_FULL_KEY = 'full'
+EMG_APDF_ACTIVE_KEY = 'active'
+EMG_APDF_P10_KEY = 'p10'
+EMG_APDF_P50_KEY = 'p50'
+EMG_APDF_P90_KEY = 'p90'
+
+# Aggregation keys
+EMG_DAILY_AGGREGATE_KEY = 'EMG_daily_metrics'
+EMG_WEEKLY_AGGREGATE_KEY = 'EMG_weekly_metrics'
 ```
 
 ### Aggregation Method
@@ -235,7 +424,7 @@ The EMG data is saved to OH profiles with this nested structure:
 
 ## Visualization System
 
-**File:** `visualize/oh_profile_plots.py`
+**File:** `sensors/visualize/oh_profile_plots.py`
 
 ### Plot Types Generated
 
@@ -303,35 +492,56 @@ def generate_all_oh_profile_plots(
 
 ---
 
-## Key Files Modified
+## Key Files Reference
 
-### Core Processing
+### Core Pipeline (sensors/)
+| File | Purpose | Lines |
+|------|---------|-------|
+| `sensors/emg_pipeline.py` | Main pipeline orchestration, two-pass processing | ~1031 |
+| `sensors/types.py` | Shared type definitions (PreprocessConfig) | ~12 |
+| `sensors/__init__.py` | Package exports | ~20 |
+
+### Data Loading (sensors/load/)
+| File | Purpose | Lines |
+|------|---------|-------|
+| `sensors/load/dataset_loader.py` | Subject/day discovery | ~200 |
+| `sensors/load/daily_data_loader.py` | Load mBAN session files | ~150 |
+| `sensors/load/emg_quality.py` | **PSD noise, ADC saturation, faulty sensor detection** | ~915 |
+| `sensors/load/data_quality.py` | Quality report data structures | ~100 |
+| `sensors/load/emg_filesystem.py` | File path utilities | ~80 |
+
+### Signal Processing (sensors/process/)
 | File | Purpose |
 |------|---------|
-| `sensors/metrics/emg_metrics.py` | All metric computation functions |
-| `signal_processing/emg_preprocessing.py` | Filtering, envelope, MVC peak computation |
-| `signal_processing/emg_pipeline.py` | Main pipeline orchestration |
-| `signal_processing/emg_oh_helper.py` | OH profile JSON construction |
-| `signal_processing/emg_metrics_export.py` | CSV export functionality |
+| `sensors/process/emg_preprocessing.py` | Filtering, envelope, transfer function |
+| `sensors/process/emg_mvc.py` | MVC segment detection (hybrid TKEO), peak computation |
+| `sensors/process/filters.py` | Bandpass, notch filter implementations |
 
-### Constants and Keys
+### Metrics (sensors/metrics/)
 | File | Purpose |
 |------|---------|
-| `OH_profile/constants.py` | JSON key definitions (EMG_ACTIVE_APDF_P10_KEY, etc.) |
-| `constants.py` | Global constants (MBAN device labels, etc.) |
+| `sensors/metrics/emg_metrics.py` | Active APDF, rest metrics, session metrics |
+| `sensors/metrics/emg_metrics_export.py` | CSV export, daily/weekly aggregation |
+| `sensors/metrics/emg_session.py` | Session-level metric helpers |
 
-### Visualization
+### Visualization (sensors/visualize/)
 | File | Purpose |
 |------|---------|
-| `visualize/oh_profile_plots.py` | All plot generation from OH profiles |
-| `visualize/emg_visuals.py` | Session-level plots (APDF curves, histograms, envelopes) |
+| `sensors/visualize/emg_visuals.py` | APDF curves, histograms, envelope plots |
+| `sensors/visualize/emg_timeline.py` | Session timeline visualization |
+| `sensors/visualize/oh_profile_plots.py` | OH profile summary charts |
 
-### Data Loading
+### OH Profile Persistence (OH_profile/)
 | File | Purpose |
 |------|---------|
-| `sensors/load/dataset_loader.py` | Subject/day discovery |
-| `sensors/load/daily_data_loader.py` | Load mBAN data files |
-| `sensors/load/data_quality.py` | Quality checks and guardrails |
+| `OH_profile/constants.py` | JSON key definitions (grouped structure) |
+| `OH_profile/emg_oh_helper.py` | EMG-specific OH profile construction |
+
+### Backward Compatibility (signal_processing/)
+| File | Purpose |
+|------|---------|
+| `signal_processing/__init__.py` | Re-exports from sensors/ package |
+| `signal_processing/archive/` | Archived older MVC implementations |
 
 ---
 
@@ -367,6 +577,7 @@ if __name__ == '__main__':
 | `session_increments.csv` | Percentage changes between sessions |
 | `daily_increments.csv` | Percentage changes between days |
 | `data_quality_report.csv` | Skipped files and reasons |
+| `mvc_quality_summary.csv` | Sessions with mean %MVC > threshold (MVC calibration issues) |
 
 ### Virtual Environment
 
@@ -393,14 +604,39 @@ python main_emg.py
 ## Quick Reference: Key Function Locations
 
 ```
-compute_active_apdf()          → sensors/metrics/emg_metrics.py:73
-compute_rest_metrics()         → sensors/metrics/emg_metrics.py:117
-compute_relative_intensity_bins() → sensors/metrics/emg_metrics.py:250
-compute_mvc_peak_rms()         → signal_processing/emg_preprocessing.py
-detect_mvc_segments_hybrid()   → signal_processing/emg_preprocessing.py
-_add_relative_intensity_bins() → signal_processing/emg_pipeline.py:185
-_build_emg_profile_structure() → signal_processing/emg_oh_helper.py:155
-generate_all_oh_profile_plots() → visualize/oh_profile_plots.py
+# Pipeline entry points
+run_emg_pipeline()                 → sensors/emg_pipeline.py
+create_preprocess_config()         → sensors/emg_pipeline.py
+
+# Quality checks
+detect_psd_noise()                 → sensors/load/emg_quality.py
+detect_adc_saturation()            → sensors/load/emg_quality.py
+is_faulty_mban()                   → sensors/load/emg_quality.py
+assess_mvc_signal_quality()        → sensors/load/emg_quality.py
+
+# Metric computation
+compute_active_apdf()              → sensors/metrics/emg_metrics.py
+compute_rest_metrics()             → sensors/metrics/emg_metrics.py
+compute_session_metrics()          → sensors/metrics/emg_metrics.py
+compute_relative_intensity_bins()  → sensors/metrics/emg_metrics.py
+
+# MVC processing
+detect_mvc_segments_hybrid()       → sensors/process/emg_mvc.py
+compute_mvc_peak_rms()             → sensors/process/emg_preprocessing.py
+pick_mvc()                         → sensors/process/emg_mvc.py
+
+# Signal processing
+preprocess_emg()                   → sensors/process/emg_preprocessing.py
+bandpass_filter()                  → sensors/process/emg_preprocessing.py
+compute_tkeo_envelope()            → sensors/process/emg_preprocessing.py
+
+# OH profile persistence
+save_emg_to_oh_profiles()          → OH_profile/emg_oh_helper.py
+_build_session_metrics_dict()      → OH_profile/emg_oh_helper.py
+
+# Visualization
+generate_emg_plots_from_oh_profiles() → sensors/visualize/oh_profile_plots.py
+plot_apdf()                        → sensors/visualize/emg_visuals.py
 ```
 
 ---

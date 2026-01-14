@@ -11,6 +11,18 @@ from .emg_metrics import (
     aggregate_weekly_metrics,
     compute_percentage_changes,
 )
+from .emg_metrics_export import (
+    build_tables,
+    write_tables,
+    persist_quality_report,
+    export_mvc_quality_summary,
+    MVC_QUALITY_THRESHOLD_PERCENT,
+)
+from .emg_session import (
+    infer_sample_rate,
+    compute_session_effort,
+    build_session_metadata,
+)
 
 __all__ = [
     'get_sensor_timeline_metrics',
@@ -24,4 +36,14 @@ __all__ = [
     'aggregate_daily_metrics',
     'aggregate_weekly_metrics',
     'compute_percentage_changes',
+    # Export utilities
+    'build_tables',
+    'write_tables',
+    'persist_quality_report',
+    'export_mvc_quality_summary',
+    'MVC_QUALITY_THRESHOLD_PERCENT',
+    # Session utilities
+    'infer_sample_rate',
+    'compute_session_effort',
+    'build_session_metadata',
 ]

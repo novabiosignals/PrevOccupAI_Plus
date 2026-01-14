@@ -18,7 +18,7 @@ from scipy.ndimage import gaussian_filter1d
 from scipy.signal import butter, filtfilt
 
 # internal imports
-from signal_processing.emg_types import PreprocessConfig
+from sensors.types import PreprocessConfig
 
 
 # -------------------------------------------------------------------------------------------------------------------- #
@@ -91,27 +91,40 @@ def _compute_envelope(
     df: pd.DataFrame,
     config: PreprocessConfig,
     return_raw: bool = False,
-) -> np.ndarray | tuple[np.ndarray, np.ndarray]:
+    return_raw_adc: bool = False,
+) -> np.ndarray | tuple[np.ndarray, np.ndarray] | tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Transform a raw session dataframe into an EMG envelope (and optionally raw signal).
 
     :param df: DataFrame that still contains nSeq + EMG (and possibly ACC) columns.
     :param config: Frequency-domain configuration shared across sessions.
     :param return_raw: When ``True`` also returns the unfiltered EMG trace for plotting.
-    :returns: Envelope-only array or ``(envelope, raw)`` tuple when ``return_raw`` is set.
+    :param return_raw_adc: When ``True`` also returns raw ADC values for saturation checks.
+    :returns: Envelope-only array, ``(envelope, raw_mv)`` tuple when ``return_raw`` is set,
+              or ``(envelope, raw_mv, raw_adc)`` when both flags are set.
     """
 
-    emg_mv = _extract_emg_mv(df) # get EMG column in mV
+    if return_raw_adc:
+        emg_mv, raw_adc = _extract_emg_mv(df, return_raw_adc=True)
+    else:
+        emg_mv = _extract_emg_mv(df)
+        raw_adc = None
+    
     envelope = preprocess_emg(emg_mv, config["fs"], config["lowcut"], config["highcut"], config["smooth_sigma_ms"]) 
+    
+    if return_raw and return_raw_adc:
+        return envelope, emg_mv, raw_adc
     if return_raw:
-        return envelope, emg_mv # return both envelope and raw EMG in mV
+        return envelope, emg_mv
     return envelope
 
 
-def _extract_emg_mv(df: pd.DataFrame) -> np.ndarray:
+def _extract_emg_mv(df: pd.DataFrame, return_raw_adc: bool = False) -> np.ndarray | tuple[np.ndarray, np.ndarray]:
     """Locate the EMG column, convert it to millivolts, and guard against empty recordings.
 
     :param df: Session dataframe containing EMG plus optional auxiliary channels.
-    :returns: One-dimensional NumPy array with values expressed in millivolts.
+    :param return_raw_adc: When True, also returns raw ADC values for saturation checks.
+    :returns: One-dimensional NumPy array with values expressed in millivolts,
+              or tuple (emg_mv, raw_adc) if return_raw_adc is True.
     """
 
     emg_cols = [col for col in df.columns if "emg" in str(col).lower()]
@@ -126,7 +139,11 @@ def _extract_emg_mv(df: pd.DataFrame) -> np.ndarray:
     raw_values = df[target_col].to_numpy()
     if raw_values.size == 0:
         raise ValueError("Empty EMG column")
-    return _to_millivolts(raw_values)
+    
+    emg_mv = _to_millivolts(raw_values)
+    if return_raw_adc:
+        return emg_mv, raw_values
+    return emg_mv
 
 
 def _to_millivolts(raw_values: np.ndarray) -> np.ndarray:

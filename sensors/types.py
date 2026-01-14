@@ -1,7 +1,7 @@
 """Shared type definitions for EMG signal processing modules.
 
 This module provides type aliases and type definitions used across
-the signal_processing package to avoid circular imports.
+the sensors package to avoid circular imports.
 """
 
 from typing import Any, Dict

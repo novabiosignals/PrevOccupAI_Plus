@@ -8,7 +8,7 @@ from typing import Sequence
 from constants import MBAN
 from sensors.load.data_quality import FileQualityReport
 from sensors.load.dataset_loader import discover_daily_acquisitions
-from signal_processing import create_preprocess_config, run_emg_pipeline
+from sensors.emg_pipeline import create_preprocess_config, run_emg_pipeline
 
 # ------------------------------------------------------------------------------------------------------------------- #
 # Configuration

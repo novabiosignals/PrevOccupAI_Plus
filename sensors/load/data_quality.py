@@ -8,6 +8,7 @@ import numpy as np
 import pandas as pd
 
 from constants import FS_MBAN
+from sensors.load.emg_quality import detect_adc_saturation
 
 
 # Type aliases for clarity
@@ -131,6 +132,10 @@ def assess_muscleban_dataframe(
                 report["issues"].append(
                     create_quality_issue("flat-signal", "EMG shows ~0 variance; likely saturated or empty.")
                 )
+            # Check for ADC saturation/clipping (raw integer values hitting limits)
+            saturation_issue = detect_adc_saturation(finite_values)
+            if saturation_issue:
+                report["issues"].append(saturation_issue)
         else:
             report["issues"].append(create_quality_issue("non-finite", "EMG column contains no finite samples."))
 
