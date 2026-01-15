@@ -161,7 +161,6 @@ def plot_timeline_per_acquisition(day_metrics_dict: Dict, day: str, subject: str
         handle_plot(save_dir=output_path, save=True, filename=filename)
 
 
-
 def get_day_string(date_string: str, locale_string: str = "Portuguese_Portugal.1252") -> Tuple[str, str]:
     """
     Gets the day as a string (i.e. Mon, Tue, Wednesday, etc.) from a date string in the language of the defined locale

@@ -7,6 +7,7 @@ import os
 import sensors.load as sl
 import sensors.metrics as sm
 import sensors.visualize as sv
+from sensors.visualize.wrist_activities import _organize_wrist_activities_from_oh_profile
 from utils import extract_group_from_path, extract_device_num_from_path
 from OH_profile.load import get_OH_profile
 from OH_profile.write import save_OH_profile, write_to_OH_profile
@@ -22,7 +23,7 @@ GENERATE_PLOTS = True
 # ------------------------------------------------------------------------------------------------------------------- #
 DRIVE = "E"
 DATASET_PATH = "Backup PrevOccupAI_PLUS Data\\data"
-SUBJECT_FOLDER_PATH = f"{DRIVE}:\\{DATASET_PATH}\\group1\\sensors\\LIBPhys #003"
+SUBJECT_FOLDER_PATH = f"{DRIVE}:\\{DATASET_PATH}\\group1\\sensors\\LIBPhys #001"
 OH_PROFILE_PATH = r"C:\Users\srale\Desktop\OH_profiles"
 PLOTS_OUTPUT_PATH = r"C:\Users\srale\Desktop\timeline_plots"
 FS = 100
@@ -66,6 +67,6 @@ if GENERATE_NOISE_OH_PROFILE:
             # save to json
             save_OH_profile(OH_PROFILE_PATH, subject_id, oh_profile)
 
-    # if GENERATE_PLOTS:
-    #
-    #     sv.plot_noise_metrics_per_week(oh_profile[SENSOR_METRICS_KEY][NOISE_KEY], str(subject_id), PLOTS_OUTPUT_PATH)
+    if GENERATE_PLOTS:
+
+        sv.plot_wrist_movements_heatmaps(oh_profile[SENSOR_METRICS_KEY][WRIST_KEY], str(subject_id), PLOTS_OUTPUT_PATH)
