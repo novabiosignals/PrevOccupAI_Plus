@@ -27,12 +27,13 @@ import re
 from pathlib import Path
 from typing import List, Dict
 from .subject_info import load_participants_info, get_muscleban_side
-from constants import PHONE, WATCH, MBAN, MAC_ADDRESS_PATTERN, PHONE_SENSORS, WATCH_SENSORS, MBAN_SENSORS
+from constants import PHONE, WATCH, MBAN, MAC_ADDRESS_PATTERN, PHONE_SENSORS, WATCH_SENSORS, MBAN_SENSORS, HEART
 
 # ------------------------------------------------------------------------------------------------------------------- #
 # file specific constants
 # ------------------------------------------------------------------------------------------------------------------- #
 MIN_BYTES = 1500
+MIN_BYTES_INERTIAL = 1000000
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # public functions
@@ -267,12 +268,13 @@ def _get_android_filepaths(device_name: str, sensor_list: List[str], folder_path
 
         # check for the string ANDROID but can not have WEAR
         files = [file for file in Path(folder_path).resolve().glob("**/*ANDROID*") if "WEAR" not in file.name
-                 and file.stat().st_size >= MIN_BYTES]
+                 and file.stat().st_size >= MIN_BYTES_INERTIAL]
 
     else:
 
         # check for the string ANDROID but can not have WEAR
-        files = [file for file in Path(folder_path).resolve().glob("**/*WEAR*") if file.stat().st_size >= MIN_BYTES]
+        files = [file for file in Path(folder_path).resolve().glob("**/*WEAR*")
+                 if (file.stat().st_size >= MIN_BYTES if HEART in file.name else file.stat().st_size >= MIN_BYTES_INERTIAL)]
 
     # get only the files from the sensors in sensor_list
     if sensor_list:

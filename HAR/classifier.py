@@ -29,7 +29,7 @@ import os
 # internal imports
 from .feature_extractor import extract_features, trim_data
 from .load import load_production_model
-from constants import ACC, GYR, MAG
+from constants import ACC, GYR, MAG, ACTIVITY_COLUMN_NAME
 
 # ------------------------------------------------------------------------------------------------------------------- #
 # constants
@@ -37,7 +37,6 @@ from constants import ACC, GYR, MAG
 SENSORS_TO_LOAD = [ACC, GYR, MAG] # sensors to extract features from
 
 HAR_MODEL = "HAR_model_500.joblib"
-ACTIVITY_COLUMN_NAME = 'activity'
 
 PROB_THRESHOLD = 0.85 # threshold for probability thresholding
 MIN_DURATIONS = {0: 20, 1: 30, 2: 5} # durations for 0 (sitting), 1 (standing), 2 (walking)

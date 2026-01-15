@@ -1,4 +1,6 @@
 from .sensor_timeline import get_sensor_timeline_metrics
+from .heart_rate import get_global_heart_rate_metrics, get_heart_rate_metrics
+from .noise import get_noise_metrics
 from .emg_metrics import (
     DEFAULT_REST_THRESHOLD_MVC,
     MIN_ACTIVE_DURATION_FOR_BASELINE_S,
@@ -21,6 +23,10 @@ from .emg_output import (
 
 __all__ = [
     'get_sensor_timeline_metrics',
+    'get_global_heart_rate_metrics',
+    'get_heart_rate_metrics',
+    'get_noise_metrics',
+    # EMG metrics
     'DEFAULT_REST_THRESHOLD_MVC',
     'MIN_ACTIVE_DURATION_FOR_BASELINE_S',
     'compute_apdf',

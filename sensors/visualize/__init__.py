@@ -1,5 +1,6 @@
-# Sensor timeline (non-EMG specific)
 from .sensor_timeline import generate_sensor_timeline_plot, get_daily_acquisitions_metadata
+from .heart_rate import plot_hr_timeline_per_acquisition, plot_weekly_hr_data, plot_hr_ranges
+from .noise import plot_noise_metrics_per_week
 
 # EMG Research: In-memory / signal-based visualizations
 from .emg_research import (
@@ -31,6 +32,12 @@ __all__ = [
     # Sensor timeline
     'generate_sensor_timeline_plot',
     'get_daily_acquisitions_metadata',
+    # Heart rate
+    'plot_hr_timeline_per_acquisition',
+    'plot_weekly_hr_data',
+    'plot_hr_ranges',
+    # Noise
+    'plot_noise_metrics_per_week',
     # EMG research (in-memory / signal-based)
     'plot_apdf',
     'plot_envelope',

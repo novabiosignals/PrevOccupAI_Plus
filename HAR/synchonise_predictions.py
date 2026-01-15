@@ -2,21 +2,14 @@
 # imports
 # ------------------------------------------------------------------------------------------------------------------- #
 import pandas as pd
-from typing import Dict, Union
+from typing import Dict
 import copy
 
 
 # internal imports
 from .classifier import classify_human_activities
-from constants import PHONE, WATCH, MBAN_LEFT, MBAN_RIGHT
+from constants import PHONE, WATCH, MBAN_LEFT, MBAN_RIGHT, WATCH_SUFFIX, MBAN_L_SUFFIX, MBAN_R_SUFFIX
 
-# ------------------------------------------------------------------------------------------------------------------- #
-# constants
-# ------------------------------------------------------------------------------------------------------------------- #
-
-WATCH_SUFFIX = '_WEAR'
-MBAN_L_SUFFIX = '_MBAN_L'
-MBAN_R_SUFFIX = '_MBAN_R'
 
 # ------------------------------------------------------------------------------------------------------------------- #
 # public functions
@@ -57,7 +50,7 @@ def classify_and_synchronise_predictions(daily_data_dict: Dict[str, Dict[str, pd
             sensor_df = _add_suffix_to_column_name(device_name, sensor_df)
 
             # create time column using the acquisition time and sampling frequency
-            time_col = _create_time_column_from_initial_time(acquisition_time, sensor_df.shape[0], fs)
+            time_col = create_time_column_from_initial_time(acquisition_time, sensor_df.shape[0], fs)
 
             # add time column to the sensor_df
             sensor_df['time'] = time_col
@@ -82,11 +75,8 @@ def classify_and_synchronise_predictions(daily_data_dict: Dict[str, Dict[str, pd
 
     return complete_df
 
-# ------------------------------------------------------------------------------------------------------------------- #
-# public functions
-# ------------------------------------------------------------------------------------------------------------------- #
 
-def _create_time_column_from_initial_time(initial_time: str, signal_size: int, fs: int) -> pd.Series:
+def create_time_column_from_initial_time(initial_time: str, signal_size: int, fs: int) -> pd.Series:
     """
     Generate a time column, starting from a given clock time.
 
@@ -113,6 +103,10 @@ def _create_time_column_from_initial_time(initial_time: str, signal_size: int, f
     time_series = pd.Series([t.strftime('%H:%M:%S.%f')[:-3] for t in time_index])
 
     return time_series
+# ------------------------------------------------------------------------------------------------------------------- #
+# private functions
+# ------------------------------------------------------------------------------------------------------------------- #
+
 
 
 def _add_suffix_to_column_name(device_name: str, df: pd.DataFrame) -> pd.DataFrame:

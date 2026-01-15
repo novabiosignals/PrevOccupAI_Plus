@@ -3,6 +3,17 @@ File containing a dictionaries and lists to map the column names from limesurvey
 the code responses to readable text
 """
 
+# ------------------------------------------------------------------------------------------------------------------- #
+# Workload  mappings
+# ------------------------------------------------------------------------------------------------------------------- #
+WORKLOAD_COLUMN_NAMES_MAP = {
+    'diario[SQ001]': 'focus_and_mental_strain',
+    'diario[SQ002]': 'rushed_and_under_pressure',
+    'diario[SQ003]': 'frequent_interruptions',
+    'diario[SQ004]': 'more_effort_than_resources',
+    'diario[SQ005]': 'heavy_workload',
+    'questAberta': 'open_question'
+}
 
 # ------------------------------------------------------------------------------------------------------------------- #
 # Estilo de Vida mappings
@@ -127,9 +138,9 @@ DD_ANSWERS_MAP = {
 
 ID_OLD_COLUMNS = ['SQ001', 'SQ002', 'SQ003', 'SQ004', 'SQ005', 'SQ006', 'SQ007', 'SQ008', 'SQ009']
 
-ID_NEW_COLUMNS = ['Cervical / pescoço', 'Ombros', 'Região dorsal superior / Torácica',
-                       'Braços(cotovelo / antebraço)', 'Punhos / mãos / dedos', 'Região dorsal inferior / Lombar',
-                       'Ancas / coxas', 'Joelhos', 'Pés / tornozelos']
+ID_NEW_COLUMNS = ['cervical/pescoço', 'ombros', 'região_dorsal_superior/torácica',
+                       'braços(cotovelo/antebraço)', 'punhos/mãos/dedos', 'região_dorsal_inferior/Lombar',
+                       'ancas/coxas', 'joelhos', 'pés/tornozelos']
 
 ID_ANSWERS_MAP = {
     "incapacidade_sofrimento": {
