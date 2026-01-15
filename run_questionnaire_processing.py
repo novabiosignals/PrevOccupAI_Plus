@@ -22,7 +22,9 @@ PROCESS_ENVIRONMENT = True
 PROCESS_BIOMECHANICAL = True
 PROCESS_WORKLOAD = True
 GENERATE_QUESTIONNAIRES_DATASET = False
-GENERATE_OH_PROFILE = True
+GENERATE_OH_PROFILE = False
+
+VISUALIZE = True
 
 # ------------------------------------------------------------------------------------------------------------------- #
 # file constants
@@ -33,6 +35,7 @@ SCORES_OUT_PATH = r"C:\Users\srale\Desktop\carga de trabalho\results"
 RAW_LIMESURVEY_PATH = R"C:\Users\srale\Desktop\sara\limesurvey_questionarios"
 DATASET_OUTPUT_PATH = "C:\\Users\\srale\\Desktop\\carga de trabalho\\dataset"
 OH_PROFILE_PATH = r"C:\Users\srale\Desktop\OH_profiles"
+PLOTS_OUTPUT_PATH = r"C:\Users\srale\Desktop\timeline_plots"
 
 # ------------------------------------------------------------------------------------------------------------------- #
 # generate dataset from raw and unfiltered limesurvey files
@@ -197,3 +200,26 @@ if GENERATE_OH_PROFILE:
 
 
 
+# ------------------------------------------------------------------------------------------------------------------- #
+# visualize
+# ------------------------------------------------------------------------------------------------------------------- #
+
+if VISUALIZE:
+
+    # get list with all subject ids
+    subject_id_list = sl.get_participant_ids_list(sl.load_participants_info())
+
+    # cycle over the subject id's
+    for subject_id in subject_id_list:
+
+        # get oh profile
+        oh_profile = get_OH_profile(OH_PROFILE_PATH, subject_id)
+
+        # check if there are biomechanical metrics to plot
+        if len(oh_profile[SINGLE_INSTANCE_QUESTIONNAIRE_KEY][BIOMECHANICAL_DOMAIN_KEY]) > 0:
+
+            # plot rosa
+            questionnaires.generate_rosa_plots(oh_profile[SINGLE_INSTANCE_QUESTIONNAIRE_KEY][BIOMECHANICAL_DOMAIN_KEY], subject_id, PLOTS_OUTPUT_PATH)
+
+        else:
+            print(f"No biomechanical metrics to plot for subject {subject_id}. \nPlease generate the oh profile first by setting {GENERATE_OH_PROFILE} to True.")

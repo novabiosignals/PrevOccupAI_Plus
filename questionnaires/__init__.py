@@ -5,6 +5,7 @@ from questionnaires.load.limesurvey_parser import generate_questionnaires_datase
 from questionnaires.process.daily_workload import clean_daily_workload
 from .metrics import (get_single_instance_questionnaire_metrics, get_domain_key_from_filename, get_psychosocial_metrics,
                       get_daily_workload_metrics, get_metadata_metrics)
+from .visualize import generate_rosa_plots
 
 
 __all__ = [
