@@ -11,17 +11,12 @@ from .emg_metrics import (
     aggregate_weekly_metrics,
     compute_percentage_changes,
 )
-from .emg_metrics_export import (
+from .emg_output import (
     build_tables,
     write_tables,
     persist_quality_report,
     export_mvc_quality_summary,
     MVC_QUALITY_THRESHOLD_PERCENT,
-)
-from .emg_session import (
-    infer_sample_rate,
-    compute_session_effort,
-    build_session_metadata,
 )
 
 __all__ = [
@@ -42,8 +37,4 @@ __all__ = [
     'persist_quality_report',
     'export_mvc_quality_summary',
     'MVC_QUALITY_THRESHOLD_PERCENT',
-    # Session utilities
-    'infer_sample_rate',
-    'compute_session_effort',
-    'build_session_metadata',
 ]

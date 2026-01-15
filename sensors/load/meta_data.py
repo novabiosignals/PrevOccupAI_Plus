@@ -33,7 +33,7 @@ def load_meta_data(csv_path: str | Path = 'participants_info.csv') -> pd.DataFra
     return pd.read_csv(path, sep=';', encoding='utf-8', index_col='subject_id')
 
 
-def get_muscleban_side(meta_data_df: pd.DataFrame, mac_address: str) -> str | None:
+def get_muscleban_side(meta_data_df: pd.DataFrame, mac_address: str) -> str | None: # I'm not using this function
     """Return ``mBAN_left`` or ``mBAN_right`` based on the MAC address lookup.
 
     :param meta_data_df: DataFrame returned by :func:`load_meta_data`.

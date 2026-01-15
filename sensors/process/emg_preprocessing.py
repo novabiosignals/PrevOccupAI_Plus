@@ -18,7 +18,7 @@ from scipy.ndimage import gaussian_filter1d
 from scipy.signal import butter, filtfilt
 
 # internal imports
-from sensors.types import PreprocessConfig
+from sensors.emg_pipeline import PreprocessConfig
 
 
 # -------------------------------------------------------------------------------------------------------------------- #

@@ -1,11 +1,15 @@
 """
-OH Profile EMG Visualizations
+EMG OH Profile Visualizations
 
-This module generates visualization plots from OH profiles and session metrics:
+This module generates visualization plots from OH profile JSON files:
 - Daily relative intensity donut charts (aggregate per day)
-- Weekly relative intensity bins overview (3 days per row, same format as rest/active)
+- Weekly relative intensity bins overview (3 days per row)
 - Daily relative intensity session stacks
 - Weekly Active APDF trends
+- Session timeline with relative intensity zones (using OH profile baseline)
+
+All functions in this module READ pre-computed metrics from OH profiles.
+For functions that COMPUTE metrics from raw signals, see emg_research.py.
 
 Plot labels and legends are in European Portuguese.
 """
@@ -15,11 +19,13 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
-from matplotlib.patches import FancyBboxPatch
+import matplotlib.dates as mdates
 from matplotlib.transforms import Bbox
 import numpy as np
 import pandas as pd
 from matplotlib.axes import Axes
+from datetime import datetime, timedelta
+from scipy.ndimage import uniform_filter1d
 
 from OH_profile.constants import (
     SENSOR_METRICS_KEY,
@@ -81,7 +87,40 @@ TRANSLATIONS_PT = {
     "No data": "Sem dados",
     "No sessions": "Sem sessões",
     "MVC underestimated": "MVC subestimado",
+    "Time": "Hora",
+    "EMG (%MVC)": "EMG (%MVC)",
+    "Rest": "Descanso",
+    "Left": "Esquerdo",
+    "Right": "Direito",
+    "Session Timeline": "Cronograma da Sessão",
+    "Summary": "Resumo",
+    "min": "min",
+    "Below usual": "Abaixo do habitual",
+    "Typical low": "Típico-baixo",
+    "Typical high": "Típico-alto",
+    "High for you": "Alto para si",
+    "Time in each zone": "Tempo em cada zona",
+    "vs Weekly Baseline": "vs Linha de Base Semanal",
+    "P10": "P10",
+    "P50": "P50",
+    "P90": "P90",
 }
+
+# Timeline processing constants
+RMS_WINDOW_S = 0.5
+REST_THRESHOLD_MVC = 0.5
+TIME_BIN_S = 5
+
+# Timeline bin colors
+COLOR_BELOW_USUAL = "#8BC34A"
+COLOR_TYPICAL_LOW = "#4CAF50"
+COLOR_TYPICAL_HIGH = "#FF9800"
+COLOR_HIGH_FOR_YOU = "#F44336"
+COLOR_ENVELOPE = "#1565C0"
+COLOR_THRESHOLD_LINES = "#666666"
+
+BIN_COLORS = [COLOR_BELOW_USUAL, COLOR_TYPICAL_LOW, COLOR_TYPICAL_HIGH, COLOR_HIGH_FOR_YOU]
+BIN_LABELS_PT = ["Abaixo do habitual", "Típico-baixo", "Típico-alto", "Alto para si"]
 
 
 # -------------------------------------------------------------------------------------------------------------------- #
@@ -144,6 +183,57 @@ def _get_relative_bin_percentages(metrics: Dict[str, Any]) -> List[Optional[floa
         bins.get(key)
         for key in RELATIVE_BIN_KEYS
     ]
+
+
+# -------------------------------------------------------------------------------------------------------------------- #
+# OH Profile Baseline Extraction
+# -------------------------------------------------------------------------------------------------------------------- #
+
+def create_weekly_baseline(p10: float, p50: float, p90: float) -> Dict[str, float]:
+    """
+    Create a weekly baseline dictionary for relative intensity binning.
+    
+    :param p10: 10th percentile of weekly Active APDF.
+    :param p50: 50th percentile (median).
+    :param p90: 90th percentile.
+    :returns: Dict with keys 'p10', 'p50', 'p90'.
+    """
+    return {"p10": p10, "p50": p50, "p90": p90}
+
+
+def create_baseline_from_oh_profile(
+    oh_profile: dict,
+    side: str,
+) -> Optional[Dict[str, float]]:
+    """
+    Extract weekly baseline from an OH profile for timeline generation.
+    
+    This function reads the pre-computed weekly Active APDF percentiles from
+    an OH profile JSON and returns them as a baseline dictionary for use
+    in timeline visualizations.
+    
+    :param oh_profile: OH profile dictionary.
+    :param side: 'left' or 'right'.
+    :returns: Dict with 'p10', 'p50', 'p90' keys, or None if data not available.
+    """
+    try:
+        emg_data = oh_profile.get(SENSOR_METRICS_KEY, {}).get(EMG_KEY, {})
+        weekly_agg = emg_data.get(EMG_WEEKLY_AGGREGATE_KEY, {})
+        side_data = weekly_agg.get(side, {})
+        
+        # Use helper to extract from nested structure
+        active_apdf = get_emg_apdf_active(side_data)
+        p10 = active_apdf.get('p10')
+        p50 = active_apdf.get('p50')
+        p90 = active_apdf.get('p90')
+        
+        if p10 is not None and p50 is not None and p90 is not None:
+            return create_weekly_baseline(p10=p10, p50=p50, p90=p90)
+        
+    except Exception as e:
+        print(f"[emg_oh] Error extracting baseline from OH profile: {e}")
+    
+    return None
 
 
 # -------------------------------------------------------------------------------------------------------------------- #
@@ -607,7 +697,7 @@ def plot_week_relative_bins_stacks_from_json(
                 ax.yaxis.tick_right()
             ax.set_title(f"Ombro {TRANSLATIONS_PT[side]}")
             ax.set_axisbelow(True)
-            ax.grid(axis="x", alpha=0.3, linestyle="--", linewidth=1.5) # vertical dashed lines
+            ax.grid(axis="x", alpha=0.3, linestyle="--", linewidth=1.5)
             
             # Remove all spines except bottom
             ax.spines["top"].set_visible(False)
@@ -766,7 +856,7 @@ def generate_emg_plots_from_oh_profiles(
         emg_data = _get_emg_data(oh_profile)
 
         if not emg_data:
-            print(f"[oh_profile_plots] No EMG data for subject {subject_id_str}")
+            print(f"[emg_oh] No EMG data for subject {subject_id_str}")
             continue
 
         subject_plots: List[Path] = []
@@ -809,6 +899,6 @@ def generate_emg_plots_from_oh_profiles(
 
         if subject_plots:
             all_plots[subject_id_str] = subject_plots
-            print(f"[oh_profile_plots] Generated {len(subject_plots)} plots for subject {subject_id_str}")
+            print(f"[emg_oh] Generated {len(subject_plots)} plots for subject {subject_id_str}")
 
     return all_plots

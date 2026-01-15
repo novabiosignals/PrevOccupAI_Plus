@@ -33,6 +33,10 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple, cast
 
+# Type alias for preprocessing configuration dictionary.
+# Keys typically include: fs, lowcut, highcut, smooth_sigma_ms, envelope_preview_seconds
+PreprocessConfig = Dict[str, Any]
+
 # Third-party
 import numpy as np
 import pandas as pd
@@ -43,7 +47,7 @@ from constants import FS_MBAN, MBAN_LEFT, MBAN_RIGHT
 # Internal - data loading and quality
 from sensors.load.data_quality import FileQualityReport, create_file_quality_report, create_quality_issue
 from sensors.load.dataset_loader import load_day_acquisitions
-from sensors.load.emg_quality import (
+from sensors.process.emg_quality_analysis import (
     assess_mvc_signal_quality,
     detect_adc_saturation,
     detect_psd_noise,
@@ -58,7 +62,7 @@ from sensors.metrics.emg_metrics import (
     compute_relative_intensity_bins,
     compute_session_metrics,
 )
-from sensors.metrics.emg_metrics_export import (
+from sensors.metrics.emg_output import (
     build_tables,
     export_mvc_quality_summary,
     persist_quality_report,
@@ -77,14 +81,16 @@ from sensors.process.emg_preprocessing import (
     transfer_emg,
 )
 
-# Internal - types
-from sensors.types import PreprocessConfig
-
 # Internal - visualization
-from sensors.visualize.emg_timeline import generate_session_timeline_from_signal
-from sensors.visualize.emg_visuals import plot_apdf, plot_histogram, plot_mvc_hybrid_diagnostics, plot_mvc_segments
-from sensors.visualize.oh_profile_plots import generate_emg_plots_from_oh_profiles
-from visualize.processing import plot_envelope
+from sensors.visualize.emg_research import (
+    generate_session_timeline_from_signal,
+    plot_apdf,
+    plot_envelope,
+    plot_histogram,
+    plot_mvc_hybrid_diagnostics,
+    plot_mvc_segments,
+)
+from sensors.visualize.emg_oh import generate_emg_plots_from_oh_profiles
 
 # Internal - OH profile persistence
 from OH_profile.emg_oh_helper import save_emg_to_oh_profiles
@@ -152,7 +158,7 @@ def run_emg_pipeline(
     """
 
     if config is None:
-        config = create_preprocess_config() 
+        config = create_preprocess_config() # define default paraemeters if none provided   
 
     percentiles = tuple(percentiles)
 
@@ -389,7 +395,180 @@ def _add_relative_intensity_bins(
 
 
 # -------------------------------------------------------------------------------------------------------------------- #
-# Day Processing Functions
+# Day Processing Helper Functions
+# -------------------------------------------------------------------------------------------------------------------- #
+
+def _get_side_from_device(device_label: str) -> str:
+    """Extract 'left' or 'right' from device label."""
+    device_lower = device_label.lower()
+    if MBAN_LEFT.lower() in device_lower:
+        return "left"
+    elif MBAN_RIGHT.lower() in device_lower:
+        return "right"
+    return device_label
+
+
+def _save_qa_plot(
+    plots_root: Path,
+    plot_type: str,
+    signal: np.ndarray,
+    subject_id: str,
+    side: str,
+    date_label: str,
+    session_label: str,
+    acquisition_type: str,
+    fs: float,
+) -> None:
+    """Save a QA diagnostic plot to the qa_flagged folder.
+    
+    :param plots_root: Root directory for plots.
+    :param plot_type: Either 'adc_saturation' or 'psd_noise'.
+    :param signal: The signal data (raw_adc for ADC, filtered for PSD).
+    :param subject_id: Subject identifier.
+    :param side: 'left' or 'right'.
+    :param date_label: Date in DD-MM-YYYY format.
+    :param session_label: Session or MVC label.
+    :param acquisition_type: 'mvc' or 'session'.
+    :param fs: Sampling frequency.
+    """
+    qa_plots_dir = plots_root / "qa_flagged"
+    qa_plots_dir.mkdir(parents=True, exist_ok=True)
+    
+    if plot_type == "adc_saturation":
+        save_adc_saturation_plot(
+            raw_adc=signal,
+            output_dir=str(qa_plots_dir),
+            subject_id=subject_id,
+            side=side,
+            session_label=session_label,
+            acquisition_type=acquisition_type,
+            fs=fs,
+        )
+    elif plot_type == "psd_noise":
+        save_quality_assessment_plot(
+            emg_filtered=signal,
+            output_dir=str(qa_plots_dir),
+            subject_id=subject_id,
+            side=side,
+            session_label=session_label,
+            acquisition_type=acquisition_type,
+            fs=fs,
+        )
+
+
+def _log_quality_issue(
+    quality_log: List[FileQualityReport],
+    issues: List[dict],
+    subject_id: str,
+    date_label: str,
+    device_label: str,
+    acquisition_label: Optional[str],
+    signal_length: int,
+    is_mvc: bool = False,
+) -> None:
+    """Append a quality report to the log.
+    
+    :param quality_log: List to append the report to.
+    :param issues: List of quality issue dicts.
+    :param subject_id: Subject identifier.
+    :param date_label: Date label from raw data.
+    :param device_label: Device label (e.g., 'mBAN_left').
+    :param acquisition_label: Session or MVC label (can be None for MVC).
+    :param signal_length: Number of samples in the signal.
+    :param is_mvc: Whether this is an MVC recording.
+    """
+    acq_label = acquisition_label or "MVC"  # Default to "MVC" if None
+    if is_mvc:
+        synthetic_path = Path(f"MVC/{subject_id}_{date_label}_{device_label}.mvc")
+    else:
+        synthetic_path = Path(f"sessions/{subject_id}_{date_label}_{device_label}_{acq_label}.emg")
+    
+    quality_log.append(
+        create_file_quality_report(
+            file_path=synthetic_path,
+            issues=issues,
+            rows=signal_length,
+            columns=1,
+            device_label=device_label,
+            acquisition_label=acq_label,
+        )
+    )
+
+
+def _plot_mvc_segments_with_diagnostics(
+    plots_root: Path,
+    subject_id: str,
+    date_label: str,
+    side: str,
+    plot_signal: np.ndarray,
+    segments: List[Tuple[int, int]],
+    threshold_val: float,
+    fs: float,
+    title_suffix: str,
+    method_name: str,
+    failed: bool = False,
+    hybrid_debug_info: Optional[dict] = None,
+    raw_mv: Optional[np.ndarray] = None,
+    show: bool = False,
+) -> None:
+    """Save MVC segment visualization and optional hybrid diagnostics.
+    
+    :param plots_root: Root directory for plots.
+    :param subject_id: Subject identifier.
+    :param date_label: Date in DD-MM-YYYY format.
+    :param side: 'left' or 'right'.
+    :param plot_signal: Signal to plot (envelope or TKEO).
+    :param segments: List of (start, end) segment tuples.
+    :param threshold_val: Threshold value used for detection.
+    :param fs: Sampling frequency.
+    :param title_suffix: Suffix for plot title (e.g., '(hybrid: baseline)').
+    :param method_name: Method name for legend.
+    :param failed: Whether segmentation failed (affects filename and title).
+    :param hybrid_debug_info: Optional debug info for hybrid diagnostics plot.
+    :param raw_mv: Raw signal in mV (needed for hybrid diagnostics).
+    :param show: Whether to display the plot interactively.
+    """
+    mvc_dir = plots_root / subject_id / date_label / side / "MVC"
+    mvc_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Determine filenames based on success/failure
+    if failed:
+        segments_filename = "mvc_segments_failed.png"
+        diagnostics_filename = "mvc_hybrid_diagnostics_failed.png"
+        title_prefix = f"MVC segmentation – {subject_id} {side} {date_label} {title_suffix} [FAILED: {len(segments)} segments]"
+        diag_title = f"MVC Hybrid Diagnostics – {subject_id} {side} {date_label} [FAILED]"
+    else:
+        segments_filename = "mvc_segments.png"
+        diagnostics_filename = "mvc_hybrid_diagnostics.png"
+        title_prefix = f"MVC segmentation – {subject_id} {side} {date_label} {title_suffix}"
+        diag_title = f"MVC Hybrid Diagnostics – {subject_id} {side} {date_label}"
+    
+    plot_mvc_segments(
+        plot_signal,
+        segments,
+        fs,
+        float(threshold_val),
+        mvc_dir / segments_filename,
+        title_prefix,
+        method=method_name,
+        show=show,
+    )
+    
+    # Plot hybrid diagnostics if available
+    if hybrid_debug_info is not None and raw_mv is not None:
+        plot_mvc_hybrid_diagnostics(
+            raw_mv,
+            segments,
+            hybrid_debug_info,
+            fs,
+            mvc_dir / diagnostics_filename,
+            title=diag_title,
+            show=show,
+        )
+
+
+# -------------------------------------------------------------------------------------------------------------------- #
+# Day Processing Main Function
 # -------------------------------------------------------------------------------------------------------------------- #
 def _process_day(
     day: dict,
@@ -437,35 +616,17 @@ def _process_day(
             continue
 
         # --- MVC Quality Checks ---
+        side = _get_side_from_device(device_label)
+        date_label_qa = _convert_date_to_dd_mm_yyyy(day["date_label"])
+        
         # Check for ADC saturation/clipping first
         mvc_saturation = detect_adc_saturation(mvc_raw_adc) if mvc_raw_adc is not None else None
         if mvc_saturation:
             print(f"[emg_pipeline] MVC ADC saturation ({day['subject_id']} {device_label}): {mvc_saturation['message']}")
             if plots_root and mvc_raw_adc is not None:
-                qa_plots_dir = plots_root / "qa_flagged"
-                side_label = "left" if device_label == MBAN_LEFT else "right"
-                date_label_qa = _convert_date_to_dd_mm_yyyy(day["date_label"])
-                save_adc_saturation_plot(
-                    raw_adc=mvc_raw_adc,
-                    output_dir=str(qa_plots_dir),
-                    subject_id=day["subject_id"],
-                    side=side_label,
-                    session_label=f"{date_label_qa}_MVC",
-                    acquisition_type="mvc",
-                    fs=config["fs"],
-                )
+                _save_qa_plot(plots_root, "adc_saturation", mvc_raw_adc, day["subject_id"], side, date_label_qa, f"{date_label_qa}_MVC", "mvc", config["fs"])
             if quality_log is not None:
-                synthetic_path = Path(f"MVC/{day['subject_id']}_{day['date_label']}_{device_label}.mvc")
-                quality_log.append(
-                    create_file_quality_report(
-                        file_path=synthetic_path,
-                        issues=[mvc_saturation],
-                        rows=len(mvc_raw_mv),
-                        columns=1,
-                        device_label=device_label,
-                        acquisition_label=mvc_label,
-                    )
-                )
+                _log_quality_issue(quality_log, [mvc_saturation], day["subject_id"], day["date_label"], device_label, mvc_label, len(mvc_raw_mv), is_mvc=True)
             continue  # Skip this side entirely
 
         # Check for faulty sensor (all values same sign)
@@ -473,17 +634,7 @@ def _process_day(
         if faulty_issue:
             print(f"[emg_pipeline] MVC faulty sensor ({day['subject_id']} {device_label}): {faulty_issue['message']}")
             if quality_log is not None:
-                synthetic_path = Path(f"MVC/{day['subject_id']}_{day['date_label']}_{device_label}.mvc")
-                quality_log.append(
-                    create_file_quality_report(
-                        file_path=synthetic_path,
-                        issues=[faulty_issue],
-                        rows=len(mvc_raw_mv),
-                        columns=1,
-                        device_label=device_label,
-                        acquisition_label=mvc_label,
-                    )
-                )
+                _log_quality_issue(quality_log, [faulty_issue], day["subject_id"], day["date_label"], device_label, mvc_label, len(mvc_raw_mv), is_mvc=True)
             continue  # Skip this side entirely
         
         # Check MVC signal quality (duration, amplitude)
@@ -495,17 +646,7 @@ def _process_day(
                 print(f"[emg_pipeline] MVC quality failed ({day['subject_id']} {device_label}): "
                       f"{'; '.join(iss['message'] for iss in mvc_issues)}")
                 if quality_log is not None:
-                    synthetic_path = Path(f"MVC/{day['subject_id']}_{day['date_label']}_{device_label}.mvc")
-                    quality_log.append(
-                        create_file_quality_report(
-                            file_path=synthetic_path,
-                            issues=mvc_issues,
-                            rows=len(mvc_raw_mv),
-                            columns=1,
-                            device_label=device_label,
-                            acquisition_label=mvc_label,
-                        )
-                    )
+                    _log_quality_issue(quality_log, mvc_issues, day["subject_id"], day["date_label"], device_label, mvc_label, len(mvc_raw_mv), is_mvc=True)
                 continue  # Skip this side entirely
         
         # Check for PSD noise in MVC (after bandpass filter)
@@ -514,32 +655,10 @@ def _process_day(
         if is_mvc_noisy:
             print(f"[emg_pipeline] MVC noise detected ({day['subject_id']} {device_label}): "
                   f"{'; '.join(iss['message'] for iss in psd_issues)}")
-            # Save QA diagnostic plot for review
             if plots_root:
-                qa_plots_dir = plots_root / "qa_flagged"
-                side_label = "left" if device_label == MBAN_LEFT else "right"
-                date_label_qa = _convert_date_to_dd_mm_yyyy(day["date_label"])
-                save_quality_assessment_plot(
-                    emg_filtered=mvc_filtered,
-                    output_dir=str(qa_plots_dir),
-                    subject_id=day["subject_id"],
-                    side=side_label,
-                    session_label=f"{date_label_qa}_MVC",
-                    acquisition_type="mvc",
-                    fs=config["fs"],
-                )
+                _save_qa_plot(plots_root, "psd_noise", mvc_filtered, day["subject_id"], side, date_label_qa, f"{date_label_qa}_MVC", "mvc", config["fs"])
             if quality_log is not None:
-                synthetic_path = Path(f"MVC/{day['subject_id']}_{day['date_label']}_{device_label}.mvc")
-                quality_log.append(
-                    create_file_quality_report(
-                        file_path=synthetic_path,
-                        issues=psd_issues,
-                        rows=len(mvc_raw_mv),
-                        columns=1,
-                        device_label=device_label,
-                        acquisition_label=mvc_label,
-                    )
-                )
+                _log_quality_issue(quality_log, psd_issues, day["subject_id"], day["date_label"], device_label, mvc_label, len(mvc_raw_mv), is_mvc=True)
             continue  # Skip this side entirely
 
         plot_signal: Optional[np.ndarray] = None
@@ -615,62 +734,15 @@ def _process_day(
                     "mvc-guardrail-fail",
                     f"MVC segmentation found {len(segments)} segment(s) (<2) for {device_label} on {day['date_label']} — skipping side."
                 )
-                synthetic_path = Path(f"MVC/{day['subject_id']}_{day['date_label']}_{device_label}.mvc")
-                quality_log.append(
-                    create_file_quality_report(
-                        file_path=synthetic_path,
-                        issues=[issue],
-                        rows=len(mvc_env),
-                        columns=1,
-                        device_label=device_label,
-                        acquisition_label=mvc_label,
-                    )
-                )
+                _log_quality_issue(quality_log, [issue], day["subject_id"], day["date_label"], device_label, mvc_label, len(mvc_env), is_mvc=True)
             if plots_root and plot_signal is not None and threshold_val is not None:
-                subject_id = day.get("subject_id", "unknown")
-                date_label = _convert_date_to_dd_mm_yyyy(day.get("date_label", "unknown_date"))
-                device_lower = device_label.lower()
-                if MBAN_LEFT.lower() in device_lower:
-                    side = "left"
-                elif MBAN_RIGHT.lower() in device_lower:
-                    side = "right"
-                else:
-                    side = device_label
-
-                mvc_dir = plots_root / subject_id / date_label / side / "MVC"
-                mvc_dir.mkdir(parents=True, exist_ok=True)
-
                 # Determine method name for legend
-                if tkeo_segments:
-                    if fallback_used:
-                        method_name = "envelope fallback"
-                    else:
-                        method_name = "TKEO"
-                else:
-                    method_name = "envelope"
-
-                plot_mvc_segments(
-                    plot_signal,
-                    segments,
-                    config["fs"],
-                    float(threshold_val),
-                    mvc_dir / "mvc_segments_failed.png",
-                    f"MVC segmentation – {subject_id} {side} {date_label} {title_suffix} [FAILED: {len(segments)} segments]",
-                    method=method_name,
-                    show=show_mvc_plots,
+                method_name = "envelope fallback" if (tkeo_segments and fallback_used) else ("TKEO" if tkeo_segments else "envelope")
+                _plot_mvc_segments_with_diagnostics(
+                    plots_root, day["subject_id"], date_label_qa, side, plot_signal, segments,
+                    threshold_val, config["fs"], title_suffix, method_name, failed=True,
+                    hybrid_debug_info=hybrid_debug_info, raw_mv=raw_mv, show=show_mvc_plots
                 )
-                
-                # Plot hybrid diagnostics if available (shows log-energy, thresholds, baseline)
-                if hybrid_debug_info is not None and raw_mv is not None:
-                    plot_mvc_hybrid_diagnostics(
-                        raw_mv,
-                        segments,
-                        hybrid_debug_info,
-                        config["fs"],
-                        mvc_dir / "mvc_hybrid_diagnostics_failed.png",
-                        title=f"MVC Hybrid Diagnostics – {subject_id} {side} {date_label} [FAILED]",
-                        show=show_mvc_plots,
-                    )
             continue
 
         # Compute MVC peak using peak-centered RMS on rectified signal (no smoothing attenuation)
@@ -687,49 +759,13 @@ def _process_day(
 
         # Optional visualization of MVC segmentation for QA (only on pass)
         if plots_root and plot_signal is not None and threshold_val is not None:
-            subject_id = day.get("subject_id", "unknown")
-            date_label = _convert_date_to_dd_mm_yyyy(day.get("date_label", "unknown_date"))
-            device_lower = device_label.lower()
-            if MBAN_LEFT.lower() in device_lower:
-                side = "left"
-            elif MBAN_RIGHT.lower() in device_lower:
-                side = "right"
-            else:
-                side = device_label
-
-            mvc_dir = plots_root / subject_id / date_label / side / "MVC"
-
             # Determine method name for legend
-            if tkeo_segments:
-                if fallback_used:
-                    method_name = "envelope fallback"
-                else:
-                    method_name = "TKEO"
-            else:
-                method_name = "envelope"
-
-            plot_mvc_segments(
-                plot_signal,
-                segments,
-                config["fs"],
-                float(threshold_val),
-                mvc_dir / "mvc_segments.png",
-                f"MVC segmentation – {subject_id} {side} {date_label} {title_suffix}",
-                method=method_name,
-                show=show_mvc_plots,
+            method_name = "envelope fallback" if (tkeo_segments and fallback_used) else ("TKEO" if tkeo_segments else "envelope")
+            _plot_mvc_segments_with_diagnostics(
+                plots_root, day["subject_id"], date_label_qa, side, plot_signal, segments,
+                threshold_val, config["fs"], title_suffix, method_name, failed=False,
+                hybrid_debug_info=hybrid_debug_info, raw_mv=raw_mv, show=show_mvc_plots
             )
-            
-            # Plot hybrid diagnostics if available (shows log-energy, thresholds, baseline)
-            if hybrid_debug_info is not None and raw_mv is not None:
-                plot_mvc_hybrid_diagnostics(
-                    raw_mv,
-                    segments,
-                    hybrid_debug_info,
-                    config["fs"],
-                    mvc_dir / "mvc_hybrid_diagnostics.png",
-                    title=f"MVC Hybrid Diagnostics – {subject_id} {side} {date_label}",
-                    show=show_mvc_plots,
-                )
 
         for session_label, session_df in acquisitions.items():
             if session_label == mvc_label:
@@ -747,32 +783,10 @@ def _process_day(
             if saturation_issue:
                 print(f"[emg_pipeline] Session ADC saturation ({day['subject_id']} {device_label} {session_label}): "
                       f"{saturation_issue['message']}")
-                # Save ADC saturation diagnostic plot
                 if plots_root and raw_adc is not None:
-                    qa_plots_dir = plots_root / "qa_flagged"
-                    side_label_qa = "left" if device_label == MBAN_LEFT else "right"
-                    date_label_qa = _convert_date_to_dd_mm_yyyy(day["date_label"])
-                    save_adc_saturation_plot(
-                        raw_adc=raw_adc,
-                        output_dir=str(qa_plots_dir),
-                        subject_id=day["subject_id"],
-                        side=side_label_qa,
-                        session_label=f"{date_label_qa}_{session_label}",
-                        acquisition_type="session",
-                        fs=config["fs"],
-                    )
+                    _save_qa_plot(plots_root, "adc_saturation", raw_adc, day["subject_id"], side, date_label_qa, f"{date_label_qa}_{session_label}", "session", config["fs"])
                 if quality_log is not None:
-                    synthetic_path = Path(f"sessions/{day['subject_id']}_{day['date_label']}_{device_label}_{session_label}.emg")
-                    quality_log.append(
-                        create_file_quality_report(
-                            file_path=synthetic_path,
-                            issues=[saturation_issue],
-                            rows=len(raw_mv),
-                            columns=1,
-                            device_label=device_label,
-                            acquisition_label=session_label,
-                        )
-                    )
+                    _log_quality_issue(quality_log, [saturation_issue], day["subject_id"], day["date_label"], device_label, session_label, len(raw_mv), is_mvc=False)
                 continue  # Skip this session
             
             # Check for faulty sensor
@@ -781,17 +795,7 @@ def _process_day(
                 print(f"[emg_pipeline] Session faulty sensor ({day['subject_id']} {device_label} {session_label}): "
                       f"{faulty_issue['message']}")
                 if quality_log is not None:
-                    synthetic_path = Path(f"sessions/{day['subject_id']}_{day['date_label']}_{device_label}_{session_label}.emg")
-                    quality_log.append(
-                        create_file_quality_report(
-                            file_path=synthetic_path,
-                            issues=[faulty_issue],
-                            rows=len(raw_mv),
-                            columns=1,
-                            device_label=device_label,
-                            acquisition_label=session_label,
-                        )
-                    )
+                    _log_quality_issue(quality_log, [faulty_issue], day["subject_id"], day["date_label"], device_label, session_label, len(raw_mv), is_mvc=False)
                 continue  # Skip this session
             
             # Check for PSD noise (after bandpass filter)
@@ -800,32 +804,10 @@ def _process_day(
             if is_session_noisy:
                 print(f"[emg_pipeline] Session noise detected ({day['subject_id']} {device_label} {session_label}): "
                       f"{'; '.join(iss['message'] for iss in psd_issues)}")
-                # Save QA diagnostic plot for review
                 if plots_root:
-                    qa_plots_dir = plots_root / "qa_flagged"
-                    side_label_qa = "left" if device_label == MBAN_LEFT else "right"
-                    date_label_qa = _convert_date_to_dd_mm_yyyy(day["date_label"])
-                    save_quality_assessment_plot(
-                        emg_filtered=session_filtered,
-                        output_dir=str(qa_plots_dir),
-                        subject_id=day["subject_id"],
-                        side=side_label_qa,
-                        session_label=f"{date_label_qa}_{session_label}",
-                        acquisition_type="session",
-                        fs=config["fs"],
-                    )
+                    _save_qa_plot(plots_root, "psd_noise", session_filtered, day["subject_id"], side, date_label_qa, f"{date_label_qa}_{session_label}", "session", config["fs"])
                 if quality_log is not None:
-                    synthetic_path = Path(f"sessions/{day['subject_id']}_{day['date_label']}_{device_label}_{session_label}.emg")
-                    quality_log.append(
-                        create_file_quality_report(
-                            file_path=synthetic_path,
-                            issues=psd_issues,
-                            rows=len(raw_mv),
-                            columns=1,
-                            device_label=device_label,
-                            acquisition_label=session_label,
-                        )
-                    )
+                    _log_quality_issue(quality_log, psd_issues, day["subject_id"], day["date_label"], device_label, session_label, len(raw_mv), is_mvc=False)
                 continue  # Skip this session
 
             # Normalize against the MVC peak so that downstream plots and metrics work in %MVC space.
@@ -913,7 +895,7 @@ def _generate_plots_for_loading_rejections(
         side = "left" if "left" in device_label.lower() else "right"
 
         # Determine output folder structure
-        qa_folder = plots_root / subject_id / date_folder / "qa_flagged"
+        qa_folder = plots_root / "qa_flagged"
         qa_folder.mkdir(parents=True, exist_ok=True)
 
         # Read raw EMG data from the file
@@ -935,7 +917,7 @@ def _generate_plots_for_loading_rejections(
                     output_dir=str(qa_folder),
                     subject_id=subject_id,
                     side=side,
-                    session_label=acquisition_label,
+                    session_label=f"{date_folder}_{acquisition_label}",
                     acquisition_type="loading_rejected",
                 )
                 print(f"[emg_pipeline] Saved ADC saturation plot (loading rejection): {subject_id}/{side}/{acquisition_label}")

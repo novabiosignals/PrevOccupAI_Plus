@@ -4,7 +4,7 @@ This package contains sophisticated algorithms that were developed but are not
 needed for the current project. They are preserved here for potential use in 
 future projects.
 
-**NOTE**: The active EMG pipeline code is now in `sensors/` package. This archive
+**NOTE**: The active EMG pipeline code is in the `sensors/` package. This archive
 contains historical/alternative implementations.
 
 Modules:
@@ -22,5 +22,5 @@ Usage Example:
     from sensors.process.emg_mvc import detect_mvc_segments_hybrid
     
     # For archived versions (testing/comparison):
-    from signal_processing.archive.emg_mvc_hybrid_scoring import detect_mvc_segments_hybrid
+    from archive.emg_mvc_hybrid_scoring import detect_mvc_segments_hybrid
 """

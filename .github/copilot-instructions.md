@@ -15,15 +15,17 @@ Raw Data (E:\...\data\) → Pipeline Processing → OH Profiles (JSON) + CSV Exp
 - **`main_sensors.py`** - IMU/HAR sensor processing
 - **`main_questionnaires.py`** - Questionnaire data processing
 
-### Core Modules
+### Core Modules (Authoritative)
 | Module | Purpose |
 |--------|---------|
+| `sensors/` | **Primary EMG pipeline codebase** |
 | `sensors/load/` | Dataset discovery, file loading, quality checks |
+| `sensors/process/` | EMG preprocessing, MVC detection |
 | `sensors/metrics/` | Metric computation (APDF, rest metrics, aggregations) |
-| `signal_processing/` | EMG preprocessing, MVC detection, pipeline orchestration |
+| `sensors/visualize/` | EMG plots and OH profile visualizations |
 | `OH_profile/` | OH profile JSON read/write and constants |
 | `questionnaires/` | Questionnaire parsing and scoring |
-| `visualize/` | Plotting functions for EMG, OH profiles |
+| `signal_processing/` | **Legacy re-export wrapper (do not add new code here)** |
 
 ## EMG Pipeline Framework
 
@@ -40,15 +42,15 @@ MIN_ACTIVE_DURATION_FOR_BASELINE_S = 1800  # 30 min for weekly baseline
 ```
 
 ### MVC Normalization
-Each session is normalized by **its side's MVC file** (`MVC_left.joblib` / `MVC_right.joblib`).
+Each session is normalized by **its side's MVC file**.
 - MVC computed via peak-centered RMS on bandpass-filtered signal
 - Mean %MVC of 5-25% is normal; >50% indicates MVC underestimation
 
 ## Development Patterns
 
-### Virtual Environment
-```powershell
-.\EMG_venv\Scripts\Activate.ps1
+### Virtual Environment (macOS)
+```bash
+source EMG_venv/bin/activate
 ```
 
 ### Running the EMG Pipeline
@@ -83,7 +85,7 @@ Weekly relative intensity bins require:
 1. **Pass 1**: Compute session-level Active APDF
 2. **Pass 2**: Compute weekly baseline, then classify sessions into bins
 
-See `signal_processing/emg_pipeline.py` → `_add_relative_intensity_bins()`
+See `sensors/emg_pipeline.py` → `_add_relative_intensity_bins()`
 
 ## Data Quality Checks
 - Sessions with mean %MVC > 50% likely have MVC calibration issues
@@ -91,4 +93,5 @@ See `signal_processing/emg_pipeline.py` → `_add_relative_intensity_bins()`
 - Known problematic subject-sides: 82-right, 109-right, 114-left (MVC underestimated)
 
 ## Documentation
-Detailed pipeline documentation in `docs/EMG_PIPELINE_CHANGES.md` - **read this first** when working on EMG code.
+Detailed pipeline documentation in `docs/EMG_PIPELINE_CHANGES.md` and `docs/EMG_CODE_AUDIT.md` - **read this first** when working on EMG code.
+

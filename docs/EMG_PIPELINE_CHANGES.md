@@ -281,8 +281,8 @@ def detect_psd_noise(emg_filtered: np.ndarray, fs: float = 1000.0) -> Tuple[bool
 ### Quality Diagnostic Plots
 
 When a session fails quality checks, diagnostic plots are saved to `{plots_root}/qa_flagged/`:
-- ADC saturation histograms
-- PSD plots with marked noise peaks
+- ADC saturation histograms (MVC and session files)
+- PSD plots with marked noise peaks (MVC and session files)
 - MVC segment detection visualizations
 
 ---

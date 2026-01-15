@@ -46,7 +46,7 @@ def build_day_index(
     :returns: List of dicts describing subject, day, and device routing.
     """
 
-    _ensure_data_root()
+    _ensure_data_root() # Validate DATA_ROOT existence before proceeding.
     descriptors = discover_daily_acquisitions(
         DATA_ROOT,
         participants_csv=PARTICIPANTS_CSV,
@@ -92,8 +92,7 @@ def main(
     """
 
     if run_all:
-        load_data = preprocess = visualize = True
-        tkeo_segments = True
+        load_data = preprocess = visualize = tkeo_segments = True
 
     descriptors: list[dict] = []
 

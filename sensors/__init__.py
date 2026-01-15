@@ -8,8 +8,7 @@ Subpackages:
 - impute: Data imputation utilities
 """
 
-from .types import PreprocessConfig
-from .emg_pipeline import create_preprocess_config, run_emg_pipeline
+from .emg_pipeline import PreprocessConfig, create_preprocess_config, run_emg_pipeline
 
 __all__ = [
     'PreprocessConfig',

@@ -16,6 +16,14 @@ from .emg_mvc import (
     detect_mvc_segments_tkeo,
     pick_mvc,
 )
+from .emg_quality_analysis import (
+    detect_adc_saturation,
+    is_faulty_mban,
+    detect_psd_noise,
+    assess_mvc_signal_quality,
+    save_quality_assessment_plot,
+    save_adc_saturation_plot,
+)
 
 __all__ = [
     'apply_pre_processing_pipeline',
@@ -34,4 +42,11 @@ __all__ = [
     'detect_mvc_segments_hybrid',
     'detect_mvc_segments_tkeo',
     'pick_mvc',
+    # EMG quality assessment
+    'detect_adc_saturation',
+    'is_faulty_mban',
+    'detect_psd_noise',
+    'assess_mvc_signal_quality',
+    'save_quality_assessment_plot',
+    'save_adc_saturation_plot',
 ]

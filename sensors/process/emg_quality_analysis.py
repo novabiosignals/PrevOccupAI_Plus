@@ -419,65 +419,6 @@ def assess_mvc_signal_quality(
 
 
 # -------------------------------------------------------------------------------------------------------------------- #
-# Combined Quality Assessment
-# -------------------------------------------------------------------------------------------------------------------- #
-def run_emg_quality_checks(
-    raw_adc: Optional[np.ndarray] = None,
-    emg_mv: Optional[np.ndarray] = None,
-    emg_filtered: Optional[np.ndarray] = None,
-    fs: float = FS_MBAN,
-    is_mvc: bool = False,
-) -> Tuple[bool, List[QualityIssue]]:
-    """
-    Run all applicable EMG quality checks based on available signal stages.
-    
-    This is an orchestration function that runs the appropriate checks
-    for each processing stage provided.
-    
-    :param raw_adc: Raw ADC values (before mV conversion).
-    :param emg_mv: EMG signal in millivolts (after transfer function).
-    :param emg_filtered: Bandpass-filtered EMG signal.
-    :param fs: Sampling frequency in Hz.
-    :param is_mvc: If True, also run MVC-specific checks on emg_mv.
-    :returns: Tuple of (should_discard, list of all QualityIssues).
-    """
-    all_issues: List[QualityIssue] = []
-    should_discard = False
-    
-    # Stage 1: Raw ADC checks
-    if raw_adc is not None:
-        saturation_issue = detect_adc_saturation(raw_adc)
-        if saturation_issue:
-            all_issues.append(saturation_issue)
-            should_discard = True  # ADC saturation is fatal
-    
-    # Stage 2: Post-transfer checks
-    if emg_mv is not None:
-        faulty_issue = is_faulty_mban(emg_mv)
-        if faulty_issue:
-            all_issues.append(faulty_issue)
-            should_discard = True  # Faulty sensor is fatal
-        
-        # MVC-specific checks
-        if is_mvc:
-            mvc_issues = assess_mvc_signal_quality(emg_mv, fs)
-            all_issues.extend(mvc_issues)
-            # MVC issues are fatal if they include duration or amplitude problems
-            if any(iss["code"] in ("mvc-too-short", "mvc-low-amplitude", "mvc-flat-signal") 
-                   for iss in mvc_issues):
-                should_discard = True
-    
-    # Stage 3: Post-filter checks
-    if emg_filtered is not None and not should_discard:
-        is_noisy, psd_issues = detect_psd_noise(emg_filtered, fs)
-        all_issues.extend(psd_issues)
-        if is_noisy:
-            should_discard = True
-    
-    return should_discard, all_issues
-
-
-# -------------------------------------------------------------------------------------------------------------------- #
 # Helper Functions
 # -------------------------------------------------------------------------------------------------------------------- #
 def _get_n_highest_peaks(

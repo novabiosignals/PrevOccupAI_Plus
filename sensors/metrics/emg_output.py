@@ -1,10 +1,12 @@
 """
-EMG Metrics Export and Persistence Utilities
+EMG Output: Orchestration and Persistence
 
-This module consolidates all table-building, CSV export, and quality-report
-persistence helpers used by the main EMG pipeline. Functions here are designed
-to work with the data structures produced by ``sensors.metrics.emg_metrics``.
+This module handles:
+- Table building: Orchestrates session → daily → weekly aggregation
+- CSV export: Writes DataFrames to disk
+- Quality reports: Persists data quality findings
 
+For core metric computation functions, see ``sensors.metrics.emg_metrics``.
 Uses Active APDF + Rest Time framework for physiologically meaningful metrics.
 """
 
@@ -206,7 +208,7 @@ def persist_quality_report(
         return None
     path = output_root / "data_quality_report.csv"
     write_quality_report(reports, path)
-    print(f"[emg_metrics_export] Data-quality report written to {path} ({len(reports)} issue(s))")
+    print(f"[emg_output] Data-quality report written to {path} ({len(reports)} issue(s))")
     return path
 
 
@@ -249,7 +251,7 @@ def export_mvc_quality_summary(
     path = output_root / "mvc_quality_summary.csv"
     summary_df.to_csv(path, index=False)
     print(
-        f"[emg_metrics_export] MVC quality summary written to {path} "
+        f"[emg_output] MVC quality summary written to {path} "
         f"({len(summary_df)} session(s) flagged with mean %MVC > {MVC_QUALITY_THRESHOLD_PERCENT}%)"
     )
     return path

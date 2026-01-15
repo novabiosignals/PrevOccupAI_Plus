@@ -64,7 +64,7 @@ ROUNDING_FACTOR = 1000 # sampling rate  times 10
 # -------------------------------------------------------------------------------------------------------------------- #
 # public functions
 # -------------------------------------------------------------------------------------------------------------------- #
-def load_daily_acquisitions(
+def  load_daily_acquisitions(
     folder_path: str,
     load_devices: Dict[str, List[str]],
     fs_android: int = 100,

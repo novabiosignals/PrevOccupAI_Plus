@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 
 from constants import FS_MBAN
-from sensors.load.emg_quality import detect_adc_saturation
+from sensors.process.emg_quality_analysis import detect_adc_saturation
 
 
 # Type aliases for clarity
