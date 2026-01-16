@@ -11,16 +11,17 @@ from constants import WORKLOAD, PSYCHOSOCIAL, PERSONAL, WORK_TYPE
 from OH_profile.constants import *
 from OH_profile.load import get_OH_profile
 from OH_profile.write import save_OH_profile, write_to_OH_profile
+from questionnaires.visualize import ROSA_KEYS_KEEP
 
 # ------------------------------------------------------------------------------------------------------------------- #
 # flags
 # ------------------------------------------------------------------------------------------------------------------- #
 GENERATE_SCORES = False
-PROCESS_PSYCHOSOCIAL = True
-PROCESS_PERSONAL = True
-PROCESS_ENVIRONMENT = True
+PROCESS_PSYCHOSOCIAL = False
+PROCESS_PERSONAL = False
+PROCESS_ENVIRONMENT = False
 PROCESS_BIOMECHANICAL = True
-PROCESS_WORKLOAD = True
+PROCESS_WORKLOAD = False
 GENERATE_QUESTIONNAIRES_DATASET = False
 GENERATE_OH_PROFILE = False
 
@@ -219,7 +220,16 @@ if VISUALIZE:
         if len(oh_profile[SINGLE_INSTANCE_QUESTIONNAIRE_KEY][BIOMECHANICAL_DOMAIN_KEY]) > 0:
 
             # plot rosa
-            questionnaires.generate_rosa_plots(oh_profile[SINGLE_INSTANCE_QUESTIONNAIRE_KEY][BIOMECHANICAL_DOMAIN_KEY], subject_id, PLOTS_OUTPUT_PATH)
+            questionnaires.generate_biomec_env_plots(oh_profile[SINGLE_INSTANCE_QUESTIONNAIRE_KEY][BIOMECHANICAL_DOMAIN_KEY],
+                                                     subject_id, PLOTS_OUTPUT_PATH, filename_suffix='Rosa',keys_to_keep=ROSA_KEYS_KEEP)
+
+            # plot environmental results
+            questionnaires.generate_biomec_env_plots(oh_profile= oh_profile[SINGLE_INSTANCE_QUESTIONNAIRE_KEY][ENVIRONMENTAL_DOMAIN_KEY],
+                                                     subject=subject_id, output_folder_path=PLOTS_OUTPUT_PATH, filename_suffix='environment')
+
+            # plot copsoq and mueq
+            questionnaires.generate_copsoq_mueq_plots(oh_profile[SINGLE_INSTANCE_QUESTIONNAIRE_KEY][PSYCHOSOCIAL_DOMAIN_KEY],
+                                                      subject_id, PLOTS_OUTPUT_PATH)
 
         else:
             print(f"No biomechanical metrics to plot for subject {subject_id}. \nPlease generate the oh profile first by setting {GENERATE_OH_PROFILE} to True.")

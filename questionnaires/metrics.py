@@ -205,14 +205,14 @@ def get_psychosocial_metrics(scores_csv_file: str, subject_id: int) -> Dict:
 
     # Select correct output key
     if is_copsoq:
-        key = (PSYCHOSOCIAL_COPSOQ_POPULATION_KEY if is_population else PSYCHOSOCIAL_COPSOQ_WORK_TYPE_KEY)
+        key = (PSYCHOSOCIAL_COPSOQ_POPULATION_KEY if is_population else f'{PSYCHOSOCIAL_COPSOQ_WORK_TYPE_KEY}_{work_type}')
 
     # it's MUEQ
     else:
-        key = (PSYCHOSOCIAL_MUEQ_POPULATION_KEY if is_population else PSYCHOSOCIAL_MUEQ_WORK_TYPE_KEY)
+        key = (PSYCHOSOCIAL_MUEQ_POPULATION_KEY if is_population else f'{PSYCHOSOCIAL_MUEQ_WORK_TYPE_KEY}_{work_type}')
 
     # add results with the correct key to the dictionary
-    metrics_dict[key] = scores_df.to_dict()
+    metrics_dict[key] = scores_df[scores_df.index.str.contains("mean", case=False)].iloc[0].to_dict()
 
     return metrics_dict
 

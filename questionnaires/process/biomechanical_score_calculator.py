@@ -29,7 +29,7 @@ from utils import load_json_file, create_dir, extract_group_from_path, find_proj
 from constants import CONFIG_FOLDER_NAME, CSV
 import questionnaires.process.rosa_tools as rt
 import questionnaires.process.mappings.rosa_question_mappings as rosa_qm
-from questionnaires.process.mappings.questionnaire_mappings import ID_OLD_COLUMNS, ID_NEW_COLUMNS, ID_ANSWERS_MAP
+from questionnaires.process.mappings.questionnaire_mappings import ID_OLD_COLUMNS, ID_NEW_COLUMNS, ID_ANSWERS_MAP, ID_PAIN_PERCEPTION_MAPPING
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # constants
@@ -134,7 +134,7 @@ def calculate_biomechanical_scores(folder_path, pure_rosa: bool, output_folder_p
     final_df = pd.concat(list_dfs, axis=1)
 
     # fill NaN values with 0
-    final_df.fillna(0, inplace=True)
+    final_df.fillna('N', inplace=True)
 
     # save dataframe into a csv file
     folder_path = create_dir(find_project_root(), os.path.join(output_folder_path, f"group{extract_group_from_path(folder_path)}"))
@@ -203,12 +203,22 @@ def _get_incapacidade_dor_results(results_df: pd.DataFrame) -> pd.DataFrame:
     # create copy
     df = results_df.copy()
 
-    # Replace any column substring "SQ00X" with the new descriptive name
+    # rename incapacidade / sofrimento / intensidade columns
     for old, new in zip(ID_OLD_COLUMNS, ID_NEW_COLUMNS):
-        df.columns = df.columns.str.replace(old, new, regex=False)
+        mask = df.columns.str.contains(old) & (
+                df.columns.str.contains('incapacidade', case=False) |
+                df.columns.str.contains('sofrimento', case=False) |
+                df.columns.str.contains('intensidade', case=False) |
+                df.columns.str.contains('tempo', case=False) |
+                df.columns.str.contains('localizacao', case=False)
+        )
+        df.columns = df.columns.where(~mask, df.columns.str.replace(old, new, regex=False))
+
+    # rename pain perception columns
+    df.rename(columns=ID_PAIN_PERCEPTION_MAPPING, inplace=True)
 
     # replace missing values with '0'
-    df = df.fillna('0')
+    df = df.fillna('N')
 
     # iterate through the columns
     for col in df.columns:
