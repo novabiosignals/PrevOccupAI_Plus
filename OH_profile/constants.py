@@ -61,6 +61,10 @@ SENSOR_TIMELINE_END_TIMES_KEY = 'end_times'
 HAR_TIMELINE_KEY = 'HAR_timeline'
 HAR_DURATIONS_KEY = 'HAR_durations'
 HAR_DISTRIBUTIONS_KEY = 'HAR_distributions'
+HAR_STEPS_KEY = 'HAR_steps'
+
+HAR_DISTANCE_KEY = 'distance_walked_m'
+HAR_NUM_STEPS_KEY = 'num_steps'
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # HEART RATE SUB-KEYS

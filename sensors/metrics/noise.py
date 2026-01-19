@@ -23,7 +23,7 @@ from typing import Dict
 import HAR
 import sensors.load as sl
 from constants import NOISE, NOISE_CLASS_COLUMN_NAME, PHONE
-from .metric_utils import calculate_statistics, calculate_class_distributions
+from .metric_utils import calculate_statistics, calculate_class_distributions, calculate_class_durations
 from utils import extract_date_from_path
 from OH_profile.constants import *
 
@@ -112,8 +112,7 @@ def _calculate_noise_metrics(df: pd.DataFrame, fs: int, start_time: str, window_
     class_distributions = calculate_class_distributions(df, NOISE_CLASS_COLUMN_NAME)
 
     # calculate class durations
-    # TODO: call metrics_utils.calculate_class_durations instead to avoid redundancy
-    class_durations = _calculate_class_durations(df, fs, class_distributions)
+    class_durations = calculate_class_durations(df, fs, class_distributions)
 
     # calculate timeline metrics
     timeline_metrics = _calculate_windowed_timeline_metrics(df, NOISE_CLASS_COLUMN_NAME, start_time, fs, window_size_min=window_size_min)
@@ -163,31 +162,6 @@ def _classify_noise(dba_value: float) -> str:
     # else it's high noise ≥ 80
     else:
         return NOISE_HIGH_KEY
-
-
-def _calculate_class_durations(df: pd.DataFrame, fs: int, class_distributions: Dict[str, float]) -> Dict[str, float]:
-    """
-    Calculate the duration of each class in seconds and save it to a dictionary.
-
-    :param df: The dataframe containing the noise data
-    :param fs: The sampling frequency of the noise recorder
-    :param class_distributions: A dictionary with the class distributions {class_1: 0.5, class_2: 0.5}
-    :return: A dictionary with the class durations {total_dur_s: float , class_1_dur_s: float, class_2_dur_s: float}
-    """
-
-    # init dict to store the durations
-    durations_dict = {}
-
-    # calculate the total duration in seconds of the noise data
-    total_dur_s = len(df) / fs
-
-    # cycle over the dictionary with the class distributions
-    for class_name, distribution in class_distributions.items():
-
-        durations_dict[f"{class_name}{DURATION_SECONDS_SUFFIX_KEY}"] = round(distribution * total_dur_s, 4)
-
-    return durations_dict
-
 
 def _calculate_windowed_timeline_metrics(df: pd.DataFrame, column_name: str, start_time: str, fs: int,
                                          window_size_min: int) -> Dict[str, str]:
