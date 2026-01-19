@@ -47,6 +47,7 @@ POSTURE_KEY = 'posture'
 NOISE_KEY = 'noise'
 EMG_KEY = 'emg'
 WRIST_KEY = 'wrist_activities'
+ENVIRONMENT_KEY = 'environment'
 # -------------------------------------------------------------------------------------------------------------------- #
 # public functions
 # -------------------------------------------------------------------------------------------------------------------- #
@@ -110,7 +111,8 @@ def _generate_OH_profile_json_skeleton() -> Dict:
             POSTURE_KEY: {},
             NOISE_KEY: {},
             EMG_KEY: {},
-            WRIST_KEY: {}
+            WRIST_KEY: {},
+            ENVIRONMENT_KEY: {}
         }
     }
 

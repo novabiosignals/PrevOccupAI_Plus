@@ -39,7 +39,7 @@ import sensors.load
 from constants import ACQUISITION_TIME_SECONDS, MBAN_RIGHT
 from OH_profile.constants import SENSOR_TIMELINE_MISSING_TIMES_KEY, SENSOR_TIMELINE_TIMES_KEY, SENSOR_TIMELINE_START_TIMES_KEY, SENSOR_TIMELINE_END_TIMES_KEY
 from sensors.impute.impute_sensor_timeline import compute_end_times
-from .plot_utils import RefLine, HandlerRefLine, get_weekday_name
+from .plot_utils import RefLine, HandlerRefLine, get_day_string
 
 # ------------------------------------------------------------------------------------------------------------------- #
 # file specific constants
@@ -272,7 +272,7 @@ def _visualize_daily_acquisitions(acquisitions_dict: Dict[str, Dict[str, list]],
     ax.set_xlabel("Tempo (hh:mm)", color='#06171C')
     ax.set_yticks([])
 
-    week_day, date_str = get_weekday_name(acquisition_date)
+    week_day, date_str = get_day_string(acquisition_date, 'pt_PT.UTF-8')
 
     if show_dates:
         ax.set_title(f"{week_day} | {date_str}", color='#06171C', fontsize=10, fontweight='bold')
