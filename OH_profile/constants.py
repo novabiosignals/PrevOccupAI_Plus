@@ -60,7 +60,13 @@ SENSOR_TIMELINE_END_TIMES_KEY = 'end_times'
 # -------------------------------------------------------------------------------------------------------------------- #
 # HUMAN ACTIVITY SUB-KEYS
 # -------------------------------------------------------------------------------------------------------------------- #
+HAR_TIMELINE_KEY = 'HAR_timeline'
+HAR_DURATIONS_KEY = 'HAR_durations'
+HAR_DISTRIBUTIONS_KEY = 'HAR_distributions'
+HAR_STEPS_KEY = 'HAR_steps'
 
+HAR_DISTANCE_KEY = 'distance_walked_m'
+HAR_NUM_STEPS_KEY = 'num_steps'
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # HEART RATE SUB-KEYS
@@ -96,7 +102,7 @@ NOISE_HIGH_KEY = 'Ruído elevado'
 NOISE_STATISTICS_KEY = 'Noise_statistics'
 NOISE_DURATIONS_KEY = 'Noise_durations'
 NOISE_DISTRIBUTIONS_NOISE = 'Noise_distributions'
-NOISE_DURATION_SECONDS_SUFFIX_KEY = '_duration_sec'
+
 NOISE_TIMELINE_KEY = 'Noise_timeline'
 
 # -------------------------------------------------------------------------------------------------------------------- #
@@ -122,3 +128,9 @@ ENV_PM10_KEY = 'PM10_particles_ug/m3'
 ENV_PM025_KEY = 'PM2.5_particles_ug/m3'
 ENV_TEMPERATURE_KEY = 'Temperature_Celsius'
 ENV_REL_HUMIDITY_KEY = 'Humidity_relative_percentage'
+
+
+# -------------------------------------------------------------------------------------------------------------------- #
+# GENERAL
+# -------------------------------------------------------------------------------------------------------------------- #
+DURATION_SECONDS_SUFFIX_KEY = '_duration_sec'

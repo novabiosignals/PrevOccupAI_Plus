@@ -18,6 +18,9 @@ calculate_class_distributions(...): Calculate class distributions for a specifie
 import pandas as pd
 from typing import Dict, List
 
+from OH_profile.constants import DURATION_SECONDS_SUFFIX_KEY
+
+
 # ------------------------------------------------------------------------------------------------------------------- #
 # public functions
 # ------------------------------------------------------------------------------------------------------------------- #
@@ -88,6 +91,31 @@ def calculate_class_distributions(df: pd.DataFrame, column_name: str, nr_decimal
     distributions = {class_name: round(distribution, nr_decimals) for class_name, distribution in distributions.items()}
 
     return distributions
+
+
+def calculate_class_durations(df: pd.DataFrame, fs: int, class_distributions: Dict[str, float], nr_decimals: int = 4) -> Dict[str, float]:
+    """
+    Calculate the duration of each class in seconds and save it to a dictionary.
+
+    :param df: The dataframe containing the noise data
+    :param fs: The sampling frequency of the noise recorder
+    :param class_distributions: A dictionary with the class distributions {class_1: 0.5, class_2: 0.5}
+    :param nr_decimals: number of decimal places to round the class distributions (Default = 4).
+    :return: A dictionary with the class durations {total_dur_s: float , class_1_dur_s: float, class_2_dur_s: float}
+    """
+
+    # init dict to store the durations
+    durations_dict = {}
+
+    # calculate the total duration in seconds of the noise data
+    total_dur_s = len(df) / fs
+
+    # cycle over the dictionary with the class distributions
+    for class_name, distribution in class_distributions.items():
+
+        durations_dict[f"{class_name}{DURATION_SECONDS_SUFFIX_KEY}"] = round(distribution * total_dur_s, nr_decimals)
+
+    return durations_dict
 
 
 def calculate_timeline_metrics(acquisition_df: pd.DataFrame, class_column_name: str, class_ignore: str = None) -> Dict[str, str]:

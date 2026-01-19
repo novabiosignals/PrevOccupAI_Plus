@@ -22,7 +22,7 @@ from sklearn.ensemble import RandomForestClassifier
 # public functions
 # ------------------------------------------------------------------------------------------------------------------- #
 
-def load_production_model(model_path: str) -> Tuple[RandomForestClassifier, List[str]]:
+def load_production_model(model_path: str, print_model_info: bool=False) -> Tuple[RandomForestClassifier, List[str]]:
     """
     Loads the production model
     :param model_path: path o the model
@@ -31,16 +31,18 @@ def load_production_model(model_path: str) -> Tuple[RandomForestClassifier, List
     # load_signals the classifier
     har_model = joblib.load(model_path)
 
-    # print model name
-    print(f"model: {type(har_model).__name__}")
-    print(f"\nhyperparameters: {har_model.get_params()}")
-
-    # print the classes that the model saw during training
-    print(f"\nclasses: {har_model.classes_}")
-
     # get the features that the model was trained with
     feature_names = har_model.feature_names_in_
-    print(f"\nnumber of features: {len(feature_names)}")
-    print(f"features: {feature_names}")
+
+    # print model name
+    print(f"\n--> using model: {type(har_model).__name__}")
+
+    # print model information
+    if print_model_info:
+        print("\nmodel info: ")
+        print(f"\nclasses: {har_model.classes_}")
+        print(f"\nhyperparameters: {har_model.get_params()}")
+        print(f"\nnumber of features: {len(feature_names)}")
+        print(f"features: {feature_names}")
 
     return har_model, feature_names
