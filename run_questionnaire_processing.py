@@ -7,7 +7,7 @@ import re
 # internal imports
 import questionnaires
 import sensors.load as sl
-from constants import WORKLOAD, PSYCHOSOCIAL, PERSONAL, WORK_TYPE
+from constants import WORKLOAD, PSYCHOSOCIAL, PERSONAL, WORK_TYPE, BIOMECHANICAL
 from OH_profile.constants import *
 from OH_profile.load import get_OH_profile
 from OH_profile.write import save_OH_profile, write_to_OH_profile
@@ -17,15 +17,15 @@ from questionnaires.visualize import ROSA_KEYS_KEEP
 # flags
 # ------------------------------------------------------------------------------------------------------------------- #
 GENERATE_SCORES = False
-PROCESS_PSYCHOSOCIAL = False
-PROCESS_PERSONAL = False
-PROCESS_ENVIRONMENT = False
+PROCESS_PSYCHOSOCIAL = True
+PROCESS_PERSONAL = True
+PROCESS_ENVIRONMENT = True
 PROCESS_BIOMECHANICAL = True
-PROCESS_WORKLOAD = False
+PROCESS_WORKLOAD = True
 GENERATE_QUESTIONNAIRES_DATASET = False
-GENERATE_OH_PROFILE = False
+GENERATE_OH_PROFILE = True
 
-VISUALIZE = True
+VISUALIZE = False
 
 # ------------------------------------------------------------------------------------------------------------------- #
 # file constants
@@ -81,10 +81,7 @@ if GENERATE_SCORES:
                         questionnaires.calculate_personal_scores(domain_folder_path, output_folder_path=SCORES_OUT_PATH)
 
                     if PROCESS_BIOMECHANICAL:
-                        questionnaires.calculate_biomechanical_scores(domain_folder_path, pure_rosa=False,
-                                                                      output_folder_path=SCORES_OUT_PATH)
-
-                        questionnaires.calculate_rosa_scores(domain_folder_path, output_folder_path=SCORES_OUT_PATH)
+                        questionnaires.calculate_biomechanical_scores(domain_folder_path, output_folder_path=SCORES_OUT_PATH)
 
                     if PROCESS_WORKLOAD:
                         questionnaires.clean_daily_workload(domain_folder_path, output_folder_path=SCORES_OUT_PATH)
@@ -156,19 +153,31 @@ if GENERATE_OH_PROFILE:
                             # add metadata to OH profile
                             metadata_dict = questionnaires.get_metadata_metrics(results_file_path, int(subject_id))
 
-                            oh_profile = write_to_OH_profile(oh_profile, main_outer_key=METADATA_KEY,
-                                                             main_inner_key=None, dict_to_write=metadata_dict)
+                            # add personal scores to the oh profile
+                            personal_metrics_dict = questionnaires.get_single_instance_questionnaire_metrics(results_file_path,int(subject_id),domain=PERSONAL)
 
-                        print(f"Getting metrics for {results_file} of subject {subject_id}...")
-                        # get metrics
-                        metrics_dict = questionnaires.get_single_instance_questionnaire_metrics(results_file_path, int(subject_id))
+                            # write to oh profile
+                            oh_profile = write_to_OH_profile(oh_profile, main_outer_key=METADATA_KEY,main_inner_key=None, dict_to_write=metadata_dict)
+                            oh_profile = write_to_OH_profile(oh_profile,main_outer_key=SINGLE_INSTANCE_QUESTIONNAIRE_KEY,
+                                                             main_inner_key=PERSONAL_DOMAIN_KEY, dict_to_write=personal_metrics_dict)
 
-                        # get the main inner key depending on the questionnaire type
-                        main_inner_key = questionnaires.get_domain_key_from_filename(results_file_path)
+                        elif BIOMECHANICAL in results_file_path:
 
-                        # write to OH profile
-                        oh_profile = write_to_OH_profile(oh_profile, main_outer_key=SINGLE_INSTANCE_QUESTIONNAIRE_KEY,
-                                                         main_inner_key=main_inner_key, dict_to_write=metrics_dict)
+                            # get metrics
+                            metrics_dict = questionnaires.get_single_instance_questionnaire_metrics(results_file_path, int(subject_id), domain=BIOMECHANICAL)
+
+                            # write to OH profile
+                            oh_profile = write_to_OH_profile(oh_profile, main_outer_key=SINGLE_INSTANCE_QUESTIONNAIRE_KEY,
+                                                             main_inner_key=BIOMECHANICAL_DOMAIN_KEY, dict_to_write=metrics_dict)
+
+                        else: # its environmental
+                            # get metrics
+                            metrics_dict = questionnaires.get_single_instance_questionnaire_metrics(results_file_path,int(subject_id),domain=None)
+
+                            # write to OH profile
+                            oh_profile = write_to_OH_profile(oh_profile, main_outer_key=SINGLE_INSTANCE_QUESTIONNAIRE_KEY,
+                                                             main_inner_key=ENVIRONMENTAL_DOMAIN_KEY,dict_to_write=metrics_dict)
+
                     # save OH profile to json
                     save_OH_profile(OH_PROFILE_PATH, subject_id, oh_profile)
 
@@ -200,7 +209,6 @@ if GENERATE_OH_PROFILE:
                 save_OH_profile(OH_PROFILE_PATH, participant_id, oh_profile)
 
 
-
 # ------------------------------------------------------------------------------------------------------------------- #
 # visualize
 # ------------------------------------------------------------------------------------------------------------------- #
@@ -221,7 +229,7 @@ if VISUALIZE:
 
             # plot rosa
             questionnaires.generate_biomec_env_plots(oh_profile[SINGLE_INSTANCE_QUESTIONNAIRE_KEY][BIOMECHANICAL_DOMAIN_KEY],
-                                                     subject_id, PLOTS_OUTPUT_PATH, filename_suffix='Rosa',keys_to_keep=ROSA_KEYS_KEEP)
+                                                     subject_id, PLOTS_OUTPUT_PATH, filename_suffix='Rosa',keys_to_keep=ROSA_KEYS_KEEP, is_rosa=True)
 
             # plot environmental results
             questionnaires.generate_biomec_env_plots(oh_profile= oh_profile[SINGLE_INSTANCE_QUESTIONNAIRE_KEY][ENVIRONMENTAL_DOMAIN_KEY],

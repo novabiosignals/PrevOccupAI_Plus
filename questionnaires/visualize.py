@@ -54,7 +54,7 @@ FILE_FORMAT = PNG
 # ------------------------------------------------------------------------------------------------------------------- #
 
 def generate_biomec_env_plots(oh_profile: Dict[str, Any], subject: str, output_folder_path: str, filename_suffix: str,
-                              keys_to_keep: Optional[List[str]] = None) -> None:
+                              keys_to_keep: Optional[List[str]] = None, is_rosa: bool = False) -> None:
     """
     Generates the heat maps for the biomechanical or environmental scores for one subject. From these scores, only the ones
     in keys_to_keep are used fo plotting.
@@ -63,6 +63,7 @@ def generate_biomec_env_plots(oh_profile: Dict[str, Any], subject: str, output_f
     :param output_folder_path: Path to the folder where the plots should be saved
     :param filename_suffix: Filename suffix appended to all plots.
     :param keys_to_keep: list of keys to keep. If none are provided, all are kept (default = None)
+    :param is_rosa: if True, handle the ROSA_final_normalized column specially (default=False)
     :return: None
     """
     # create copy
@@ -108,7 +109,8 @@ def generate_biomec_env_plots(oh_profile: Dict[str, Any], subject: str, output_f
     cmap = clr.LinearSegmentedColormap.from_list('name', ['gray', GREEN, YELLOW, RED], N=4)
 
     # generate heat map
-    _create_heat_map(df, output_path, f"{filename_suffix}_plot_{subject}{FILE_FORMAT}", color_map=cmap,vmin=-1, vmax=2, is_rosa=False)
+    _create_heat_map(df, output_path, f"{filename_suffix}_plot_{subject}{FILE_FORMAT}", color_map=cmap,vmin=-1,
+                     vmax=2, is_rosa=is_rosa)
 
 
 def generate_copsoq_mueq_plots(oh_profile: Dict[str, Any], subject: str, output_folder_path: str) -> None:
