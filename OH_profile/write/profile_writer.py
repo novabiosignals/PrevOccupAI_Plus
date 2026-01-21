@@ -75,6 +75,29 @@ def write_to_OH_profile(oh_profile: Dict, main_outer_key: str, main_inner_key: O
         oh_profile[main_outer_key][main_inner_key].update(dict_to_write)
 
     return oh_profile
+
+
+def clear_dict_entries(oh_profile: dict, key_to_clear: str) -> dict:
+    """
+    Recursively searches for `key_to_clear` in a nested dictionary
+    and clears its contents (if it's a dict) or sets it to None otherwise.
+
+    :param oh_profile: The main dictionary to modify
+    :param key_to_clear: The key name to search for and clear
+    :return: The modified dictionary
+    """
+    for key, value in oh_profile.items():
+        if key == key_to_clear:
+            if isinstance(oh_profile[key], dict):
+                oh_profile[key].clear()  # clear all items but keep the key
+            else:
+                oh_profile[key] = None  # set non-dict value to None
+
+        elif isinstance(value, dict):
+
+            # recurse into nested dictionary
+            clear_dict_entries(value, key_to_clear)
+    return oh_profile
 # -------------------------------------------------------------------------------------------------------------------- #
 # private functions
 # -------------------------------------------------------------------------------------------------------------------- #

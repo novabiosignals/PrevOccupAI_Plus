@@ -39,6 +39,23 @@ META_DATA_COLUMNS = ['idade', 'sexo', 'altura', 'peso', 'mao']
 DATE_FORMAT = "%d-%m-%Y"
 
 SCORING_VALUE = '1_completely-disagree_5_completely-agree'
+
+IPAQ_KEY = "IPAQ"
+OSPAQ_KEY = "OSPAQ"
+OSPAQ_DISTRIBUTIONS_KEY = 'OSPAQ_distributions'
+
+OSPAQ_WALKING = "Andar"
+OSPAQ_SITTING = "Sentado"
+OSPAQ_STANDING = "De pé"
+OSPAQ_HEAVY = "trabalho_pesado"
+
+MAP_OSPAQ = {
+    "percentagem_sentado": OSPAQ_SITTING,
+    "percentagem_pe": OSPAQ_STANDING,
+    "percentagem_caminhar": OSPAQ_WALKING,
+    "percentagem_trab_pesado": OSPAQ_HEAVY}
+
+OSPAQ_DISTRIBUTIONS = ["percentagem_caminhar", "percentagem_sentado", "percentagem_pe", "percentagem_trab_pesado"]
 # ------------------------------------------------------------------------------------------------------------------- #
 # public functions
 # ------------------------------------------------------------------------------------------------------------------- #
@@ -354,22 +371,31 @@ def _organize_personal_metrics(metrics_dict: Dict[str, Any], language: str) -> D
     else:
         demo_key = "dados_pessoais"
 
-    ipaq_key = "IPAQ"
-    ospaq_key = "OSPAQ"
-
     # Initialize the organized dictionary with the new keys
-    organized_dict = {demo_key: {}, ipaq_key: {}, ospaq_key: {}}
+    organized_dict = {
+        demo_key: {},
+        IPAQ_KEY: {},
+        OSPAQ_KEY: {
+            OSPAQ_DISTRIBUTIONS_KEY: {}
+        }
+    }
 
     # Iterate over the original flat metrics dictionary
     for key, value in metrics_dict.items():
 
         # keys belonging to OSPAQ
         if key in OSPAQ_KEYS:
-            organized_dict[ospaq_key][key] = value
 
+            if key in OSPAQ_DISTRIBUTIONS:
+
+                mapped_key = MAP_OSPAQ[key]
+                organized_dict[OSPAQ_KEY][OSPAQ_DISTRIBUTIONS_KEY][mapped_key] = value/100
+
+            else:
+                organized_dict[OSPAQ_KEY][key] = value
         # keys belonging to IPAQ
         elif key in IPAQ_KEYS:
-            organized_dict[ipaq_key][key] = value
+            organized_dict[IPAQ_KEY][key] = value
 
         # all remaining keys go under demographics/lifestyle
         else:

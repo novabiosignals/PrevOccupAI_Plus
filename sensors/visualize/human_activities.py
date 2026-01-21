@@ -18,58 +18,147 @@ import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 from datetime import datetime, timedelta
 from matplotlib.ticker import FuncFormatter
+from matplotlib.patches import Patch, Rectangle
 from babel.dates import format_datetime
-from matplotlib.patches import Patch
-
+import os
 
 # internal imports
-from .plot_utils import handle_plot
-from constants import WALKING, STANDING, SITTING
-
+from .plot_utils import handle_plot, get_weekday_name, add_percentage_labels
+from HAR.classifier import CLASS_WALK, CLASS_SIT, CLASS_STAND
+from .constants import RED, YELLOW, BLUE_STATE, GREEN, DUSTY_GRAPE, REDDISH_BROWN, GRAY
+from OH_profile.constants import HAR_DISTRIBUTIONS_KEY, HAR_TIMELINE_KEY, HAR_STEPS_KEY, HAR_DISTANCE_KEY, HAR_NUM_STEPS_KEY
+from utils import create_dir
 # ------------------------------------------------------------------------------------------------------------------- #
 # file specific constants
 # ------------------------------------------------------------------------------------------------------------------- #
-WALKING_NAME = 'walking'
-SITTING_NAME = 'sitting'
-STANDING_NAME = 'standing_name'
+WALKING_NAME = 'Andar'
+STANDING_NAME = 'De pé'
+SITTING_NAME = 'Sentado'
+TRABALHO_PESADO = 'trabalho_pesado'
+
 TOTAL_DURATION = 'total_duration'
-ACTIVITY_MAP = {WALKING: WALKING_NAME, SITTING: SITTING_NAME, STANDING: STANDING_NAME}
+ACTIVITY_MAP = {CLASS_WALK: WALKING_NAME, CLASS_SIT: SITTING_NAME, CLASS_STAND: STANDING_NAME}
 SESSION_DT = 'session_dt'
 
 activity_colors = {
-    WALKING_NAME: '#8FBCE6',   #blue
-    SITTING_NAME: '#81C784',   #green
-    STANDING_NAME: '#C8A165'   #castanho
+    WALKING_NAME: BLUE_STATE,
+    SITTING_NAME: GREEN,
+    STANDING_NAME: REDDISH_BROWN,
 }
 
-SITTING_WARNING_COLOR = "#FFA726"  #orange
-SITTING_RISK_COLOR = '#EF9A9A' #red
+SITTING_WARNING_COLOR = YELLOW  #orange
+SITTING_RISK_COLOR = RED #red
 
 MAX_CONTINUOUS_SITTING_S =2*60*60 # 2 hours (EU-OSHA)
 WARNING_SITTING_S = 1*60*60 # 1 hour
+
+BAR_WIDTH = 0.6
+
 # ------------------------------------------------------------------------------------------------------------------- #
 # public functions
 # ------------------------------------------------------------------------------------------------------------------- #
-
-
-def plot_activity_proportions_per_day(all_metrics: dict, subject_id: str, show: bool, save: bool, save_dir: str) -> None:
+def plot_activity_distributions_ospaq_vs_real(personal_metrics_dict: dict,har_metrics_dict: dict,subject_id: str,
+    output_folder_path: str) -> None:
     """
-    Plots a stacked bar chart for each day of acquisition, using HAR_distributions.
+    Plots of the activity distributions - perceived (OSPAQ questionnaire) vs real (from sensors), side by side.
 
-    :param all_metrics: Dictionary containing the metrics loaded from JSON.
+    - Left plot: single OSPAQ bar (from questionnaires), stacked: walking → standing → sitting
+      The 'trabalho_pesado' is added to the walking percentage
+    - Right plot: HAR real data per day, stacked: walking → standing → sitting
+    - Shared y-axis
+    - Percentage labels added on top of each stack using reusable function
+    :param personal_metrics_dict: Dictionary containing the personal questionnaire metrics loaded from JSON.
     :param subject_id: Identifier of the subject extracted from the JSON filename
-    :param show: Whether to display the plot.
-    :param save: Whether to save the plot to disk.
-    :param save_dir: Directory path to save plots.
+    :param output_folder_path: Directory path to save plots.
+                          Sitting periods exceeding this duration are highlighted as a
+                          warning (e.g., orange), but are below the maximum recommended
+                          limit.
     """
 
-    print(f"[INFO] Generating activity proportions plots for {subject_id}")
+    # Extract OSPAQ data
+    ospaq = personal_metrics_dict["OSPAQ"]['OSPAQ_distributions'].copy()
 
-    human_activities = all_metrics["sensor_metrics"]["human_activities"]
+    # extract the distributions and put in percentage
+    walking = ospaq.get(WALKING_NAME, 0)*100
+    sitting = ospaq.get(SITTING_NAME, 0)*100
+    standing = ospaq.get(STANDING_NAME, 0)*100
+    heavy = ospaq.get(TRABALHO_PESADO, 0)*100
+
+    # add value of trabalho pesado to the walking and remove it from the dict
+    walking += heavy
+    ospaq.pop(TRABALHO_PESADO, None)
+
+    # Create figure with shared y-axis
+    fig, (ax_left, ax_right) = plt.subplots(1, 2, figsize=(14, 6), sharey=True)
+
+    # ---------------- LEFT: OSPAQ (axes coordinates) ----------------
+    BAR_WIDTH_AXES = 0.15  # fraction of subplot width
+    X_CENTER = 0.5
+
+    bottom = 0.0
+    stacks_left = []  # to collect values for percentage labels
+
+    segments = [
+        (walking, activity_colors[WALKING_NAME]),
+        (standing, activity_colors[STANDING_NAME]),
+        (sitting, activity_colors[SITTING_NAME]),
+    ]
+
+    for value, color in segments:
+        if value == 0:
+            stacks_left.append([0])
+            continue
+        height = value / 100.0  # percent → fraction
+        rect = Rectangle((X_CENTER - BAR_WIDTH_AXES / 2, bottom),BAR_WIDTH_AXES,height,transform=ax_left.transAxes,
+            color=color)
+
+        ax_left.add_patch(rect)
+        bottom += height
+        stacks_left.append([value])  # store original % for labels
+
+    # Add percentage labels (reusable function)
+    add_percentage_labels(ax_left, stacks_left, use_axes=True)
+
+    # Format left axis
+    ax_left.set_xlim(0, 1)
+    ax_left.set_ylim(0, 1)
+    ax_left.set_xticks([0.5])
+    ax_left.set_xticklabels(["questionário"], fontsize=12)
+    ax_left.set_ylabel("Percentagem de Tempo (%)", fontsize=12)
+    ax_left.set_title("Resultado do questionário", fontsize=14)
+    ax_left.set_axisbelow(True)
+
+    ax_left.grid(axis='y', color='lightgray', linestyle='--', linewidth=0.7)
+    for spine in ax_left.spines.values():
+        spine.set_visible(False)
+
+    # ---------------- RIGHT: REAL (HAR bars) ----------------
+    plot_activity_proportions_per_day(har_metrics_dict, ax=ax_right)
+    ax_right.set_title("Resultado dos sensores", fontsize=14)
+    ax_right.tick_params(axis='y', left=False, labelleft=False)
+
+    # Leave space for legend with tight_layout
+    plt.tight_layout(rect=[0, 0.08, 1, 0.92])
+
+    fig.legend(loc="upper center",bbox_to_anchor=(0.5, 0.1),  ncol=4,frameon=False,fontsize=12)
+
+    fig.suptitle("Distribuição de atividades ao longo do dia", fontsize=16, y=0.97)
+
+    # ---------------- SAVE ----------------
+    output_path = create_dir(output_folder_path, os.path.join(subject_id, "human_activities"))
+    filename = f"{subject_id}_ospaq_vs_real_activity_distribution.png"
+    handle_plot(save_dir=output_path, filename=filename)
+
+
+def plot_activity_proportions_per_day(har_metrics_dict: dict, ax: plt.Axes, locale='pt_PT.UTF-8') -> plt.Axes:
+    """
+    Plots a stacked bar chart for each day of acquisition, using HAR_distributions,
+    into a provided matplotlib axis.
+    """
 
     # Collect data per day
     dates_sorted = sorted(
-        human_activities.keys(),
+        har_metrics_dict.keys(),
         key=lambda d: datetime.strptime(d, "%d-%m-%Y")
     )
 
@@ -77,111 +166,60 @@ def plot_activity_proportions_per_day(all_metrics: dict, subject_id: str, show: 
     date_labels = []
 
     for date_str in dates_sorted:
-        sessions = human_activities[date_str]
+        sessions = har_metrics_dict[date_str]
 
-        # Since there is only one session per day, take the first one
         session_key = list(sessions.keys())[0]
         session_data = sessions[session_key]
 
-        distributions = session_data.get("HAR_distributions", None)
+        distributions = session_data.get(HAR_DISTRIBUTIONS_KEY, None)
         if not distributions:
             print(f"[WARNING] No HAR_distributions for date {date_str}")
             continue
 
-        # Convert to percentage
-        walking_props.append(distributions.get("Andar", 0) * 100)
-        sitting_props.append(distributions.get("Sentado", 0) * 100)
-        standing_props.append(distributions.get("De pé", 0) * 100)
+        walking_props.append(distributions.get(WALKING_NAME, 0) * 100)
+        sitting_props.append(distributions.get(SITTING_NAME, 0) * 100)
+        standing_props.append(distributions.get(STANDING_NAME, 0) * 100)
 
-        # Format date for x-axis
-        try:
-            weekday_str = format_datetime(datetime.strptime(date_str, "%d-%m-%Y"), "EEEE", locale="pt_PT")
-        except Exception:
-            weekday_str = date_str
+        weekday_str = get_weekday_name(date_str, locale)
         date_labels.append(weekday_str)
 
     if not date_labels:
-        print("[INFO] No valid data to plot")
-        return
+        print("No valid data to plot")
+        return ax
 
-    # Define week range for suptitle
-    first_date = datetime.strptime(dates_sorted[0], "%d-%m-%Y")
-    last_date = datetime.strptime(dates_sorted[-1], "%d-%m-%Y")
-    first_weekday = format_datetime(first_date, "EEEE", locale="pt_PT")
-    last_weekday = format_datetime(last_date, "EEEE", locale="pt_PT")
-    main_title_range = f"{first_weekday} ({first_date.strftime('%d/%m/%y')}) - {last_weekday} ({last_date.strftime('%d/%m/%y')})"
-
-    # Plotting
-    fig, ax = plt.subplots(figsize=(12, 6))
     positions = list(range(len(date_labels)))
 
-    ax.bar(positions, walking_props, color=activity_colors[WALKING_NAME], label=WALKING_NAME)
-    ax.bar(positions, sitting_props, bottom=walking_props, color=activity_colors[SITTING_NAME], label=SITTING_NAME)
+    # Walking at the bottom
+    ax.bar(positions,walking_props,color=activity_colors[WALKING_NAME],label=WALKING_NAME,width=BAR_WIDTH)
 
-    bottom = [w + s for w, s in zip(walking_props, sitting_props)]
-    ax.bar(positions, standing_props, bottom=bottom, color=activity_colors[STANDING_NAME], label=STANDING_NAME)
+    # Standing in the middle
+    bottom_standing = walking_props  # bottom is walking
+    ax.bar(positions,standing_props,bottom=bottom_standing,color=activity_colors[STANDING_NAME],label=STANDING_NAME,width=BAR_WIDTH)
 
-    for i, (w, s, st) in enumerate(zip(walking_props, sitting_props, standing_props)):
-        # integer values for display
-        w_int = round(w)
-        s_int = round(s)
+    # Sitting on top
+    bottom_sitting = [w + st for w, st in zip(walking_props, standing_props)]
+    ax.bar(positions,sitting_props,bottom=bottom_sitting,color=activity_colors[SITTING_NAME],label=SITTING_NAME,width=BAR_WIDTH)
 
-        # ensure total 100 by fixing the last category
-        st_int = 100 - (w_int + s_int)
-
-        # if rounding makes it negative, adjust
-        if st_int < 0:
-            st_int = 0
-            s_int = 100 - w_int
-
-        # label positions
-        if w >= 4:
-            ax.text(i, w / 2, f"{w_int}%", ha='center', va='center', color='black', fontsize=10)
-        else:
-            ax.text(i, w + 1, f"{w_int}%", ha='center', va='bottom', color='black', fontsize=10)
-
-        if s >= 4:
-            ax.text(i, w + s / 2, f"{s_int}%", ha='center', va='center', color='black', fontsize=10)
-        else:
-            ax.text(i, w + s + 1, f"{s_int}%", ha='center', va='bottom', color='black', fontsize=10)
-
-        if st >= 4:
-            ax.text(i, w + s + st / 2, f"{st_int}%", ha='center', va='center', color='black', fontsize=10)
-        else:
-            ax.text(i, w + s + st + 1, f"{st_int}%", ha='center', va='bottom', color='black', fontsize=10)
-
+    add_percentage_labels(ax, [walking_props, standing_props, sitting_props])
 
     ax.set_xticks(positions)
-    ax.set_xticklabels(date_labels, rotation=0, ha='center', fontsize=12)
-    ax.set_ylabel("Percentagem de Tempo (%)", fontsize=12)
+    ax.set_xticklabels(date_labels, fontsize=12)
     ax.set_ylim(0, 100)
     ax.yaxis.set_major_formatter(FuncFormatter(lambda x, _: f"{x:.0f}%"))
-
-    ax.grid(axis="y", color="lightgray", linestyle="--", linewidth=0.7)
+    ax.grid(axis="y", linestyle="--", linewidth=0.7, color="lightgray")
     ax.set_axisbelow(True)
+
+    ax.set_xlim(-0.5, len(positions) - 0.5)
 
     for spine in ax.spines.values():
         spine.set_visible(False)
 
-    ax.set_title(
-        f"Sujeito: {subject_id} | Distribuição de Atividades por Dia \n{main_title_range}",
-        fontsize=14, pad=20
-    )
-    ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.15), ncol=3, frameon=False, fontsize=12)
+    ax.set_title("Distribuição de Atividades por Dia", fontsize=14)
 
-    plt.tight_layout()
-
-    filename = f"{subject_id}_activity_distribution_per_day.png"
-    handle_plot(save_dir=save_dir, save=save, filename=filename)
+    return ax
 
 
-def plot_activity_timeline_per_day(all_metrics: dict,
-                                  subject_id: str,
-                                  show: bool,
-                                  save: bool,
-                                  save_dir: str,
-                                  warning_sitting_s: float = 60*60,
-                                  max_continuous_sitting_s: float = 2 * 60 * 60):
+def plot_activity_timeline_per_day(oh_profile: dict, subject_id: str, output_folder_path: str, locale='pt_PT.UTF-8') -> None:
     """
     Plot activity timelines for each subject and acquisition day.
 
@@ -204,31 +242,24 @@ def plot_activity_timeline_per_day(all_metrics: dict,
         - Type 2 diabetes and cardiovascular disease
         - Obesity
 
-    :param all_metrics: Dictionary containing the metrics loaded from JSON.
+    :param oh_profile: Dictionary containing the HAR metrics loaded from JSON.
     :param subject_id: Identifier of the subject extracted from the JSON filename
-    :param show: Whether to display the plot.
-    :param save: Whether to save the plot to disk.
-    :param save_dir: Directory path to save plots.
-    :param max_continuous_sitting_s: Maximum allowed duration (in seconds) for continuous sitting. Default is 2 hours (EU-OSHA).
-    :param warning_sitting_s: Warning threshold (in seconds) for continuous sitting.
+    :param output_folder_path: Directory path to save plots.
                           Sitting periods exceeding this duration are highlighted as a
                           warning (e.g., orange), but are below the maximum recommended
                           limit.
     """
 
-    print(f"[INFO] Generating activity timeline plots {subject_id}")
-
-    human_activities = all_metrics["sensor_metrics"]["human_activities"]
-    activity_names = [WALKING_NAME, SITTING_NAME, STANDING_NAME]
+    activity_names = [WALKING_NAME, STANDING_NAME, SITTING_NAME]
     y_positions = [0, 0.2, 0.4]
     bar_height = 0.1
 
-    for date_str, sessions in human_activities.items():
+    for date_str, sessions in oh_profile.items():
 
         session_key = list(sessions.keys())[0]
         session_data = sessions[session_key]
 
-        har_timeline = session_data.get("HAR_timeline", {})
+        har_timeline = session_data.get(HAR_TIMELINE_KEY, {})
         if not har_timeline:
             continue
 
@@ -255,14 +286,14 @@ def plot_activity_timeline_per_day(all_metrics: dict,
                 total_duration = (end - start).total_seconds()
 
                 # warning (orange)
-                if total_duration > warning_sitting_s:
-                    warning_start = start + timedelta(seconds=warning_sitting_s)
-                    warning_end = min(end, start + timedelta(seconds=max_continuous_sitting_s))
+                if total_duration > WARNING_SITTING_S:
+                    warning_start = start + timedelta(seconds=WARNING_SITTING_S)
+                    warning_end = min(end, start + timedelta(seconds=MAX_CONTINUOUS_SITTING_S))
                     warning_sitting_intervals.append((warning_start, warning_end))
 
                 # risk (red)
-                if total_duration > max_continuous_sitting_s:
-                    risk_start = start + timedelta(seconds=max_continuous_sitting_s)
+                if total_duration > MAX_CONTINUOUS_SITTING_S:
+                    risk_start = start + timedelta(seconds=MAX_CONTINUOUS_SITTING_S)
                     risk_sitting_intervals.append((risk_start, end))
 
         #Plot
@@ -324,38 +355,180 @@ def plot_activity_timeline_per_day(all_metrics: dict,
 
         warning_patch = Patch(
             facecolor=SITTING_WARNING_COLOR,
-            label=f"Sentado > {warning_sitting_s / 3600:.1f} h"
+            label=f"Sentado > {WARNING_SITTING_S / 3600:.1f} h"
         )
 
-        risk_patch = Patch(
-            facecolor=SITTING_RISK_COLOR,
-            label=f"Excedido o tempo sentado \nrecomendado (> {max_continuous_sitting_s / 3600:.1f} h)"
-        )
+        risk_patch = Patch(facecolor=SITTING_RISK_COLOR,
+                           label=f"Excedido o tempo sentado \nrecomendado (> {MAX_CONTINUOUS_SITTING_S / 3600:.1f} h)")
 
-        ax.legend(
-            handles=[warning_patch, risk_patch],
-            loc="center left",
-            bbox_to_anchor=(1.02, 0.5),
-            frameon=False,
-            fontsize=11
-        )
+        ax.legend(handles=[warning_patch, risk_patch],loc="center left",bbox_to_anchor=(1.02, 0.5),frameon=False,fontsize=11)
 
         for spine in ax.spines.values():
             spine.set_visible(False)
 
-        try:
-            date_obj = datetime.strptime(date_str, "%d-%m-%Y")
-            date_formatted = format_datetime(
-                date_obj,
-                "dd/MM/yyyy (EEEE)",
-                locale="pt_PT"
-            )
-        except Exception:
-            date_formatted = date_str
+        date_formatted = get_weekday_name(date_str, locale)
 
         # title
-        ax.set_title(f"Sujeito: {subject_id} | {date_formatted}", fontsize=14)
+        ax.set_title(f"{date_formatted}", fontsize=14)
 
         plt.tight_layout()
+
+        # generate output folder
+        output_path = create_dir(output_folder_path, os.path.join(subject_id, "human_activities"))
+
         filename = f"{subject_id}_{date_str}_activity_timeline.png"
-        handle_plot(save_dir=save_dir, save=save, filename=filename)
+        handle_plot(save_dir=output_path, filename=filename)
+
+
+def plot_steps_and_distance_per_day(har_metrics_dict: dict, subject_id: str, output_folder_path: str, age:int):
+    """
+    Plot daily step counts per acquisition day and annotate walked distance in meters.
+
+    The bar chart displays the total number of steps per day.
+    The walked distance is shown as a text annotation (in meters) next to each bar,
+    avoiding the use of a secondary axis.
+
+    Although 10 000 steps per day are widely promoted as an optimal target for health,
+    recent evidence suggests that the number of steps associated with reduced all-cause
+    mortality depends on age.
+
+    According to a large meta-analysis of 15 international cohorts
+    (Paluch et al., 2022, The Lancet Public Health, doi: https://doi.org/10.1016/S2468-2667(21)00302-9),
+    the risk of all-cause mortality decreases progressively with increasing daily step counts up to approximately
+    8 000–10 000 steps per day in adults younger than 60 years, and up to
+    6 000–8 000 steps per day in adults aged 60 years and older.
+
+    :param har_metrics_dict: Dictionary containing the HAR metrics loaded from JSON.
+    :param subject_id: Identifier of the subject extracted from the JSON filename.
+    :param output_folder_path: Directory path to save plots.
+    :param age: Age of the subject (in years), used to determine the recommended
+            daily number of steps based on age-dependent evidence.
+    """
+
+    # Collect data
+    dates = []
+    steps = []
+    distances = []
+    date_objs = []
+
+    # Iterate through each day and session to sum steps and distance
+    for date_str, sessions in har_metrics_dict.items():
+
+        total_steps = 0
+        total_distance = 0.0
+
+        for session_key, session_data in sessions.items():
+            har_steps = session_data.get(HAR_STEPS_KEY)
+            if not har_steps:
+                continue
+            # Sum steps and distance for the day
+            total_steps += har_steps.get(HAR_NUM_STEPS_KEY, 0)
+            total_distance += har_steps.get(HAR_DISTANCE_KEY, 0.0)
+        try:
+            # Convert date string to datetime object
+            date_obj = datetime.strptime(date_str, "%d-%m-%Y")
+            weekday = format_datetime(date_obj, "EEEE", locale="pt_PT").capitalize()
+        except Exception:
+            weekday = date_str
+
+
+        # Only include days with steps > 0
+        if total_steps > 0:
+            dates.append(weekday)
+            steps.append(total_steps)
+            distances.append(total_distance)
+            date_objs.append(date_obj)
+
+    if not steps:
+        print("[WARNING] No HAR_steps data found. Plot will not be generated.")
+        return
+
+    # Determine recommended steps based on age
+    if age < 60:
+        recommended_steps = 9000  # in the middle of 8k-10k
+    else:
+        recommended_steps = 7000  # in the middle of 6k-8k
+
+    # Plot
+    fig = plt.figure(figsize=(12, 5), constrained_layout=True)
+    gs = fig.add_gridspec(1, 2, width_ratios=[4, 1], wspace=0.05)
+    ax = fig.add_subplot(gs[0, 0])
+    ax_dist = fig.add_subplot(gs[0, 1])
+
+    # Gray bar = recommended steps (capped at recommended_steps)
+    ax.barh(dates, [recommended_steps] * len(dates),
+            color=GRAY, edgecolor="none", label=f"Passos diários recomendados para {age} anos: {recommended_steps}")
+
+    # Blue bar = real steps (cortada ao recommended_steps)
+    steps_capped = [min(s, recommended_steps) for s in steps]
+    bars_blue = ax.barh(dates, steps_capped,
+            color=BLUE_STATE, edgecolor="none", label="Passos diários no local de trabalho")
+
+    # Add step count label at the end of each blue bar
+    for bar, real_steps in zip(bars_blue, steps):
+        ax.text(
+            bar.get_width() - 200,  # position near end of blue bar
+            bar.get_y() + bar.get_height() / 2,
+            f"{real_steps}",
+            va="center",
+            ha="right",
+            fontsize=10,
+            color="black"
+        )
+
+    # Vertical line showing recommended steps
+    ax.axvline(
+        recommended_steps,
+        linestyle="--",
+        linewidth=1,
+        color="gray"
+    )
+
+    # Label for recommended steps value
+    ax.text(
+        recommended_steps,
+        -0.6,  # position above the first bar
+        f"{recommended_steps}",
+        ha="center",
+        va="bottom",
+        fontsize=10,
+        color="black"
+    )
+
+    # Reverse y-axis so first day appears on top
+    ax.invert_yaxis()
+
+    # Formatting main axis
+    ax.set_xlabel("Número de passos", fontsize=12)
+    ax.set_ylabel("Dia", fontsize=12)
+    ax.set_title(f"Passos e distância percorrida", fontsize=14, pad=35)
+    ax.tick_params(axis="x", labelsize=11)
+    ax.tick_params(axis="y", labelsize=11)
+    for spine in ax.spines.values():
+        spine.set_visible(False)
+    ax.legend(frameon=False, loc="upper center", bbox_to_anchor=(0.5, 1.12), ncol=2)
+
+    # Distance column (right)
+    ax_dist.set_xlim(0, 1)
+    # Match y-limits to main axis so days align correctly
+    ax_dist.set_ylim(ax.get_ylim())
+
+    ax_dist.set_xticks([])
+    ax_dist.set_yticks(range(len(dates)))
+    ax_dist.set_yticklabels([])
+
+    # Add distance labels (in km) aligned with each day
+    for i, distance in enumerate(distances):
+        ax_dist.text(0.5, i, f"{distance / 1000:.1f} km", va="center", ha="center", fontsize=10, color="black")
+
+    ax_dist.set_title("Distância percorrida\nno local de trabalho", fontsize=11)
+
+    for spine in ax_dist.spines.values():
+        spine.set_visible(False)
+
+    # generate output folder
+    output_path = create_dir(output_folder_path, os.path.join(subject_id, "human_activities"))
+
+    # Save / Show plot
+    filename = f"{subject_id}_daily_steps_distance.png"
+    handle_plot(save_dir=output_path, filename=filename)

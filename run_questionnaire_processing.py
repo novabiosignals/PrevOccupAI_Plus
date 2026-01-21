@@ -10,22 +10,29 @@ import sensors.load as sl
 from constants import WORKLOAD, PSYCHOSOCIAL, PERSONAL, WORK_TYPE, BIOMECHANICAL
 from OH_profile.constants import *
 from OH_profile.load import get_OH_profile
-from OH_profile.write import save_OH_profile, write_to_OH_profile
+from OH_profile.write import save_OH_profile, write_to_OH_profile, clear_dict_entries
 from questionnaires.visualize.questionnaires import ROSA_KEYS_KEEP
 import questionnaires.visualize as qv
 import questionnaires.metrics as qm
 # ------------------------------------------------------------------------------------------------------------------- #
 # flags
 # ------------------------------------------------------------------------------------------------------------------- #
+# flags to generate the scores
 GENERATE_SCORES = False
 PROCESS_PSYCHOSOCIAL = True
 PROCESS_PERSONAL = True
 PROCESS_ENVIRONMENT = True
 PROCESS_BIOMECHANICAL = True
 PROCESS_WORKLOAD = True
-GENERATE_QUESTIONNAIRES_DATASET = False
-GENERATE_OH_PROFILE = True
 
+# generate the raw dataset
+GENERATE_QUESTIONNAIRES_DATASET = False
+
+# generate OH profile
+GENERATE_OH_PROFILE = True
+RERUN_OH_PROFILE = True
+
+# generate visualizations
 VISUALIZE = False
 
 # ------------------------------------------------------------------------------------------------------------------- #

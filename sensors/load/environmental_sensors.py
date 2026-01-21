@@ -49,7 +49,7 @@ def calculate_mean_illuminance(df: pd.DataFrame, subject_id: int) -> float:
     lux_cols = df.filter(like="lux")
 
     # get the values for the subject and calculate the mean
-    return lux_cols.loc[subject_id].mean()
+    return round(lux_cols.loc[subject_id].mean(), 4)
 
 
 def get_CO2_values(df: pd.DataFrame, subject_id: int) -> float:

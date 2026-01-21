@@ -93,6 +93,10 @@ def get_global_heart_rate_metrics(subject_data_folder_path: str, subject_age: in
         # load_signals all acquisitions from the same day into a nested dictionary
         df_dict = sl.load_daily_acquisitions(day_folder_path, load_devices={WATCH: [HEART]})
 
+        # if no data was loaded
+        if len(df_dict) == 0:
+            return {}
+
         # iterate through all the acquisitions in the dictionary
         for time_key, df in df_dict[WATCH].items():
 
@@ -140,6 +144,10 @@ def get_heart_rate_metrics(day_folder_path: str, hr_min: float, hr_max: float, f
 
     # load_signals all acquisitions from the same day into a nested dictionary
     df_dict = sl.load_daily_acquisitions(day_folder_path, load_devices=selected_sensors)
+
+    # if no data was loaded or there's no phone data, return empty dict
+    if len(df_dict) == 0 or len(df_dict[PHONE]) == 0:
+        return {}
 
     # pre-process data
     processed_df_dict = sp.apply_pre_processing_pipeline(df_dict, fs_android=fs)

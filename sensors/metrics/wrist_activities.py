@@ -74,6 +74,10 @@ def get_wrist_activity_metrics(day_folder_path: str, fs: int, w_size: float) -> 
     # load_signals all acquisitions from the same day into a nested dictionary
     df_dict = sl.load_daily_acquisitions(day_folder_path, load_devices=selected_sensors)
 
+    # if no data was loaded or there's no phone data, return empty dict
+    if len(df_dict) == 0 or len(df_dict[PHONE]) == 0:
+        return {}
+
     # pre-process data
     processed_df_dict = sp.apply_pre_processing_pipeline(df_dict, fs_android=fs)
 

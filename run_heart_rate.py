@@ -7,7 +7,7 @@ import os
 import sensors.visualize as sv
 import sensors.load as sl
 import sensors.metrics as sm
-import questionnaires
+import questionnaires.metrics as qm
 from OH_profile.constants import SENSOR_METRICS_KEY, HEART_RATE_KEY, HR_RELATIVE_BASE_KEY, METADATA_KEY
 from utils import extract_group_from_path, extract_device_num_from_path
 from OH_profile.load import get_OH_profile
@@ -26,7 +26,7 @@ HEART_RATE_WEEK = True
 # ------------------------------------------------------------------------------------------------------------------- #
 DRIVE = "E"
 DATASET_PATH = "Backup PrevOccupAI_PLUS Data\\data"
-SUBJECT_FOLDER_PATH = f"{DRIVE}:\\{DATASET_PATH}\\group2\\sensors\\LIBPhys #001"
+SUBJECT_FOLDER_PATH = f"{DRIVE}:\\{DATASET_PATH}\\group1\\sensors\\LIBPhys #002"
 QUESTIONNAIRE_RESULTS_PATH = "C:\\Users\\srale\\Desktop\\carga de trabalho\\results"
 OH_PROFILE_PATH = r"C:\Users\srale\Desktop\OH_profiles"
 PLOTS_OUTPUT_PATH = r"C:\Users\srale\Desktop\timeline_plots"
@@ -73,7 +73,7 @@ if GENERATE_HEART_RATE_OH_PROFILE:
                                   f"to generate the results or place them in the correct folder: \n{personal_quest_results_path}")
 
             # get metadata (age) from data and add it to OH profile
-            metadata_dict = questionnaires.get_metadata_metrics(personal_quest_results_path, int(subject_id))
+            metadata_dict = qm.get_metadata_metrics(personal_quest_results_path, int(subject_id))
 
             # write metadata results to the OH profile
             oh_profile = write_to_OH_profile(oh_profile, main_outer_key=METADATA_KEY,
@@ -84,9 +84,12 @@ if GENERATE_HEART_RATE_OH_PROFILE:
         # calculate relative metrics
         relative_HR_dict = sm.get_global_heart_rate_metrics(subject_data_folder_path=SUBJECT_FOLDER_PATH, subject_age=age)
 
-        # write to oh profile
-        oh_profile = write_to_OH_profile(oh_profile, main_outer_key=SENSOR_METRICS_KEY,
-                                         main_inner_key=HEART_RATE_KEY, dict_to_write=relative_HR_dict)
+        # if there are no metrics, continue
+        if len(relative_HR_dict) > 0:
+
+            # write to oh profile
+            oh_profile = write_to_OH_profile(oh_profile, main_outer_key=SENSOR_METRICS_KEY,
+                                             main_inner_key=HEART_RATE_KEY, dict_to_write=relative_HR_dict)
 
     # get global metrics from OH profile
     global_metrics_dict = oh_profile[SENSOR_METRICS_KEY][HEART_RATE_KEY][HR_RELATIVE_BASE_KEY]
@@ -106,6 +109,10 @@ if GENERATE_HEART_RATE_OH_PROFILE:
             # get heart rate metrics for the day
             metrics_dict = sm.get_heart_rate_metrics(day_folder_path, hr_min=global_metrics_dict[HR_MIN_KEY],
                                                      hr_max=global_metrics_dict[HR_MAX_KEY], fs=FS, w_size=W_SIZE)
+
+            # if there are no metrics, continue
+            if len(metrics_dict) == 0:
+                continue
 
             # write to oh profile
             oh_profile = write_to_OH_profile(oh_profile, main_outer_key=SENSOR_METRICS_KEY,

@@ -31,13 +31,6 @@ FS = 100
 # program starts here
 # ------------------------------------------------------------------------------------------------------------------- #
 
-# get group and device num from path
-group = str(extract_group_from_path(DATA_FOLDER_PATH))
-device_num = str(extract_device_num_from_path(DATA_FOLDER_PATH))
-
-# get subject id
-subject_id = sl.get_participant_id(sl.load_participants_info(), device_num, group)
-
 if GENERATE_NOISE_OH_PROFILE:
 
     # cycle over the group folders ('group1', group2...)
@@ -65,7 +58,7 @@ if GENERATE_NOISE_OH_PROFILE:
                         # get subject id
                         subject_id = sl.get_participant_id(sl.load_participants_info(), device_num, group)
 
-                        print(f"Extracting wrist metrics for subject: {subject_id}")
+                        print(f"Extracting noise metrics for subject: {subject_id}")
 
                         # get oh profile
                         oh_profile = get_OH_profile(OH_PROFILE_PATH, subject_id)
@@ -82,6 +75,10 @@ if GENERATE_NOISE_OH_PROFILE:
 
                                 # extract noise features
                                 daily_metrics_dict = sm.get_noise_metrics(day_folder_path, fs=FS)
+
+                                if len(daily_metrics_dict) == 0:
+
+                                    continue
 
                                 # write to oh profile
                                 oh_profile = write_to_OH_profile(oh_profile, main_outer_key=SENSOR_METRICS_KEY,

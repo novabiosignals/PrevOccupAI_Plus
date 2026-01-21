@@ -4,6 +4,7 @@ from .noise import plot_noise_metrics_per_week
 from .environmental_sensors import plot_environment_data
 from .wrist_activities import plot_wrist_movements_heatmaps
 from .plot_utils import get_weekday_name
+from .human_activities import plot_activity_distributions_ospaq_vs_real, plot_activity_timeline_per_day, plot_steps_and_distance_per_day
 
 __all__ = [
     'generate_sensor_timeline_plot',
@@ -14,6 +15,8 @@ __all__ = [
     'plot_hr_ranges',
     'plot_environment_data',
     'plot_wrist_movements_heatmaps',
-    'get_weekday_name'
-
+    'get_weekday_name',
+    'plot_activity_timeline_per_day',
+    'plot_activity_distributions_ospaq_vs_real',
+    'plot_steps_and_distance_per_day'
 ]
