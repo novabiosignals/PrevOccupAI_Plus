@@ -316,7 +316,7 @@ def plot_activity_timeline_per_day(oh_profile: dict, subject_id: str, output_fol
 
         ax.broken_barh(
             warning_intervals_mpl,
-            (y_positions[1] - bar_height / 2, bar_height),
+            (y_positions[2] - bar_height / 2, bar_height),
             facecolors=SITTING_WARNING_COLOR
         )
 
@@ -328,7 +328,7 @@ def plot_activity_timeline_per_day(oh_profile: dict, subject_id: str, output_fol
 
         ax.broken_barh(
             risk_intervals_mpl,
-            (y_positions[1] - bar_height / 2, bar_height),
+            (y_positions[2] - bar_height / 2, bar_height),
             facecolors=SITTING_RISK_COLOR
         )
 
