@@ -7,6 +7,7 @@ Available Functions
 split_df_by_non_nan_blocks(...): Split a DataFrame into contiguous non-NaN acquisition blocks.
 calculate_statistics(...): Compute summary statistics for a numeric column.
 calculate_class_distributions(...): Calculate class distributions for a specified column containing the class labels.
+calculate_class_durations(...): Calculate the duration of each class in seconds and save it to a dictionary.
 -------------------
 
 [Private]

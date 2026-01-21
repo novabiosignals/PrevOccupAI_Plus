@@ -31,8 +31,8 @@ GENERATE_PLOTS = True
 
 DRIVE = 'E'
 DATASET_PATH = 'Backup PrevOccupAI_PLUS Data\\data'
-SUBJECT_FOLDER_PATH = f"{DRIVE}:\\{DATASET_PATH}\\group2\\sensors\\LIBPhys #006\\"
-OH_PROFILE_PATH = f"{DRIVE}:\\Backup PrevOccupAI_PLUS Data\\OH_profiles"
+SUBJECT_FOLDER_PATH = f"{DRIVE}:\\{DATASET_PATH}\\group1\\sensors\\LIBPhys #001\\"
+OH_PROFILE_PATH = r"C:\Users\srale\Desktop\OH_profiles"
 OH_PLOTS_PATH = f"{DRIVE}:\\Backup PrevOccupAI_PLUS Data\\OH_plots"
 W_SIZE = 5.0
 FS = 100

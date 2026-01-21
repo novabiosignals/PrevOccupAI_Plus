@@ -10,7 +10,6 @@ get_noise_metrics(...): Extracts metrics from the noise data from one day and sa
 [Private]
 _calculate_noise_metrics(...):  Extract features from noise data in dBA (statistics, class distributions, and durations).
 _classify_noise(...): Classifies a noise level (in dBA) into noise categories (near-silent, low noise, disruptive noise, high noise)
-_calculate_class_durations(...): Calculate the duration of each class in seconds and save it to a dictionary.
 _calculate_windowed_timeline_metrics(...): Calculates timeline metrics for noise data using a windowing approach.
 """
 # ------------------------------------------------------------------------------------------------------------------- #

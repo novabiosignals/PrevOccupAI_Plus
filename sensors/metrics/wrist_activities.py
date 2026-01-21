@@ -188,7 +188,7 @@ def _calculate_significant_wrist_acceleration(df: pd.DataFrame, fs: int) -> floa
     total = valid_mask.sum()
 
     # (4) Percentage of significant events
-    significant_percentage = ((significant_movements / total) * 100 if total > 0 else 0)
+    significant_percentage = round(((significant_movements / total) * 100 if total > 0 else 0), 4)
 
     return significant_percentage
 
@@ -244,25 +244,6 @@ def _calculate_significant_wrist_rotation(df: pd.DataFrame, fs: int) -> float:
     significant_events = (total_rotations > SIGNIFICANT_THRESHOLD).sum()
 
     # (7) Percentage of significant events
-    significant_percent = (significant_events / len(total_rotations) * 100) if len(total_rotations) > 0 else 0
+    significant_percent = round((significant_events / len(total_rotations) * 100) if len(total_rotations) > 0 else 0, 4)
 
-    # Plot detrended angle
-    # df["ANGLE_DETRENDED"].plot()
-    # plt.title("Wrist Rotation (Detrended)")
-    # plt.xlabel("Sample Index")
-    # plt.ylabel("Angle (degrees)")
-    # plt.show()
-
-    """
-
-    plt.figure(figsize=(12, 5))
-    plt.plot(window_sum.index, window_sum.values, marker='o', linestyle='-', color='purple')
-    plt.axhline(SIGNIFICANT_THRESHOLD, color='red', linestyle='--', label="Significant Threshold")
-    plt.title("Window-to-Window Angle Differences")
-    plt.xlabel("Window ID")
-    plt.ylabel("Angle Difference (degrees)")
-    plt.legend()
-    plt.show()
-
-    """
     return significant_percent

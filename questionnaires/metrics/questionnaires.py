@@ -28,7 +28,7 @@ import re
 from constants import PERSONAL, BIOMECHANICAL, COPSOQ, POPULATION
 from OH_profile.constants import *
 import sensors.load as sl
-from .metrics_mappings import BIOMECHANICAL_METRIC_LABELS, IPAQ_KEYS, OSPAQ_KEYS
+from questionnaires.constants import BIOMECHANICAL_METRIC_LABELS, IPAQ_KEYS, OSPAQ_KEYS
 # ------------------------------------------------------------------------------------------------------------------- #
 # file specific constants
 # ------------------------------------------------------------------------------------------------------------------- #

@@ -338,7 +338,7 @@ def reconstruct_df_from_dict(timeline_metrics_dict: Dict[str, str], fs: int, cla
     return df
 
 
-def get_weekday_name(date_string, locale_string):
+def get_weekday_name(date_string, locale_string, date_format=DATE_FORMAT):
     """
     Returns the name of the day for a given date string in a specified locale.
 
@@ -347,7 +347,7 @@ def get_weekday_name(date_string, locale_string):
     :return: the localized day name without '-feira' and properly encoded in UTF-8
     """
     # parse the date string into a datetime object
-    date_time = datetime.strptime(date_string, DATE_FORMAT)
+    date_time = datetime.strptime(date_string, date_format)
 
     try:
         # set the locale for date formatting

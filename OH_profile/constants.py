@@ -113,8 +113,8 @@ NOISE_TIMELINE_KEY = 'Noise_timeline'
 # -------------------------------------------------------------------------------------------------------------------- #
 # WRIST ACTIVITIES SUB-KEYS
 # -------------------------------------------------------------------------------------------------------------------- #
-WRIST_SIGNIFICANT_ACC_PERC_KEY = 'significant_acceleration_percentage'
-WRIST_SIGNIFICANT_ROT_PERC_KEY = 'significant_rotation_percentage'
+WRIST_SIGNIFICANT_ACC_PERC_KEY = 'WRIST_significant_acceleration_percentage'
+WRIST_SIGNIFICANT_ROT_PERC_KEY = 'WRIST_significant_rotation_percentage'
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # ENVIRONMENT SUB-KEYS
