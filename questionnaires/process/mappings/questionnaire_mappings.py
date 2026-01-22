@@ -165,3 +165,15 @@ ID_ANSWERS_MAP = {
     }
 }
 
+ID_PAIN_PERCEPTION_MAPPING = {'DorPercep[SQ001]': 'DorPercep_sentado_muitas_horas',
+                              'DorPercep[SQ002]': 'DorPercep_uso_do_rato',
+                              'DorPercep[SQ003]': 'DorPercep_cadeira_inadequada',
+                              'DorPercep[SQ004]': 'DorPercep_má_postura',
+                              'DorPercep[SQ005]': 'DorPercep_sem_apoio_de_braços',
+                              'DorPercep[SQ006]': 'DorPercep_posição_cabeça',
+                              'DorPercep[SQ007]': 'DorPercep_sem_apoio_de_costas',
+                              'DorPercep[SQ008]': 'DorPercep_ritmo_volume_intenso_trabalho',
+                              'DorPercep[SQ009]': 'DorPercep_falta_exercício_físico',
+                              'DorPercep[SQ010]': 'DorPercep_não_aplicável',
+                              'DorPercep[other]': 'DorPercep_outro'}
+

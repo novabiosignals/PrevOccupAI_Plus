@@ -51,8 +51,8 @@ def plot_wrist_movements_heatmaps(oh_profile, subject: str, output_folder_path: 
     heatmap_rot = df_rot.pivot_table(index='weekday', columns='acquisition', values='value', aggfunc='sum')
 
     # order the days
-    heatmap_acc = heatmap_acc.reindex(DAY_ORDER_PT)
-    heatmap_rot = heatmap_rot.reindex(DAY_ORDER_PT)
+    heatmap_acc = _order_heatmap_by_existing_weekdays(heatmap_acc)
+    heatmap_rot = _order_heatmap_by_existing_weekdays(heatmap_rot)
 
     # generate output folder path
     output_path = create_dir(output_folder_path, os.path.join(str(subject), "wrist_movements"))
@@ -68,7 +68,6 @@ def plot_wrist_movements_heatmaps(oh_profile, subject: str, output_folder_path: 
 # ------------------------------------------------------------------------------------------------------------------- #
 # private functions
 # ------------------------------------------------------------------------------------------------------------------- #
-
 
 def _organize_wrist_activities_from_oh_profile(oh_profile: dict) -> Dict:
     """
@@ -154,3 +153,12 @@ def _plot_heatmap(df: pd.DataFrame, title: str, color_map: str, value_label: str
     # save figure
     plt.savefig(os.path.join(output_path, filename), bbox_inches='tight')
     plt.close()
+
+
+def _order_heatmap_by_existing_weekdays(heatmap: pd.DataFrame) -> pd.DataFrame:
+    """
+    Orders heatmap rows according to DAY_ORDER_PT, keeping only weekdays
+    that actually exist in the data.
+    """
+    ordered_weekdays = [day for day in DAY_ORDER_PT if day in heatmap.index]
+    return heatmap.reindex(ordered_weekdays)

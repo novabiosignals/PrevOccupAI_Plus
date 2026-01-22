@@ -24,7 +24,7 @@ from matplotlib.ticker import FuncFormatter
 from typing import Dict
 
 # internal imports
-from .plot_utils import handle_plot, get_weekday_name
+from .plot_utils import handle_plot, get_weekday_name, add_percentage_labels
 from utils import create_dir
 from sensors.metrics.noise import NOISE_NEAR_SILENCE_KEY, NOISE_LOW_KEY, NOISE_DISTURBING_KEY, NOISE_HIGH_KEY, NOISE_TIMELINE_WLEN, NOISE_DISTRIBUTIONS_NOISE, W_SIZE_MINUTES
 from constants import DATE_FORMAT
@@ -222,6 +222,10 @@ def _plot_noise_distributions_per_week(distributions_dict: dict, subject: str, s
     for cls in all_classes:
         ax.bar(positions, class_props[cls], bottom=bottom, color=colors[cls], label=cls)
         bottom += np.array(class_props[cls])
+
+    # --- Add percentage labels ---
+    stacks = [class_props[cls] for cls in all_classes]
+    add_percentage_labels(ax, stacks, fontsize=10, min_display_percent=2)
 
     ax.grid(axis="y", color="lightgray", linestyle="--", linewidth=0.7)
     ax.set_axisbelow(True)

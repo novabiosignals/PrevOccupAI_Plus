@@ -7,22 +7,33 @@ import re
 # internal imports
 import questionnaires
 import sensors.load as sl
-from constants import WORKLOAD, PSYCHOSOCIAL, PERSONAL, WORK_TYPE
+from constants import WORKLOAD, PSYCHOSOCIAL, PERSONAL, WORK_TYPE, BIOMECHANICAL
 from OH_profile.constants import *
 from OH_profile.load import get_OH_profile
-from OH_profile.write import save_OH_profile, write_to_OH_profile
-
+from OH_profile.write import save_OH_profile, write_to_OH_profile, clear_dict_entries
+from questionnaires.visualize.questionnaires import ROSA_KEYS_KEEP
+import questionnaires.visualize as qv
+import questionnaires.metrics as qm
 # ------------------------------------------------------------------------------------------------------------------- #
 # flags
 # ------------------------------------------------------------------------------------------------------------------- #
+# flags to generate the scores
 GENERATE_SCORES = False
 PROCESS_PSYCHOSOCIAL = True
 PROCESS_PERSONAL = True
 PROCESS_ENVIRONMENT = True
 PROCESS_BIOMECHANICAL = True
 PROCESS_WORKLOAD = True
+
+# generate the raw dataset
 GENERATE_QUESTIONNAIRES_DATASET = False
+
+# generate OH profile
 GENERATE_OH_PROFILE = True
+RERUN_OH_PROFILE = True
+
+# generate visualizations
+VISUALIZE = False
 
 # ------------------------------------------------------------------------------------------------------------------- #
 # file constants
@@ -33,6 +44,7 @@ SCORES_OUT_PATH = r"C:\Users\srale\Desktop\carga de trabalho\results"
 RAW_LIMESURVEY_PATH = R"C:\Users\srale\Desktop\sara\limesurvey_questionarios"
 DATASET_OUTPUT_PATH = "C:\\Users\\srale\\Desktop\\carga de trabalho\\dataset"
 OH_PROFILE_PATH = r"C:\Users\srale\Desktop\OH_profiles"
+PLOTS_OUTPUT_PATH = r"C:\Users\srale\Desktop\timeline_plots"
 
 # ------------------------------------------------------------------------------------------------------------------- #
 # generate dataset from raw and unfiltered limesurvey files
@@ -77,10 +89,7 @@ if GENERATE_SCORES:
                         questionnaires.calculate_personal_scores(domain_folder_path, output_folder_path=SCORES_OUT_PATH)
 
                     if PROCESS_BIOMECHANICAL:
-                        questionnaires.calculate_biomechanical_scores(domain_folder_path, pure_rosa=False,
-                                                                      output_folder_path=SCORES_OUT_PATH)
-
-                        questionnaires.calculate_rosa_scores(domain_folder_path, output_folder_path=SCORES_OUT_PATH)
+                        questionnaires.calculate_biomechanical_scores(domain_folder_path, output_folder_path=SCORES_OUT_PATH)
 
                     if PROCESS_WORKLOAD:
                         questionnaires.clean_daily_workload(domain_folder_path, output_folder_path=SCORES_OUT_PATH)
@@ -136,7 +145,7 @@ if GENERATE_OH_PROFILE:
                         print(f"Getting metrics for daily workload questionnaire of subject {subject_id}...")
 
                         # get metrics
-                        metrics_dict = questionnaires.get_daily_workload_metrics(results_file_path, int(subject_id))
+                        metrics_dict = qm.get_daily_workload_metrics(results_file_path, int(subject_id))
 
                         # write to OH profile
                         oh_profile = write_to_OH_profile(oh_profile, main_outer_key=DAILY_QUESTIONNAIRE_DOMAIN_KEY,
@@ -150,21 +159,33 @@ if GENERATE_OH_PROFILE:
                         if PERSONAL in results_file_path:
 
                             # add metadata to OH profile
-                            metadata_dict = questionnaires.get_metadata_metrics(results_file_path, int(subject_id))
+                            metadata_dict = qm.get_metadata_metrics(results_file_path, int(subject_id))
 
-                            oh_profile = write_to_OH_profile(oh_profile, main_outer_key=METADATA_KEY,
-                                                             main_inner_key=None, dict_to_write=metadata_dict)
+                            # add personal scores to the oh profile
+                            personal_metrics_dict = qm.get_single_instance_questionnaire_metrics(results_file_path,int(subject_id),domain=PERSONAL)
 
-                        print(f"Getting metrics for {results_file} of subject {subject_id}...")
-                        # get metrics
-                        metrics_dict = questionnaires.get_single_instance_questionnaire_metrics(results_file_path, int(subject_id))
+                            # write to oh profile
+                            oh_profile = write_to_OH_profile(oh_profile, main_outer_key=METADATA_KEY,main_inner_key=None, dict_to_write=metadata_dict)
+                            oh_profile = write_to_OH_profile(oh_profile,main_outer_key=SINGLE_INSTANCE_QUESTIONNAIRE_KEY,
+                                                             main_inner_key=PERSONAL_DOMAIN_KEY, dict_to_write=personal_metrics_dict)
 
-                        # get the main inner key depending on the questionnaire type
-                        main_inner_key = questionnaires.get_domain_key_from_filename(results_file_path)
+                        elif BIOMECHANICAL in results_file_path:
 
-                        # write to OH profile
-                        oh_profile = write_to_OH_profile(oh_profile, main_outer_key=SINGLE_INSTANCE_QUESTIONNAIRE_KEY,
-                                                         main_inner_key=main_inner_key, dict_to_write=metrics_dict)
+                            # get metrics
+                            metrics_dict = qm.get_single_instance_questionnaire_metrics(results_file_path, int(subject_id), domain=BIOMECHANICAL)
+
+                            # write to OH profile
+                            oh_profile = write_to_OH_profile(oh_profile, main_outer_key=SINGLE_INSTANCE_QUESTIONNAIRE_KEY,
+                                                             main_inner_key=BIOMECHANICAL_DOMAIN_KEY, dict_to_write=metrics_dict)
+
+                        else: # its environmental
+                            # get metrics
+                            metrics_dict = qm.get_single_instance_questionnaire_metrics(results_file_path,int(subject_id),domain=None)
+
+                            # write to OH profile
+                            oh_profile = write_to_OH_profile(oh_profile, main_outer_key=SINGLE_INSTANCE_QUESTIONNAIRE_KEY,
+                                                             main_inner_key=ENVIRONMENTAL_DOMAIN_KEY,dict_to_write=metrics_dict)
+
                     # save OH profile to json
                     save_OH_profile(OH_PROFILE_PATH, subject_id, oh_profile)
 
@@ -185,7 +206,7 @@ if GENERATE_OH_PROFILE:
                 oh_profile = get_OH_profile(OH_PROFILE_PATH, participant_id)
 
                 # if it's a file then it's the psychosocial scores
-                metrics_dict = questionnaires.get_psychosocial_metrics(path, int(participant_id))
+                metrics_dict = qm.get_psychosocial_metrics(path, int(participant_id))
 
                 # write to OH profile
                 oh_profile = write_to_OH_profile(oh_profile, main_outer_key=SINGLE_INSTANCE_QUESTIONNAIRE_KEY,
@@ -196,4 +217,35 @@ if GENERATE_OH_PROFILE:
                 save_OH_profile(OH_PROFILE_PATH, participant_id, oh_profile)
 
 
+# ------------------------------------------------------------------------------------------------------------------- #
+# visualize
+# ------------------------------------------------------------------------------------------------------------------- #
 
+if VISUALIZE:
+
+    # get list with all subject ids
+    subject_id_list = sl.get_participant_ids_list(sl.load_participants_info())
+
+    # cycle over the subject id's
+    for subject_id in subject_id_list:
+
+        # get oh profile
+        oh_profile = get_OH_profile(OH_PROFILE_PATH, subject_id)
+
+        # check if there are biomechanical metrics to plot
+        if len(oh_profile[SINGLE_INSTANCE_QUESTIONNAIRE_KEY][BIOMECHANICAL_DOMAIN_KEY]) > 0:
+
+            # plot rosa
+            qv.generate_biomec_env_plots(oh_profile[SINGLE_INSTANCE_QUESTIONNAIRE_KEY][BIOMECHANICAL_DOMAIN_KEY],
+                                                     subject_id, PLOTS_OUTPUT_PATH, filename_suffix='Rosa',keys_to_keep=ROSA_KEYS_KEEP, is_rosa=True)
+
+            # plot environmental results
+            qv.generate_biomec_env_plots(oh_profile= oh_profile[SINGLE_INSTANCE_QUESTIONNAIRE_KEY][ENVIRONMENTAL_DOMAIN_KEY],
+                                                     subject=subject_id, output_folder_path=PLOTS_OUTPUT_PATH, filename_suffix='environment')
+
+            # plot copsoq and mueq
+            qv.generate_copsoq_mueq_plots(oh_profile[SINGLE_INSTANCE_QUESTIONNAIRE_KEY][PSYCHOSOCIAL_DOMAIN_KEY],
+                                                      subject_id, PLOTS_OUTPUT_PATH)
+
+        else:
+            print(f"No biomechanical metrics to plot for subject {subject_id}. \nPlease generate the oh profile first by setting {GENERATE_OH_PROFILE} to True.")

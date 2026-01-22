@@ -6,34 +6,32 @@ Available Functions
 [Public]
 get_single_instance_questionnaire_metrics(...): Load questionnaire scores from a CSV file and return all metrics of
 a specific subject as a dictionary.
-get_domain_key_from_filename(...): Given a results file name, return the corresponding OH domain key.
 get_psychosocial_metrics(...): Loads a psychosocial scores CSV file and returns a dictionary with the scores
 get_metadata_metrics(...): Get metadata metrics for the OH profile.
 -------------------
 
 [Private]
 _get_missing_workload_dates(...): gets the missing workload questionnaire dates based on the start date and the existing acquisition dates
+_organize_biomechanical_metrics(...): Organizes a flat metrics dictionary into structured biomechanical categories.
+_organize_personal_metrics(...): Organizes a flat dictionary of personal, lifestyle, IPAQ, and OSPAQ metricd into a nested dictionary
 -------------------
 """
 # ------------------------------------------------------------------------------------------------------------------- #
 # imports
 # ------------------------------------------------------------------------------------------------------------------- #
 import pandas as pd
-from typing import Dict, List
+from typing import Dict, List, Optional, Any
 from datetime import datetime, timedelta
+import re
 
 # internal imports
-from constants import ENVIRONMENT, PERSONAL, BIOMECHANICAL, ROSA, COPSOQ, POPULATION
+from constants import PERSONAL, BIOMECHANICAL, COPSOQ, POPULATION
 from OH_profile.constants import *
 import sensors.load as sl
-
+from questionnaires.constants import BIOMECHANICAL_METRIC_LABELS, IPAQ_KEYS, OSPAQ_KEYS
 # ------------------------------------------------------------------------------------------------------------------- #
 # file specific constants
 # ------------------------------------------------------------------------------------------------------------------- #
-
-KEY_DOMAIN_MAPPING = {PERSONAL: PERSONAL_DOMAIN_KEY,
-                      BIOMECHANICAL: BIOMECHANICAL_DOMAIN_KEY, ENVIRONMENT: ENVIRONMENTAL_DOMAIN_KEY,
-                      ROSA: BIOMECHANICAL_DOMAIN_KEY}
 
 # columns from personal questionnaire results
 META_DATA_COLUMNS = ['idade', 'sexo', 'altura', 'peso', 'mao']
@@ -41,19 +39,39 @@ META_DATA_COLUMNS = ['idade', 'sexo', 'altura', 'peso', 'mao']
 DATE_FORMAT = "%d-%m-%Y"
 
 SCORING_VALUE = '1_completely-disagree_5_completely-agree'
+
+IPAQ_KEY = "IPAQ"
+OSPAQ_KEY = "OSPAQ"
+OSPAQ_DISTRIBUTIONS_KEY = 'OSPAQ_distributions'
+
+OSPAQ_WALKING = "Andar"
+OSPAQ_SITTING = "Sentado"
+OSPAQ_STANDING = "De pé"
+OSPAQ_HEAVY = "trabalho_pesado"
+
+MAP_OSPAQ = {
+    "percentagem_sentado": OSPAQ_SITTING,
+    "percentagem_pe": OSPAQ_STANDING,
+    "percentagem_caminhar": OSPAQ_WALKING,
+    "percentagem_trab_pesado": OSPAQ_HEAVY}
+
+OSPAQ_DISTRIBUTIONS = ["percentagem_caminhar", "percentagem_sentado", "percentagem_pe", "percentagem_trab_pesado"]
 # ------------------------------------------------------------------------------------------------------------------- #
 # public functions
 # ------------------------------------------------------------------------------------------------------------------- #
 
-def get_single_instance_questionnaire_metrics(scores_csv_file: str, subject_id: int) -> Dict:
+def get_single_instance_questionnaire_metrics(scores_csv_file: str, subject_id: int, domain: Optional[str]) -> Dict:
     """
     Load questionnaire scores from a CSV file and return all metrics of a specific subject as a dictionary.
 
     The function extracts the row corresponding to the given subject_id and converts it into a dictionary
-    where keys are column names and values are the subject's questionnaire scores.
+    where keys are column names and values are the subject's questionnaire scores. The 'personal' and 'biomechanical'
+    questionnaires are organized into nested questionnaires for better readability
 
     :param scores_csv_file: Path to the CSV file containing questionnaire scores.
     :param subject_id: Integer ID of the subject whose metrics should be retrieved.
+    :param domain: Optional domain of the subject whose metrics should be retrieved. This is used to restructure the
+    metrics extracted from the csv files with the questionnaire scores. Only the 'personal' and 'biomechanical' questionnaires are organized
     :return: A dictionary mapping each metric/column name to the subject's value.
             (example: {'age': 46, 'height': 154, 'weight': 65 ....})
     """
@@ -67,6 +85,13 @@ def get_single_instance_questionnaire_metrics(scores_csv_file: str, subject_id: 
 
     # convert the row to a dictionary
     metrics_dict = subject_results.to_dict()
+
+    # organize the metrics dict according to the domain
+    if domain == BIOMECHANICAL:
+        metrics_dict = _organize_biomechanical_metrics(metrics_dict, language='pt')
+
+    if domain == PERSONAL:
+        metrics_dict = _organize_personal_metrics(metrics_dict, language='pt')
 
     return metrics_dict
 
@@ -136,7 +161,7 @@ def get_daily_workload_metrics(scores_csv_file: str, subject_id: int) -> Dict:
 
         # add missing entries
         for missing_date in missing_dates:
-            metrics_dict.update({missing_date: 'No data available'})
+            metrics_dict.update({missing_date: {}})
 
         # sort metrics_dict by date keys
         metrics_dict = dict(sorted(metrics_dict.items(), key=lambda x: datetime.strptime(x[0], DATE_FORMAT)))
@@ -145,26 +170,6 @@ def get_daily_workload_metrics(scores_csv_file: str, subject_id: int) -> Dict:
     metrics_dict[WORKLOAD_SCORING_KEY] = SCORING_VALUE
 
     return metrics_dict
-
-
-def get_domain_key_from_filename(results_file: str) -> str:
-    """
-    Given a results file name, return the corresponding OH domain key.
-    The file name is expected to contain one of the domain identifiers
-    (e.g., PSYCHOSOCIAL, PERSONAL, BIOMECHANICAL, ENVIRONMENT, ROSA).
-    :param results_file: Path to the results file.
-    :return: The OH domain key.
-    """
-    # cycle over the domains and respective keys
-    for domain_name, domain_key in KEY_DOMAIN_MAPPING.items():
-
-        # find the key in the results file name
-        if domain_name.lower() in results_file.lower():
-
-            # get the key
-            return domain_key
-
-    raise ValueError(f"Could not determine domain for file: {results_file}")
 
 
 def get_psychosocial_metrics(scores_csv_file: str, subject_id: int) -> Dict:
@@ -205,14 +210,14 @@ def get_psychosocial_metrics(scores_csv_file: str, subject_id: int) -> Dict:
 
     # Select correct output key
     if is_copsoq:
-        key = (PSYCHOSOCIAL_COPSOQ_POPULATION_KEY if is_population else PSYCHOSOCIAL_COPSOQ_WORK_TYPE_KEY)
+        key = (PSYCHOSOCIAL_COPSOQ_POPULATION_KEY if is_population else f'{PSYCHOSOCIAL_COPSOQ_WORK_TYPE_KEY}_{work_type}')
 
     # it's MUEQ
     else:
-        key = (PSYCHOSOCIAL_MUEQ_POPULATION_KEY if is_population else PSYCHOSOCIAL_MUEQ_WORK_TYPE_KEY)
+        key = (PSYCHOSOCIAL_MUEQ_POPULATION_KEY if is_population else f'{PSYCHOSOCIAL_MUEQ_WORK_TYPE_KEY}_{work_type}')
 
     # add results with the correct key to the dictionary
-    metrics_dict[key] = scores_df.to_dict()
+    metrics_dict[key] = scores_df[scores_df.index.str.contains("mean", case=False)].iloc[0].to_dict()
 
     return metrics_dict
 
@@ -275,3 +280,125 @@ def _get_missing_workload_dates(start_date: str, acquisition_dates: List[str]) -
     missing_dates = [date for date in expected_dates if date not in acquisition_dates]
 
     return missing_dates
+
+
+def _organize_biomechanical_metrics(metrics_dict: Dict, language: str) -> Dict:
+    """
+    Organizes a flat metrics dictionary into structured biomechanical categories.
+
+    Keys are expected in three formats:
+      1. Biomechanical: "<label>[<category>]" -> inner key is <category>, outer key is <label>
+      2. Percepção da dor: "DorPercep_<something>" -> goes under "percecao_dor", remove prefix
+      3. ROSA metrics: "ROSA_<something>" -> goes under "rosa", remove prefix
+
+    :param metrics_dict: flat dictionary with all biomechanical metrics
+    :param language: str with the language in which the new dictionary should be organized: 'pt' or 'en'
+    :return: The organized dictionary with all biomechanical metrics
+    """
+
+    # (1) get the keys for the new dictionary based on the language
+    dict_keys = BIOMECHANICAL_METRIC_LABELS[language]
+
+    # init the dictionary with the new keys
+    organized_dict = {key: {} for key in dict_keys.values()}
+
+    # (2) regex to capture keys in the format: "<label>[<category>]" example: "localizacaoDor[cervical/pescoço]"
+    biomech_pattern = re.compile(r"^(.*?)\[(.*?)]$")
+
+    # (3) Iterate over the flat metrics dictionary
+    for key, value in metrics_dict.items():
+
+        if key.startswith("DorPercep_"):
+            # remove the prefix
+            clean_key = key.replace("DorPercep_", "", 1)
+
+            # use translated outer key
+            outer_key = dict_keys["percecao_dor"]
+
+            # add value
+            organized_dict[outer_key][clean_key] = value
+            continue
+
+        if key.startswith("ROSA_"):
+            # remove the prefix
+            clean_key = key.replace("ROSA_", "", 1)
+
+            # use translated outer key
+            outer_key = dict_keys["rosa"]
+
+            # add value
+            organized_dict[outer_key][clean_key] = value
+            continue
+
+        match = biomech_pattern.match(key)
+        if match:
+            label = match.group(1).strip()  # e.g., "localizacaoDor"
+            category = match.group(2).strip()  # e.g., "cervical/pescoço"
+
+            # Only add if the label exists in key mappings
+            if label in dict_keys:
+                outer_key = dict_keys[label]  # translated outer key
+                organized_dict[outer_key][category] = value
+
+    return organized_dict
+
+
+def _organize_personal_metrics(metrics_dict: Dict[str, Any], language: str) -> Dict:
+    """
+    Organizes a flat dictionary of personal, lifestyle, IPAQ, and OSPAQ metrics
+    into a structured, nested dictionary with three main sections.
+
+    The output dictionary has the following top-level keys:
+        1. `dados_pessoais` (or `personal_information` in English) –
+           contains general personal and lifestyle metrics.
+        2. `IPAQ` – contains physical activity metrics, e.g., "ipaq", "total_met".
+        3. `OSPAQ` – contains occupational activity metrics, e.g., work hours and
+           time spent sitting, standing, walking, or doing heavy tasks.
+
+    This function also removes the personal information that is in the metadata.
+
+    :param metrics_dict: Flat dictionary of personal, lifestyle, IPAQ, and OSPAQ metrics.
+    :param language: str with the language in which the new dictionary should be organized: 'pt' or 'eg'
+    :return:
+    """
+    # remove redundant information that's in metadata
+    for key in META_DATA_COLUMNS:
+        metrics_dict.pop(key, None)  # remove if exists, do nothing if missing
+
+    # Define the outer keys based on language
+    if language == "en":
+        demo_key = "personal_information"
+    else:
+        demo_key = "dados_pessoais"
+
+    # Initialize the organized dictionary with the new keys
+    organized_dict = {
+        demo_key: {},
+        IPAQ_KEY: {},
+        OSPAQ_KEY: {
+            OSPAQ_DISTRIBUTIONS_KEY: {}
+        }
+    }
+
+    # Iterate over the original flat metrics dictionary
+    for key, value in metrics_dict.items():
+
+        # keys belonging to OSPAQ
+        if key in OSPAQ_KEYS:
+
+            if key in OSPAQ_DISTRIBUTIONS:
+
+                mapped_key = MAP_OSPAQ[key]
+                organized_dict[OSPAQ_KEY][OSPAQ_DISTRIBUTIONS_KEY][mapped_key] = value/100
+
+            else:
+                organized_dict[OSPAQ_KEY][key] = value
+        # keys belonging to IPAQ
+        elif key in IPAQ_KEYS:
+            organized_dict[IPAQ_KEY][key] = value
+
+        # all remaining keys go under demographics/lifestyle
+        else:
+            organized_dict[demo_key][key] = value
+
+    return organized_dict
