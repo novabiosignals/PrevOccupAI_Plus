@@ -38,13 +38,16 @@ VISUALIZE = False
 # ------------------------------------------------------------------------------------------------------------------- #
 # file constants
 # ------------------------------------------------------------------------------------------------------------------- #
+DRIVE = 'E'
+DATASET_PATH = f'{DRIVE}:\\Backup PrevOccupAI_PLUS Data\\data'
+QUEST_DATASET_PATH = f'{DRIVE}:\\Backup PrevOccupAI_PLUS Data\\data'
+SCORES_OUT_PATH = f"{DRIVE}:\\Backup PrevOccupAI_PLUS Data\\questionnaire_scores"
+OH_PROFILE_PATH = f"{DRIVE}:\\Backup PrevOccupAI_PLUS Data\\OH_profiles"
 
-QUEST_DATASET_PATH = r"C:\Users\srale\Desktop\carga de trabalho\dataset"
-SCORES_OUT_PATH = r"C:\Users\srale\Desktop\carga de trabalho\results"
-RAW_LIMESURVEY_PATH = R"C:\Users\srale\Desktop\sara\limesurvey_questionarios"
-DATASET_OUTPUT_PATH = "C:\\Users\\srale\\Desktop\\carga de trabalho\\dataset"
-OH_PROFILE_PATH = r"C:\Users\srale\Desktop\OH_profiles"
-PLOTS_OUTPUT_PATH = r"C:\Users\srale\Desktop\timeline_plots"
+RAW_LIMESURVEY_PATH = f"{DRIVE}:\\limesurvey_questionarios"
+DATASET_OUTPUT_PATH = f"{DRIVE}:\\q_processed"
+
+PLOTS_OUTPUT_PATH = f"{DRIVE}:\\Backup PrevOccupAI_PLUS Data\\OH_plots"
 
 # ------------------------------------------------------------------------------------------------------------------- #
 # generate dataset from raw and unfiltered limesurvey files
