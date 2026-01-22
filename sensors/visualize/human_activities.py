@@ -359,7 +359,7 @@ def plot_activity_timeline_per_day(oh_profile: dict, subject_id: str, output_fol
         )
 
         risk_patch = Patch(facecolor=SITTING_RISK_COLOR,
-                           label=f"Excedido o tempo sentado \nrecomendado (> {MAX_CONTINUOUS_SITTING_S / 3600:.1f} h)")
+                           label=f"Sentado > {MAX_CONTINUOUS_SITTING_S / 3600:.1f} h")
 
         ax.legend(handles=[warning_patch, risk_patch],loc="center left",bbox_to_anchor=(1.02, 0.5),frameon=False,fontsize=11)
 
@@ -473,7 +473,8 @@ def plot_steps_and_distance_per_day(har_metrics_dict: dict, subject_id: str, out
             va="center",
             ha="right",
             fontsize=10,
-            color="black"
+            color="white",
+            fontweight="bold"
         )
 
     # Vertical line showing recommended steps

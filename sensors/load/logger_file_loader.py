@@ -166,7 +166,6 @@ def _filter_logger_file(logger_df: pd.DataFrame) -> pd.DataFrame:
     :param logger_df: A pandas DataFrame containing timestamped log messages.
     :return: The filtered dataframe
     """
-
     # keep only the rows that have : "SENSOR_DATA: received first data from"
     logger_df = logger_df[logger_df[LOG].str.contains("SENSOR_DATA: received first data from")]
 

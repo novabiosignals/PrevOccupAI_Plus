@@ -39,12 +39,12 @@ import sensors.load as sl
 
 # keys from the oh profile to keep for the rosa plot
 ROSA_KEYS_KEEP = [
-        "ROSA_score_a_adapted",
-        "ROSA_monitor_adapted_norm",
-        "ROSA_phone_adapted_norm",
-        "ROSA_mouse_adapted_norm",
-        "ROSA_keyboard_adapted_norm",
-        "ROSA_final_normalized"
+        "score_a_adapted",
+        "monitor_adapted_norm",
+        "phone_adapted_norm",
+        "mouse_adapted_norm",
+        "keyboard_adapted_norm",
+        "final_normalized"
     ]
 
 FILE_FORMAT = PNG
@@ -66,6 +66,9 @@ def generate_biomec_env_plots(oh_profile: Dict[str, Any], subject: str, output_f
     :param is_rosa: if True, handle the ROSA_final_normalized column specially (default=False)
     :return: None
     """
+    if is_rosa:
+        oh_profile = oh_profile['ROSA']
+
     # create copy
     biomechanical_dict = copy.deepcopy(oh_profile)
 

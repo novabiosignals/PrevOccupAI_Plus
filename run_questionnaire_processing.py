@@ -18,12 +18,12 @@ import questionnaires.metrics as qm
 # flags
 # ------------------------------------------------------------------------------------------------------------------- #
 # flags to generate the scores
-GENERATE_SCORES = True
-PROCESS_PSYCHOSOCIAL = False
-PROCESS_PERSONAL = False
+GENERATE_SCORES = False
+PROCESS_PSYCHOSOCIAL = True
+PROCESS_PERSONAL = True
 PROCESS_ENVIRONMENT = True
-PROCESS_BIOMECHANICAL = False
-PROCESS_WORKLOAD = False
+PROCESS_BIOMECHANICAL = True
+PROCESS_WORKLOAD = True
 
 # generate the raw dataset
 GENERATE_QUESTIONNAIRES_DATASET = False
@@ -33,7 +33,7 @@ GENERATE_OH_PROFILE = False
 RERUN_OH_PROFILE = True
 
 # generate visualizations
-VISUALIZE = False
+VISUALIZE = True
 
 # ------------------------------------------------------------------------------------------------------------------- #
 # file constants
