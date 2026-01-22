@@ -88,12 +88,18 @@ HR_MAX_KEY = 'HR_max'
 # -------------------------------------------------------------------------------------------------------------------- #
 # POSTURE SUB-KEYS
 # -------------------------------------------------------------------------------------------------------------------- #
-
+POSTURE_DATA_PATH_KEY = 'posture_data_path'
+POSTURE_AP_RANGE_KEY = 'posture_ap_range'
+POSTURE_ML_RANGE_KEY = 'posture_ml_range'
+POSTURE_RANGE_RATIO_KEY = 'posture_ratio_range'
+POSTURE_SWAY_LENGTH_KEY = 'posture_total_sway_length'
+POSTURE_SWAY_VELOCITY_KEY = 'posture_average_sway_velocity'
+POSTURE_SWAY_AREA_KEY = 'posture_sway_area_per_second'
+POSTURE_ELLIPSE_KEY = 'posture_95_confidence_ellipse_area'
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # NOISE SUB-KEYS
 # -------------------------------------------------------------------------------------------------------------------- #
-
 NOISE_NEAR_SILENCE_KEY = 'Silencioso'
 NOISE_LOW_KEY = 'Ruído baixo'
 NOISE_DISTURBING_KEY = 'Ruído incomodativo'
