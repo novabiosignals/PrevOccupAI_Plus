@@ -219,7 +219,7 @@
   "Nível de Iluminação": {
     "scale": [1,2,3],
     "values": [0,1,0],
-    "max": 3,
+    "max": 5,
     "inverted": [],
     "calculation": "sum"
   },
@@ -247,7 +247,7 @@
   "Organização do Escritório": {
     "scale": [1,2],
     "values": [0,1],
-    "max": 7,
+    "max": 11,
     "inverted": [],
     "calculation": "sum"
   },
