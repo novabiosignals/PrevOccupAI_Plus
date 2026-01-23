@@ -28,7 +28,7 @@ DATASET_PATH = 'Backup PrevOccupAI_PLUS Data\\data'
 DATA_FOLDER_PATH = f"{DRIVE}:\\Backup PrevOccupAI_PLUS Data\\data"
 OH_PROFILE_PATH = f"{DRIVE}:\\Backup PrevOccupAI_PLUS Data\\OH_profiles"
 OH_PLOTS_PATH = f"{DRIVE}:\\Backup PrevOccupAI_PLUS Data\\OH_plots"
-OH_DISPLACEMENT_DATA_PATH = f"{DRIVE}:\\OH_postural_displacement"
+OH_DISPLACEMENT_DATA_PATH = f"{DRIVE}:\\Backup PrevOccupAI_PLUS Data\\OH_postural_displacement"
 
 # TODO: these paths need to be set somewhere generally or passed as parameters
 QUESTIONNAIRE_RESULTS_PATH = f"{DRIVE}:\\Backup PrevOccupAI_PLUS Data\\questionnaire_scores"
