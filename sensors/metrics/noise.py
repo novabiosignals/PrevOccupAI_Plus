@@ -132,7 +132,7 @@ def _classify_noise(dba_value: float) -> str:
     """
     Classifies a noise level (in dBA) into a noise category based on EU Directive 2003/10/EC ([1] https://eur-lex.europa.eu/eli/dir/2003/10/)
     exposure limits and on disruptive noise thresholds for enclosed office environments, as described in
-    [2] https://www.sciencedirect.com/science/article/pii/S0360132324011557.
+    [2] https://www.sciencedirect.com/science/article/pii/S0360132324011557, [3] https://oshwiki.osha.europa.eu/en/themes/ergonomics-office-work
 
     Given the office context, noise levels above 80 dBA are classified as "high noise" according to the EU directive.
     Prolonged and consistent exposure to such levels may require preventive measures to avoid hearing impairment.
@@ -142,7 +142,7 @@ def _classify_noise(dba_value: float) -> str:
 
     Considering these two references, the following classes were derived:
         - ≤ 40 dBA: NEAR_SILENCE_NOISE -> Near-silent room
-        - 40-60 dBA: LOW_NOISE -> low, non-disruptive noise [2]
+        - 40-60 dBA: LOW_NOISE -> low, non-disruptive noise [2], [3]
         - 60–80 dBA: DISRUPTIVE_NOISE -> Disruptive background noise that heavily impacts a worker's concentration and emotional arousal levels. [2]
         - ≥ 80 dBA: HIGH_NOISE -> High noise level that may require preventive action to avoid hearing impairment during prolonged exposure. [1]
 

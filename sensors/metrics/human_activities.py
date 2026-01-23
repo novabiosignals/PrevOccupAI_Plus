@@ -349,16 +349,27 @@ def _step_detection(df_walk: pd.DataFrame, fs: int = 100,
                                                   peak_threshold=peak_threshold, valley_threshold=valley_threshold,
                                                   w_size_moving_average_s=w_size_moving_average_s)
 
-    # apply valley correction to obtain valley-peak-valley pattern
-    valleys_idx = _apply_valley_correction(df[Y_ACC_COL].values, peaks=peaks_idx, valleys=valleys_idx, min_step_period=min_step_period)
+    # check whether no peaks or valleys have been detected
+    if len(peaks_idx) == 0 or len(valleys_idx) == 0:
 
-    # rotate acc data device- to world-frame
-    xyz_acc = _rotate_device_to_world(df)
+        # set distance_walked and num_steps to zero
+        distance_walked = 0
+        num_steps = 0
 
-    # compute step lengths
-    distance_walked = _calculate_distance_walked(xyz_acc, peaks_idx=peaks_idx, valleys_idx=valleys_idx, fs=fs)
+    else:
 
-    return len(peaks_idx), distance_walked, (peaks_idx, valleys_idx)
+        # apply valley correction to obtain valley-peak-valley pattern
+        valleys_idx = _apply_valley_correction(df[Y_ACC_COL].values, peaks=peaks_idx, valleys=valleys_idx, min_step_period=min_step_period)
+
+        # rotate acc data device- to world-frame
+        xyz_acc = _rotate_device_to_world(df)
+
+        # compute distance walked and number of steps
+        distance_walked = _calculate_distance_walked(xyz_acc, peaks_idx=peaks_idx, valleys_idx=valleys_idx, fs=fs)
+        num_steps = len(peaks_idx)
+
+
+    return num_steps, distance_walked, (peaks_idx, valleys_idx)
 
 
 def _calculate_minimum_step_period(df_walk: pd.DataFrame, fs: int = 100) -> int:
