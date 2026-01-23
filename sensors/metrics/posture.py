@@ -172,8 +172,6 @@ def _calculate_posture_metrics(df: pd.DataFrame, subject_height_m: float, fs: in
     # cycle over the block_ids to obtain metrics per activity block
     for block_num, block_df in df_posture_analysis.groupby([BLOCK_ID_COLUMN_NAME]):
 
-        print(f"{block_num}: {len(block_df)}")
-
         # check whether the block is at least as long as the defined minimum sitting time
         if len(block_df) * (1/fs) >= min_sitting_time_min:
 
