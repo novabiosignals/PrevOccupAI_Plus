@@ -42,6 +42,8 @@ ROUND_DECIMALS = 2
 # ------------------------------------------------------------------------------------------------------------------- #
 # public functions
 # ------------------------------------------------------------------------------------------------------------------- #
+# TODO: pass subject id for storing data
+# TODO: pass path for storing data
 def get_posture_metrics(day_folder_path: str, fs: int, w_size_HAR: float, subject_height_m: float) -> Dict:
     """
     Extracts metrics related to seated posture. Before the extraction of metrics, the data is pre-processed and
@@ -142,13 +144,16 @@ def _calculate_posture_metrics(df: pd.DataFrame, subject_height_m: float, fs: in
     # obtain postural displacement
     displacement_matrix = _calculate_postural_displacement(quaternions, subject_height_m=subject_height_m)
 
+    # plot the displacement # TODO remove this function
+    plot_postural_displacement(displacement_matrix)
+
     # extract the posture metrics from the displacement matrix
     metrics_dict = _extract_postural_features(displacement_matrix, fs=fs)
 
     return metrics_dict, displacement_matrix
 
 
-def _calculate_postural_displacement(quaternions: np.ndarray, subject_height_m: float) -> np.ndarray:
+def _calculate_postural_displacement(quaternions: np.ndarray, subject_height_m: float, yaw_range_limit: float = 60.0) -> np.ndarray:
     """
     calculates displacement in anterior-posterior, mediolateral and vertical direction, from quaternions and the subject's
     torso length. The calculation of displacement is done through Euler angles obtained from the quaternions.
@@ -181,6 +186,7 @@ def _calculate_postural_displacement(quaternions: np.ndarray, subject_height_m: 
 
     :param quaternions: np.ndarray of shape [N, 4] containing quaternions in the order [x, y, z, w].
     :param subject_height_m: the subject height in meters
+    :param yaw_range_limit: the range of yaw angles to consider, to define which range is considered for posture analysis
     :return: np.ndarray containing the displacement in anterior-posterior, lateral and vertical direction
     [d_AP, d_LAT, d_VERT], centered around the subjects 'standard posture'.
     """
@@ -190,6 +196,11 @@ def _calculate_postural_displacement(quaternions: np.ndarray, subject_height_m: 
 
     # convert quaternions to Rotation object
     rotations = R.from_quat(quaternions)
+
+    # invert yaw axis to have correct displacement
+    raw_euler = rotations.as_euler('xyz', degrees=False)
+    raw_euler[:, 1] = (-1) * raw_euler[:, 1]
+    rotations = R.from_euler('xyz', raw_euler, degrees=False)
 
     # obtain mean rotation (as estimate for 'standard subject posture')
     ref_rotation = rotations.mean()
@@ -202,14 +213,23 @@ def _calculate_postural_displacement(quaternions: np.ndarray, subject_height_m: 
 
     # obtain pitch and roll angles
     pitch = xyz_euler_angles[:, 0]  # x-axis
+    yaw = xyz_euler_angles[:, 1]  # y-axis
     roll = xyz_euler_angles[:, 2]  # z-axis
 
-    # calculate displacement
-    d_ap = trunk_length * np.sin(pitch)
-    d_lat = trunk_length * np.sin(roll)
-    d_vert = -trunk_length * (1.0 - np.cos(roll) * np.cos(pitch))
+    # convert y-axis to degrees
+    yaw_deg = np.rad2deg(yaw)
 
-    return np.column_stack((d_ap, d_lat, d_vert))
+    # create mask to filter out all yaw angles that are outside limit
+    valid_angles = np.abs(yaw_deg) < yaw_range_limit
+    valid_pitch = pitch[valid_angles]
+    valid_roll = roll[valid_angles]
+
+    # calculate displacement
+    d_ap = trunk_length * np.sin(valid_pitch)
+    d_lat = trunk_length * np.sin(valid_roll)
+    d_vert = -trunk_length * (1.0 - np.cos(valid_roll) * np.cos(valid_pitch))
+
+    return np.column_stack((d_ap, -d_lat, d_vert))
 
 
 def _extract_postural_features(displacement_matrix: np.ndarray, fs: int) -> Dict:
@@ -255,7 +275,7 @@ def _extract_postural_features(displacement_matrix: np.ndarray, fs: int) -> Dict
      metrics_dict[POSTURE_RANGE_RATIO_KEY] = np.round(range_ratio, ROUND_DECIMALS)
      metrics_dict[POSTURE_SWAY_LENGTH_KEY] = np.round(total_sway_length, ROUND_DECIMALS)
      metrics_dict[POSTURE_SWAY_VELOCITY_KEY] = np.round(average_sway_velocity, ROUND_DECIMALS)
-     metrics_dict[POSTURE_SWAY_AREA_KEY] = np.round(sway_area_per_second, ROUND_DECIMALS)
+     metrics_dict[POSTURE_SWAY_AREA_KEY] = np.round(sway_area_per_second, 4)
      metrics_dict[POSTURE_ELLIPSE_KEY] = np.round(confidence_ellipse_area, ROUND_DECIMALS)
 
      return metrics_dict
@@ -305,6 +325,10 @@ def _get_total_sway_length(displacement_matrix: np.ndarray, fs: int) -> Tuple[fl
     # get only AP and LAT columns
     ap_lat = displacement_matrix[:, :2]
 
+    # get number of samples
+    n_samples = displacement_matrix.shape[0]
+
+
     # calculate difference
     diff = np.diff(ap_lat, axis=0)
 
@@ -312,12 +336,12 @@ def _get_total_sway_length(displacement_matrix: np.ndarray, fs: int) -> Tuple[fl
     total_sway_length = np.sum(np.linalg.norm(diff, axis=1))
 
     # calculate average sway velocity
-    average_sway_velocity = total_sway_length * (fs / displacement_matrix.shape[0])
+    average_sway_velocity = total_sway_length * (fs / (n_samples - 1))
 
     return total_sway_length, average_sway_velocity
 
 
-def _get_sway_area_per_second(displacement_matrix: np.ndarray, fs: int) -> float:
+def _get_sway_area_per_second(displacement_matrix: np.ndarray, fs: int) -> Tuple[float]:
     """
     calculates the sway area per second.
 
@@ -382,6 +406,70 @@ def _get_confidence_ellipse_area(displacement_matrix: np.ndarray) -> float:
     confidence_ellipse_area = scalar * quantiles * np.sqrt(ap_rms * ml_rms - covariance)
 
     return confidence_ellipse_area
+
+
+###### test function for plotting
+# function for plotting
+import matplotlib.pyplot as plt
+def plot_postural_displacement(displacement: np.ndarray) -> None:
+    """
+    Plots torso displacement projections from three standard viewpoints.
+
+    The input array is expected to contain displacement components expressed
+    in meters, ordered as:
+
+    - Column 0: Anterior–Posterior displacement (AP)
+    - Column 1: Lateral displacement (LAT)
+    - Column 2: Vertical displacement (VERT)
+
+    Three views are plotted using a 1×3 subplot layout:
+
+    1. Top view   : AP vs LAT   (horizontal plane)
+    2. Side view  : AP vs VERT  (sagittal plane)
+    3. Back view  : LAT vs VERT (frontal plane)
+
+    :param displacement: NumPy array of shape (N, 3) containing
+                         [d_AP, d_LAT, d_VERT].
+    """
+
+    if displacement.ndim != 2 or displacement.shape[1] != 3:
+        raise ValueError(
+            "displacement must be a NumPy array of shape (N, 3) "
+            "containing [d_AP, d_LAT, d_VERT]."
+        )
+
+    d_ap = displacement[:, 0]
+    d_lat = displacement[:, 1]
+    d_vert = displacement[:, 2]
+
+    fig, axes = plt.subplots(1, 3, figsize=(15, 5))
+
+    # --- Top view: AP vs LAT ---
+    axes[0].plot(d_lat, d_ap, linewidth=1)
+    axes[0].set_title("Top View (LAT–AP)")
+    axes[0].set_ylabel("Anterior–Posterior displacement [m]")
+    axes[0].set_xlabel("Lateral displacement [m]")
+    axes[0].axis("equal")
+    axes[0].grid(True)
+
+    # --- Side view: AP vs VERT ---
+    axes[1].plot(d_ap, d_vert, linewidth=1)
+    axes[1].set_title("Side View (AP–VERT)")
+    axes[1].set_xlabel("Anterior–Posterior displacement [m]")
+    axes[1].set_ylabel("Vertical displacement [m]")
+    axes[1].axis("equal")
+    axes[1].grid(True)
+
+    # --- Back view: LAT vs VERT ---
+    axes[2].plot(d_lat, d_vert, linewidth=1)
+    axes[2].set_title("Back View (LAT–VERT)")
+    axes[2].set_xlabel("Lateral displacement [m]")
+    axes[2].set_ylabel("Vertical displacement [m]")
+    axes[2].axis("equal")
+    axes[2].grid(True)
+
+    plt.tight_layout()
+    plt.show()
 
 
 
