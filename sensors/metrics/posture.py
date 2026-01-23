@@ -14,20 +14,22 @@ Available Functions
 # ------------------------------------------------------------------------------------------------------------------- #
 # imports
 # ------------------------------------------------------------------------------------------------------------------- #
+import os
 from typing import Dict, Tuple
 import pandas as pd
 import numpy as np
+import scipy as scp
 from scipy.spatial.transform import Rotation as R
 from scipy import stats
 
-
+from HAR.classifier import BLOCK_ID_COLUMN_NAME
 # internal imports
 from constants import ACTIVITY_COLUMN_NAME, PHONE, ACC, GYR, MAG, ROT
 from OH_profile.constants import POSTURE_ELLIPSE_KEY, POSTURE_SWAY_AREA_KEY, POSTURE_SWAY_VELOCITY_KEY, \
     POSTURE_SWAY_LENGTH_KEY, POSTURE_RANGE_RATIO_KEY, POSTURE_ML_RANGE_KEY, POSTURE_AP_RANGE_KEY
 
 from HAR import classify_human_activities, CLASS_SIT
-from utils import extract_date_from_path
+from utils import extract_date_from_path, create_dir
 import sensors.load as sensor_loader
 import sensors.process as sensor_processor
 
@@ -39,19 +41,27 @@ QUATERNION_COLUMNS = [f'x_{ROT}', f'y_{ROT}', f'z_{ROT}', f'w_{ROT}']
 STERNUM_FACTOR = 0.15
 ROUND_DECIMALS = 2
 
+DISPLACEMENT_FILE_NAME_SUFFIX = "displacements.npy"
+
 # ------------------------------------------------------------------------------------------------------------------- #
 # public functions
 # ------------------------------------------------------------------------------------------------------------------- #
-# TODO: pass subject id for storing data
-# TODO: pass path for storing data
-def get_posture_metrics(day_folder_path: str, fs: int, w_size_HAR: float, subject_height_m: float) -> Dict:
+def get_posture_metrics(day_folder_path: str, fs: int, w_size_HAR: float, subject_id: str,
+                        subject_height_m: float,displacement_store_path: str,
+                        min_sitting_time_min = 5.0 ,yaw_range_limit_deg: float = 60,
+                        ) -> Dict:
     """
     Extracts metrics related to seated posture. Before the extraction of metrics, the data is pre-processed and
     classified using a HAR model.
     :param day_folder_path: Path to the folder containing the all the acquisitions from an entire day.
     :param fs: The sampling frequency with which the data was acquired.
     :param w_size_HAR: The window size for HAR classification in seconds
+    :param subject_id: The subject ID (as a string) as defined in the OH profile
     :param subject_height_m: The subject height in meters.
+    :param min_sitting_time_min: the minimum sitting time in minutes that should be considered for performing posture analysis.
+    :param yaw_range_limit_deg: the range of yaw angles to consider, to define which range is considered for posture analysis.
+                                Only displacements that are within [-yaw_range, +yaw_range] in relation to the reference posture are considered.
+    :param displacement_store_path: Path to the folder where the extracted displacement matrices should be stored.
     :return: dictionary containing the extracted posture metrics. The dictionary has the following structure:
 
     {"DD-MM-YYYY": {
@@ -69,14 +79,14 @@ def get_posture_metrics(day_folder_path: str, fs: int, w_size_HAR: float, subjec
     """
 
     # get date from path
-    day_date = extract_date_from_path(day_folder_path)
+    acquisition_date = extract_date_from_path(day_folder_path)
 
     # reformate to dd-mm-yyyy
-    year, month, day = day_date.split('-')
-    day_date = f"{day}-{month}-{year}"
+    year, month, day = acquisition_date.split('-')
+    acquisition_date = f"{day}-{month}-{year}"
 
     # init dict for holding the extracted metrics
-    day_metrics_dict = {day_date: {}}
+    day_metrics_dict = {acquisition_date: {}}
 
     # load the acquisition(s) for the day
     df_dict = sensor_loader.load_daily_acquisitions(day_folder_path, load_devices={PHONE: [ACC, GYR, MAG, ROT]})
@@ -94,20 +104,22 @@ def get_posture_metrics(day_folder_path: str, fs: int, w_size_HAR: float, subjec
         if not df.empty:
 
             # extract posture metrics
-            metrics_dict, displacement_matrix = _calculate_posture_metrics(df, subject_height_m=subject_height_m, fs=fs)
+            metrics_dict, displacement_matrix = _calculate_posture_metrics(df, subject_height_m=subject_height_m, fs=fs,
+                                                                           min_sitting_time_min=min_sitting_time_min,
+                                                                           yaw_range_limit_deg=yaw_range_limit_deg)
 
-            # TODO store displacement matrix + update data_path in OH profile (ask Sara how she plots the pain_data)
-
+            # store displacement matrix
+            _save_displacement_data(displacement_matrix, subject_id=subject_id,
+                                    displacement_store_path=displacement_store_path,
+                                    acquisition_date=acquisition_date, acquisition_time=acquisition_time)
 
         else:
 
             # set metrics_dict to empty if no data
             metrics_dict = {}
 
-
-
         # add the extracted metrics to the day_metrics dictionary
-        day_metrics_dict[day_date][acquisition_time] = metrics_dict
+        day_metrics_dict[acquisition_date][acquisition_time] = metrics_dict
 
     return day_metrics_dict
 
@@ -115,13 +127,17 @@ def get_posture_metrics(day_folder_path: str, fs: int, w_size_HAR: float, subjec
 # ------------------------------------------------------------------------------------------------------------------- #
 # private functions
 # ------------------------------------------------------------------------------------------------------------------- #
-def _calculate_posture_metrics(df: pd.DataFrame, subject_height_m: float, fs: int) -> Tuple[Dict, np.ndarray]:
+def _calculate_posture_metrics(df: pd.DataFrame, subject_height_m: float, fs: int, min_sitting_time_min = 5.0,
+                               yaw_range_limit_deg: float = 60) -> Tuple[Dict, np.ndarray]:
     """
     Calculates posture-related metrics and processes the data contained in df to store it later for more efficient
     plotting. The df should contain at least the phone's quaternion data: ['x_ROT', 'y_ROT', 'z_ROT', 'w_ROT'].
     The following metrics are calculated:
     :param df: :param df: pandas.DataFrame containing the phone data and the corresponding HAR classification
     :param fs: the sampling frequency
+    :param min_sitting_time_min: the minimum sitting time in minutes that should be considered for performing posture analysis
+    :param yaw_range_limit_deg: the range of yaw angles to consider, to define which range is considered for posture analysis.
+                                Only displacements that are within [-yaw_range, +yaw_range] in relation to the reference posture are considered.
     :return: dictionary containing the posture related metrics. The dictionary has the following structure:
 
     {
@@ -135,25 +151,102 @@ def _calculate_posture_metrics(df: pd.DataFrame, subject_height_m: float, fs: in
     }
     """
 
+    # init dict for storing results
+    metrics_dict: Dict[str, float] = {}
+
+    # list to hold the displacement matrices
+    displacement_matrices = []
+
     # filter DataFrame for sitting instances
     df_posture_analysis = df[df[ACTIVITY_COLUMN_NAME] == CLASS_SIT]
 
     # get quaternions from DataFrame
     quaternions = df_posture_analysis[QUATERNION_COLUMNS].values
 
-    # obtain postural displacement
-    displacement_matrix = _calculate_postural_displacement(quaternions, subject_height_m=subject_height_m)
+    # obtain rotation matrices and reference rotation posture
+    ref_rotation = _get_reference_rotation(quaternions)
 
-    # plot the displacement # TODO remove this function
-    plot_postural_displacement(displacement_matrix)
+    # counter for averaging
+    num_blocks = 0
 
-    # extract the posture metrics from the displacement matrix
-    metrics_dict = _extract_postural_features(displacement_matrix, fs=fs)
+    # cycle over the block_ids to obtain metrics per activity block
+    for block_num, block_df in df_posture_analysis.groupby([BLOCK_ID_COLUMN_NAME]):
+
+        print(f"{block_num}: {len(block_df)}")
+
+        # check whether the block is at least as long as the defined minimum sitting time
+        if len(block_df) * (1/fs) >= min_sitting_time_min:
+
+            # get the quaternions of the current block
+            block_quaternions = block_df[QUATERNION_COLUMNS].values
+
+            # obtain postural displacement
+            block_displacement_matrix = _calculate_postural_displacement(block_quaternions, ref_rotation,
+                                                                         subject_height_m=subject_height_m,
+                                                                         yaw_range_limit=yaw_range_limit_deg)
+
+            # check whether there are values in the displacement matrix
+            # this would be the case if the subject would not be facing the computer outside of yaw range limit
+            if block_displacement_matrix.size == 0:
+                continue
+
+            # extract the posture metrics from the displacement matrix
+            block_metrics_dict = _extract_postural_features(block_displacement_matrix, fs=fs)
+
+            # init the metrics dict with values of the first iteration
+            if not metrics_dict:
+                metrics_dict = block_metrics_dict.copy()
+
+            # add displacement matrix to the list
+            displacement_matrices.append(block_displacement_matrix)
+
+            # update the metrics dictionary
+            metrics_dict[POSTURE_AP_RANGE_KEY] = max(metrics_dict[POSTURE_AP_RANGE_KEY],block_metrics_dict[POSTURE_AP_RANGE_KEY])
+            metrics_dict[POSTURE_ML_RANGE_KEY] = max(metrics_dict[POSTURE_ML_RANGE_KEY], block_metrics_dict[POSTURE_ML_RANGE_KEY])
+            metrics_dict[POSTURE_SWAY_LENGTH_KEY] = metrics_dict[POSTURE_SWAY_LENGTH_KEY] + block_metrics_dict[POSTURE_SWAY_LENGTH_KEY]
+            metrics_dict[POSTURE_SWAY_VELOCITY_KEY] = metrics_dict[POSTURE_SWAY_VELOCITY_KEY] + block_metrics_dict[POSTURE_SWAY_VELOCITY_KEY]
+            metrics_dict[POSTURE_SWAY_AREA_KEY] = metrics_dict[POSTURE_SWAY_AREA_KEY] + block_metrics_dict[POSTURE_SWAY_AREA_KEY]
+            metrics_dict[POSTURE_ELLIPSE_KEY] = metrics_dict[POSTURE_ELLIPSE_KEY] + block_metrics_dict[POSTURE_ELLIPSE_KEY]
+
+            # update counter
+            num_blocks += 1
+
+
+    # calculate range ratio
+    metrics_dict[POSTURE_RANGE_RATIO_KEY] = metrics_dict[POSTURE_ML_RANGE_KEY] /metrics_dict[POSTURE_AP_RANGE_KEY]
+
+    # calculate means
+    metrics_dict[POSTURE_SWAY_VELOCITY_KEY] = metrics_dict[POSTURE_SWAY_VELOCITY_KEY] / num_blocks
+    metrics_dict[POSTURE_SWAY_AREA_KEY] = metrics_dict[POSTURE_SWAY_AREA_KEY] / num_blocks
+    metrics_dict[POSTURE_ELLIPSE_KEY] = metrics_dict[POSTURE_ELLIPSE_KEY] / num_blocks
+
+    # concatenate the displacement matrices
+    displacement_matrix = np.concatenate(displacement_matrices, axis=0)
+
+    # round the metrics
+    _round_metrics(metrics_dict, ROUND_DECIMALS)
 
     return metrics_dict, displacement_matrix
 
+def _get_reference_rotation(quaternions: np.ndarray) -> R:
+    """
+    Gets the reference rotation. The reference rotation is calculated as the mean of all rotations. This reference
+    rotation is the estimate for the orientation in which the subject remains most of the time when sitting at the desk.
 
-def _calculate_postural_displacement(quaternions: np.ndarray, subject_height_m: float, yaw_range_limit: float = 60.0) -> np.ndarray:
+    :param quaternions: np.ndarray of shape [N, 4] containing quaternions in the order [x, y, z, w].
+    :return: Tuple containing the rotation matrices corresponding to the provided quaternions and the reference rotation.
+    """
+
+    # convert quaternions to Rotation object
+    rotations = R.from_quat(quaternions)
+
+    # obtain mean rotation (as estimate for 'standard subject posture')
+    ref_rotation = rotations.mean()
+
+    return ref_rotation
+
+
+def _calculate_postural_displacement(quaternions: np.ndarray, ref_rotation: R, subject_height_m: float, yaw_range_limit: float = 60.0) -> np.ndarray:
     """
     calculates displacement in anterior-posterior, mediolateral and vertical direction, from quaternions and the subject's
     torso length. The calculation of displacement is done through Euler angles obtained from the quaternions.
@@ -185,8 +278,10 @@ def _calculate_postural_displacement(quaternions: np.ndarray, subject_height_m: 
     (3) vertical displacement (top-down): d_vert = - L * (1 - np.cos(roll) * cos(pitch))
 
     :param quaternions: np.ndarray of shape [N, 4] containing quaternions in the order [x, y, z, w].
+    :param ref_rotation: reference rotation, corresponding to the main orientation of the subject, when sitting.
     :param subject_height_m: the subject height in meters
-    :param yaw_range_limit: the range of yaw angles to consider, to define which range is considered for posture analysis
+    :param yaw_range_limit: the range of yaw angles to consider, to define which range is considered for posture analysis.
+                            Only displacements that are within [-yaw_range, +yaw_range] in relation to the reference posture are considered.
     :return: np.ndarray containing the displacement in anterior-posterior, lateral and vertical direction
     [d_AP, d_LAT, d_VERT], centered around the subjects 'standard posture'.
     """
@@ -201,9 +296,6 @@ def _calculate_postural_displacement(quaternions: np.ndarray, subject_height_m: 
     raw_euler = rotations.as_euler('xyz', degrees=False)
     raw_euler[:, 1] = (-1) * raw_euler[:, 1]
     rotations = R.from_euler('xyz', raw_euler, degrees=False)
-
-    # obtain mean rotation (as estimate for 'standard subject posture')
-    ref_rotation = rotations.mean()
 
     # compute relative difference between to reference orientation
     relative_rotations = ref_rotation.inv() * rotations
@@ -270,13 +362,13 @@ def _extract_postural_features(displacement_matrix: np.ndarray, fs: int) -> Dict
      confidence_ellipse_area = _get_confidence_ellipse_area(displacement_matrix)
 
      # add the metrics to the dict
-     metrics_dict[POSTURE_AP_RANGE_KEY] = np.round(ap_range, ROUND_DECIMALS)
-     metrics_dict[POSTURE_ML_RANGE_KEY] = np.round(ml_range, ROUND_DECIMALS)
-     metrics_dict[POSTURE_RANGE_RATIO_KEY] = np.round(range_ratio, ROUND_DECIMALS)
-     metrics_dict[POSTURE_SWAY_LENGTH_KEY] = np.round(total_sway_length, ROUND_DECIMALS)
-     metrics_dict[POSTURE_SWAY_VELOCITY_KEY] = np.round(average_sway_velocity, ROUND_DECIMALS)
-     metrics_dict[POSTURE_SWAY_AREA_KEY] = np.round(sway_area_per_second, 4)
-     metrics_dict[POSTURE_ELLIPSE_KEY] = np.round(confidence_ellipse_area, ROUND_DECIMALS)
+     metrics_dict[POSTURE_AP_RANGE_KEY] = ap_range
+     metrics_dict[POSTURE_ML_RANGE_KEY] = ml_range
+     metrics_dict[POSTURE_RANGE_RATIO_KEY] = range_ratio
+     metrics_dict[POSTURE_SWAY_LENGTH_KEY] = total_sway_length
+     metrics_dict[POSTURE_SWAY_VELOCITY_KEY] = average_sway_velocity
+     metrics_dict[POSTURE_SWAY_AREA_KEY] = sway_area_per_second
+     metrics_dict[POSTURE_ELLIPSE_KEY] = confidence_ellipse_area
 
      return metrics_dict
 
@@ -408,6 +500,52 @@ def _get_confidence_ellipse_area(displacement_matrix: np.ndarray) -> float:
     return confidence_ellipse_area
 
 
+def _save_displacement_data(displacement_matrix: np.ndarray, subject_id: str, displacement_store_path: str,
+                            acquisition_date: str, acquisition_time: str) -> None:
+    """
+    Saves the displacement matrix for the subject. The file is stored as:
+    {subject_id}_{acquisition_date}_{acquisition_time}_displacement_matrix.npy
+
+    :param displacement_matrix: np.ndarray containing the anterior-posterior, medio-lateral, and vertical displacement
+                                [d_AP, d_LAT, d_VERT].
+    :param subject_id: the subject ID (as string).
+    :param displacement_store_path: path to where the displacement matrix should be stored.
+    :param acquisition_date: date of the acquisition (as string).
+    :param acquisition_time: time of the acquisition (as string).
+    :return:
+    """
+
+    # generate output path and filename
+    subject_displacement_path = create_dir(displacement_store_path, subject_id)
+    file_name = f"{subject_id}_{acquisition_date}_{acquisition_time}_{DISPLACEMENT_FILE_NAME_SUFFIX}"
+
+    # inform user
+    print(f"Saving displacement matrix to: {os.path.join(subject_displacement_path, file_name)}")
+
+    # store file
+    np.save(os.path.join(subject_displacement_path, file_name), displacement_matrix)
+
+
+def _round_metrics(metrics_dict: Dict, decimals: int = 2) -> None:
+    """
+    function for rounding the metrics
+    :param metrics_dict: dictionary containing the posture metrics
+    :param decimals: the amount of decimals to round to
+    :return: None
+    """
+
+    # round the values
+    for key, value in metrics_dict.items():
+
+        if key == POSTURE_SWAY_AREA_KEY:
+
+            metrics_dict[key] = np.round(value, 5)
+
+        else:
+            metrics_dict[key] = np.round(value, decimals)
+
+
+# TODO: remove once finished
 ###### test function for plotting
 # function for plotting
 import matplotlib.pyplot as plt
