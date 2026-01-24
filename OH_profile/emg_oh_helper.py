@@ -47,6 +47,24 @@ from OH_profile.constants import (
 # OH Profile Helper Functions
 # -------------------------------------------------------------------------------------------------------------------- #
 
+def _round_floats(value: Any, ndigits: int = 4) -> Any:
+    """
+    Recursively round all float values inside nested dict/list/tuple structures.
+
+    :param value: Arbitrary nested structure containing floats.
+    :param ndigits: Number of decimal places to round to.
+    :return: Structure with floats rounded to the specified precision.
+    """
+    if isinstance(value, float):
+        return round(value, ndigits)
+    if isinstance(value, dict):
+        return {k: _round_floats(v, ndigits) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_round_floats(v, ndigits) for v in value]
+    if isinstance(value, tuple):
+        return tuple(_round_floats(v, ndigits) for v in value)
+    return value
+
 def _build_session_metrics_dict(row: pd.Series) -> Dict[str, Any]:
     """
     Build a nested dictionary of EMG metrics for a single session.
@@ -61,7 +79,7 @@ def _build_session_metrics_dict(row: pd.Series) -> Dict[str, Any]:
     :param row: Series containing session metrics from compute_session_metrics().
     :return: Nested dictionary with grouped EMG metrics.
     """
-    return {
+    metrics = {
         # Session metadata
         EMG_SESSION_GROUP_KEY: {
             EMG_DURATION_S_KEY: row.get("duration_s", 0.0),
@@ -104,6 +122,8 @@ def _build_session_metrics_dict(row: pd.Series) -> Dict[str, Any]:
         },
     }
 
+    return _round_floats(metrics, ndigits=4)
+
 
 def _build_daily_aggregate_dict(row: pd.Series) -> Dict[str, Any]:
     """
@@ -114,7 +134,7 @@ def _build_daily_aggregate_dict(row: pd.Series) -> Dict[str, Any]:
     :param row: Series containing daily aggregated metrics.
     :return: Nested dictionary with grouped EMG metrics.
     """
-    return {
+    metrics = {
         # Session metadata (includes session_count for aggregates)
         EMG_SESSION_GROUP_KEY: {
             EMG_SESSION_COUNT_KEY: int(row.get("session_count", 0)),
@@ -157,6 +177,8 @@ def _build_daily_aggregate_dict(row: pd.Series) -> Dict[str, Any]:
         },
     }
 
+    return _round_floats(metrics, ndigits=4)
+
 
 def _build_weekly_aggregate_dict(row: pd.Series) -> Dict[str, Any]:
     """
@@ -167,7 +189,7 @@ def _build_weekly_aggregate_dict(row: pd.Series) -> Dict[str, Any]:
     :param row: Series containing weekly aggregated metrics.
     :return: Nested dictionary with grouped EMG metrics.
     """
-    return {
+    metrics = {
         # Session metadata (uses day_count for weekly)
         EMG_SESSION_GROUP_KEY: {
             EMG_DAY_COUNT_KEY: int(row.get("day_count", 0)),
@@ -209,6 +231,8 @@ def _build_weekly_aggregate_dict(row: pd.Series) -> Dict[str, Any]:
             EMG_BIN_HIGH_FOR_YOU_PCT_KEY: row.get("bin_high_for_you_pct", None),
         },
     }
+
+    return _round_floats(metrics, ndigits=4)
 
 
 def _build_emg_profile_structure(
