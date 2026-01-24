@@ -10,11 +10,12 @@ import questionnaires.metrics as qm
 from utils import extract_group_from_path, extract_device_num_from_path
 import sensors.load as sensor_loader
 import sensors.metrics as metrics_extractor
+import sensors.visualize as oh_visualizer
 from OH_profile.constants import SENSOR_METRICS_KEY, POSTURE_KEY
 from OH_profile.load import get_OH_profile
 from OH_profile.write import write_to_OH_profile, save_OH_profile
 from OH_profile.load.oh_profile_loader import METADATA_KEY
-from sensors.visualize import plot_postural_displacements
+
 # ------------------------------------------------------------------------------------------------------------------- #
 # flags
 # ------------------------------------------------------------------------------------------------------------------- #
@@ -135,4 +136,4 @@ if GENERATE_POSTURE_OH_PROFILE:
                                 sex = oh_profile[METADATA_KEY]['sexo']
 
                                 # generate posture plot
-                                plot_postural_displacements(OH_DISPLACEMENT_DATA_PATH, subject_id=subject_id, subject_sex=sex, output_folder_path=OH_PLOTS_PATH)
+                                oh_visualizer.plot_postural_displacements(OH_DISPLACEMENT_DATA_PATH, subject_id=subject_id, subject_sex=sex, output_folder_path=OH_PLOTS_PATH)

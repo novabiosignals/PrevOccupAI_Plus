@@ -137,7 +137,7 @@ def plot_postural_displacements(displacement_store_path: str, subject_id: str, s
                             color='black', lw=2)
                 axs[i].text(x_start, y_start + 0.02, f"{scalebar_length} m", color='black', fontsize=9)
 
-        fig.suptitle(f"Subject: {subject_id} | Sex: {subject_sex}\n{view_name}", fontsize=12)
+        fig.suptitle(f"{view_name.replace('_', ' ')}", fontsize=12)
         plt.subplots_adjust(left=0.03, right=0.97, top=0.92, bottom=0.08, wspace=0.03, hspace=0.03)
 
         # TODO: store plots
