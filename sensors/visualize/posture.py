@@ -18,8 +18,10 @@ import numpy as np
 from babel.dates import format_datetime
 from datetime import datetime
 
+from sensors.visualize.plot_utils import handle_plot
 # internal imports
-from utils import extract_date_from_path
+from utils import extract_date_from_path, create_dir
+
 # ------------------------------------------------------------------------------------------------------------------- #
 # file specific constants
 # ------------------------------------------------------------------------------------------------------------------- #
@@ -78,6 +80,9 @@ def plot_postural_displacements(displacement_store_path: str, subject_id: str, s
         ("Vista_Lateral", AP_AXIS, VERT_AXIS, view_images["Vista_Lateral"], (0.5, 0.75)),  # AP vs Vertical
         ("Vista_de_Costas", ML_AXIS, VERT_AXIS, view_images["Vista_de_Costas"], (0.75, 0.7))  # ML vs Vertical
     ]
+
+    # create directory to store plots
+    out_dir = create_dir(output_folder_path, os.path.join(subject_id, 'posture_plots'))
 
     for view_name, x_idx, y_idx, bg_image, (center_x, center_y) in views:
         width, height = VIEW_DIMENSIONS[view_name]
@@ -139,11 +144,13 @@ def plot_postural_displacements(displacement_store_path: str, subject_id: str, s
 
         fig.suptitle(f"{view_name.replace('_', ' ')}", fontsize=12)
         plt.subplots_adjust(left=0.03, right=0.97, top=0.92, bottom=0.08, wspace=0.03, hspace=0.03)
+        plt.tight_layout()
 
-        # TODO: store plots
-        # TODO: check correctness of dimensions
-        plt.show()
+        # create file name
+        file_name = f'{subject_id}_{view_name.replace("_", " ")}.png'
 
+        # save the plot
+        handle_plot(save_dir=out_dir, filename=file_name, save=True)
 
 
     print('test')
