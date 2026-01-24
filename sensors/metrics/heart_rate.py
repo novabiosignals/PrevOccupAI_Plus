@@ -41,7 +41,7 @@ from utils import extract_date_from_path
 
 # sensors to be loaded which are strictly needed for the HR plot
 selected_sensors = {PHONE: [ACC, GYR, MAG], # for HAR
-                    WATCH: [ACC,HEART]} # ACC to fill with NaN when the HR is not acquiring - do not remove ACC
+                    WATCH: [ACC, HEART]} # ACC to fill with NaN when the HR is not acquiring - do not remove ACC
 
 
 # heart rate ratio per activity

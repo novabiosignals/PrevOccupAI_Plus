@@ -59,11 +59,11 @@ def plot_wrist_movements_heatmaps(oh_profile, subject: str, output_folder_path: 
 
     # generate heatmap for the significant accelerations
     _plot_heatmap(heatmap_acc,f"Percentagem de movimentos significativos do pulso","YlOrBr","(%)",
-                  output_path, f"wrist_acceleration_{subject}.{FILE_FORMAT}")
+                  output_path, f"wrist_acceleration_{subject}{FILE_FORMAT}")
 
     # generate heatmap for the significant rotations
     _plot_heatmap(heatmap_rot,f"Percentagem de movimentos de rotação do pulso significativos","YlGnBu",
-                  "(%)",output_path, f"wrist_rotation_{subject}.{FILE_FORMAT}")
+                  "(%)",output_path, f"wrist_rotation_{subject}{FILE_FORMAT}")
 
 # ------------------------------------------------------------------------------------------------------------------- #
 # private functions

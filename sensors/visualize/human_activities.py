@@ -25,7 +25,7 @@ import os
 # internal imports
 from .plot_utils import handle_plot, get_weekday_name, add_percentage_labels
 from HAR.classifier import CLASS_WALK, CLASS_SIT, CLASS_STAND
-from .constants import RED, YELLOW, BLUE_STATE, GREEN, DUSTY_GRAPE, REDDISH_BROWN, GRAY
+from .constants import RED, YELLOW, BLUE_STATE, GREEN, SALMON, GRAY
 from OH_profile.constants import HAR_DISTRIBUTIONS_KEY, HAR_TIMELINE_KEY, HAR_STEPS_KEY, HAR_DISTANCE_KEY, HAR_NUM_STEPS_KEY
 from utils import create_dir
 # ------------------------------------------------------------------------------------------------------------------- #
@@ -43,7 +43,7 @@ SESSION_DT = 'session_dt'
 activity_colors = {
     WALKING_NAME: BLUE_STATE,
     SITTING_NAME: GREEN,
-    STANDING_NAME: REDDISH_BROWN,
+    STANDING_NAME: SALMON,
 }
 
 SITTING_WARNING_COLOR = YELLOW  #orange

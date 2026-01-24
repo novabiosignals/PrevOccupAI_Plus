@@ -33,7 +33,7 @@ from constants import PHONE, WATCH, MBAN, MAC_ADDRESS_PATTERN, PHONE_SENSORS, WA
 # file specific constants
 # ------------------------------------------------------------------------------------------------------------------- #
 MIN_BYTES = 1500
-MIN_BYTES_INERTIAL = 1000000
+MIN_BYTES_INERTIAL = 2000000
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # public functions
@@ -279,7 +279,7 @@ def _get_android_filepaths(device_name: str, sensor_list: List[str], folder_path
 
     else:
 
-        # check for the string ANDROID but can not have WEAR
+        # check for the string WEAR
         files = [file for file in Path(folder_path).resolve().glob("**/*WEAR*")
                  if (file.stat().st_size >= MIN_BYTES if HEART in file.name else file.stat().st_size >= MIN_BYTES_INERTIAL)]
 
