@@ -14,6 +14,7 @@ from OH_profile.constants import SENSOR_METRICS_KEY, POSTURE_KEY
 from OH_profile.load import get_OH_profile
 from OH_profile.write import write_to_OH_profile, save_OH_profile
 from OH_profile.load.oh_profile_loader import METADATA_KEY
+from sensors.visualize import plot_postural_displacements
 # ------------------------------------------------------------------------------------------------------------------- #
 # flags
 # ------------------------------------------------------------------------------------------------------------------- #
@@ -53,7 +54,7 @@ if GENERATE_POSTURE_OH_PROFILE:
                 if folder == 'sensors':
 
                     # cycle over the different subjects
-                    for subject_folder in os.listdir(os.path.join(DATA_FOLDER_PATH, group_folder, folder)):
+                    for subject_folder in sorted(os.listdir(os.path.join(DATA_FOLDER_PATH, group_folder, folder))):
 
                         # get folder path
                         folder_path = os.path.join(DATA_FOLDER_PATH, group_folder, folder, subject_folder)
@@ -65,7 +66,7 @@ if GENERATE_POSTURE_OH_PROFILE:
                         # get subject id
                         subject_id = sensor_loader.get_participant_id(sensor_loader.load_participants_info(), device_num, group)
 
-                        print(f"Extracting posture metrics for subject: {subject_id}")
+                        print(f"\n\nExtracting posture metrics for subject: {subject_id}")
 
                         # get the subject's OH profile
                         oh_profile = get_OH_profile(OH_PROFILE_PATH, subject_id)
@@ -100,7 +101,7 @@ if GENERATE_POSTURE_OH_PROFILE:
                         subject_height_m = subject_height / 100
 
                         # check if the metrics have already been extracted, otherwise extract
-                        if len(oh_profile[SENSOR_METRICS_KEY][POSTURE_KEY]) < 100:
+                        if len(oh_profile[SENSOR_METRICS_KEY][POSTURE_KEY]) < 1:
 
                             # iterate through the day folders
                             for date_folder in os.listdir(folder_path):
@@ -122,3 +123,16 @@ if GENERATE_POSTURE_OH_PROFILE:
                                 # save the OH profile to json
                                 save_OH_profile(OH_PROFILE_PATH, subject_id, oh_profile)
 
+
+                        if GENERATE_PLOTS:
+
+                            print(f"\nGenerating plots for subject: {subject_id}")
+
+                            # check whether there is metadata
+                            if len(oh_profile[METADATA_KEY]) > 0:
+
+                                # get the sex
+                                sex = oh_profile[METADATA_KEY]['sexo']
+
+                                # generate posture plot
+                                plot_postural_displacements(OH_DISPLACEMENT_DATA_PATH, subject_id=subject_id, subject_sex=sex, output_folder_path=OH_PLOTS_PATH)

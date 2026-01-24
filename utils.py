@@ -124,16 +124,17 @@ def extract_device_num_from_path(folder_path: str) -> Optional[str]:
         return None
 
 
-def extract_date_from_path(folder_path: str) -> Optional[str]:
+def extract_date_from_path(folder_path: str, date_pattern: str = r'\b(\d{4}-\d{2}-\d{2})\b') -> Optional[str]:
     """
     Extracts the date from a path.
     Assumes that in this path there has to be a folder with the following format: '2025-09-24'
     :param folder_path: Path to the folder
-    :return: a str with the date (example: 2025-09-24)
+    :param date_pattern: regular expression pattern to define date
+    :return: a str with the defined date pattern (example: 2025-09-24)
     """
 
     # find the date in the folder path (yyyy-mm-dd)
-    if match := re.search(r'\b(\d{4}-\d{2}-\d{2})\b', folder_path):
+    if match := re.search(date_pattern, folder_path):
 
         return match.group(1)
 
