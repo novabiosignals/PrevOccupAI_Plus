@@ -393,7 +393,7 @@ def plot_steps_and_distance_per_day(har_metrics_dict: dict, subject_id: str, out
     mortality depends on age.
 
     According to a large meta-analysis of 15 international cohorts
-    (Paluch et al., 2022, The Lancet Public Health, doi: https://doi.org/10.1016/S2468-2667(21)00302-9),
+        (Paluch et al., 2022, The Lancet Public Health, doi: https://doi.org/10.1016/S2468-2667(21)00302-9),
     the risk of all-cause mortality decreases progressively with increasing daily step counts up to approximately
     8 000–10 000 steps per day in adults younger than 60 years, and up to
     6 000–8 000 steps per day in adults aged 60 years and older.

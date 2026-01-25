@@ -244,7 +244,7 @@ if VISUALIZE:
 
             # plot environmental results
             qv.generate_biomec_env_plots(oh_profile= oh_profile[SINGLE_INSTANCE_QUESTIONNAIRE_KEY][ENVIRONMENTAL_DOMAIN_KEY],
-                                                     subject=subject_id, output_folder_path=PLOTS_OUTPUT_PATH, filename_suffix='environment')
+                                                     subject=subject_id, output_folder_path=PLOTS_OUTPUT_PATH, filename_suffix='environment', is_rosa=False)
 
             # plot copsoq and mueq
             qv.generate_copsoq_mueq_plots(oh_profile[SINGLE_INSTANCE_QUESTIONNAIRE_KEY][PSYCHOSOCIAL_DOMAIN_KEY],

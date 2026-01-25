@@ -102,7 +102,7 @@ if GENERATE_POSTURE_OH_PROFILE:
                         subject_height_m = subject_height / 100
 
                         # check if the metrics have already been extracted, otherwise extract
-                        if len(oh_profile[SENSOR_METRICS_KEY][POSTURE_KEY]) < 10000:
+                        if len(oh_profile[SENSOR_METRICS_KEY][POSTURE_KEY]) < 1:
 
                             # iterate through the day folders
                             for date_folder in os.listdir(folder_path):

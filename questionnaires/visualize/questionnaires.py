@@ -54,7 +54,7 @@ FILE_FORMAT = PNG
 # ------------------------------------------------------------------------------------------------------------------- #
 
 def generate_biomec_env_plots(oh_profile: Dict[str, Any], subject: str, output_folder_path: str, filename_suffix: str,
-                              keys_to_keep: Optional[List[str]] = None, is_rosa: bool = False) -> None:
+                              is_rosa: bool, keys_to_keep: Optional[List[str]] = None) -> None:
     """
     Generates the heat maps for the biomechanical or environmental scores for one subject. From these scores, only the ones
     in keys_to_keep are used fo plotting.
@@ -161,7 +161,7 @@ def generate_copsoq_mueq_plots(oh_profile: Dict[str, Any], subject: str, output_
 # private functions
 # ------------------------------------------------------------------------------------------------------------------- #
 
-def _create_heat_map(df: pd.DataFrame, output_path: str, filename: str, color_map, vmin: int, vmax: int, is_rosa: bool = False) -> None:
+def _create_heat_map(df: pd.DataFrame, output_path: str, filename: str, color_map, vmin: int, vmax: int, is_rosa) -> None:
     """
     Create a single-row heatmap from a DataFrame with discrete values (-1 for missing, 0/1/2 for risk).
     If is_rosa=True, moves 'ROSA_final_normalized' to the last column and adds a dashed vertical
@@ -176,8 +176,8 @@ def _create_heat_map(df: pd.DataFrame, output_path: str, filename: str, color_ma
     df_plot = df.copy()
 
     # Move ROSA_final_normalized to last column if needed
-    if is_rosa and "ROSA_final_normalized" in df_plot.columns:
-        cols = [c for c in df_plot.columns if c != "ROSA_final_normalized"] + ["ROSA_final_normalized"]
+    if is_rosa and "final_normalized" in df_plot.columns:
+        cols = [c for c in df_plot.columns if c != "final_normalized"] + ["final_normalized"]
         df_plot = df_plot[cols]
 
     # Plot heatmap
@@ -197,10 +197,10 @@ def _create_heat_map(df: pd.DataFrame, output_path: str, filename: str, color_ma
                         wspace=0.2)
 
     # Draw dashed vertical line before ROSA_final_normalized that reaches xtick numbers
-    if is_rosa and "ROSA_final_normalized" in df_plot.columns:
+    if is_rosa and "final_normalized" in df_plot.columns:
 
         # Index of last regular column (before final score)
-        last_regular_col_idx = df_plot.columns.get_loc("ROSA_final_normalized") - 1
+        last_regular_col_idx = df_plot.columns.get_loc("final_normalized") - 1
         pos = ax.get_position()
         total_cols = df_plot.shape[1]
 
