@@ -193,24 +193,55 @@ def _calculate_windowed_timeline_metrics(df: pd.DataFrame, column_name: str, sta
     # convert Index to DatetimeIndex object for the resample function
     df.index = pd.to_datetime(df.index, format="%H:%M:%S.%f")
 
-    # window dataframe
-    for window_start, window_df in df.resample(f"{window_size_min}min"):
+    # trackers for merged segments
+    current_class = None
+    current_start = None
+    current_end = None
 
-        # most common class (mode returns a pandas.Series with the most common class -> 0 class_A)
-        most_common_class = window_df[column_name].mode()
+    for _, window_df in df.resample(f"{window_size_min}min"):
+        # resample can produce empty windows (depending on alignment) -> skip them safely
+        if window_df.empty:
+            continue
 
-        # get the most common class in this window
-        most_common_class = most_common_class.iloc[0]
+        # most common class in this window
+        mode_series = window_df[column_name].mode()
+        if mode_series.empty:
+            # if column is all NaN in this window, skip
+            continue
+        window_class = mode_series.iloc[0]
 
-        # get start and end timestamps
         window_start = window_df.index[0]
         window_end = window_df.index[-1]
 
-        key = (
-            f"{window_start.strftime('%H:%M:%S.%f')[:-3]}"
-            f"_{window_end.strftime('%H:%M:%S.%f')[:-3]}"
-        )
+        if current_class is None:
+            # initialize first segment
+            current_class = window_class
+            current_start = window_start
+            current_end = window_end
+            continue
 
-        timeline_metrics[key] = most_common_class
+        if window_class == current_class:
+            # extend current segment
+            current_end = window_end
+        else:
+            # close previous segment
+            key = (
+                f"{current_start.strftime('%H:%M:%S.%f')[:-3]}"
+                f"_{current_end.strftime('%H:%M:%S.%f')[:-3]}"
+            )
+            timeline_metrics[key] = current_class
+
+            # start new segment
+            current_class = window_class
+            current_start = window_start
+            current_end = window_end
+
+    # close the last open segment
+    if current_class is not None:
+        key = (
+            f"{current_start.strftime('%H:%M:%S.%f')[:-3]}"
+            f"_{current_end.strftime('%H:%M:%S.%f')[:-3]}"
+        )
+        timeline_metrics[key] = current_class
 
     return timeline_metrics

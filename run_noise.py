@@ -9,13 +9,14 @@ import sensors.metrics as sm
 import sensors.visualize as sv
 from utils import extract_group_from_path, extract_device_num_from_path
 from OH_profile.load import get_OH_profile
-from OH_profile.write import save_OH_profile, write_to_OH_profile
+from OH_profile.write import save_OH_profile, write_to_OH_profile, clear_dict_entries
 from OH_profile.constants import SENSOR_METRICS_KEY, NOISE_KEY
 # ------------------------------------------------------------------------------------------------------------------- #
 # flags
 # ------------------------------------------------------------------------------------------------------------------- #
 GENERATE_NOISE_OH_PROFILE = True
 GENERATE_PLOTS = True
+RERUN_OH_PROFILE = True
 
 # ------------------------------------------------------------------------------------------------------------------- #
 # file constants
@@ -63,8 +64,11 @@ if GENERATE_NOISE_OH_PROFILE:
                         # get oh profile
                         oh_profile = get_OH_profile(OH_PROFILE_PATH, subject_id)
 
+                        if RERUN_OH_PROFILE:
+                            oh_profile = clear_dict_entries(oh_profile, key_to_clear='noise')
+
                         # check if the metrics have already been extracted, if not, extract noise metrics
-                        if len(oh_profile[SENSOR_METRICS_KEY][NOISE_KEY]) < 4:
+                        if len(oh_profile[SENSOR_METRICS_KEY][NOISE_KEY]) < 1:
 
                             # iterate through the folders of the several days
                             for date_folder in os.listdir(folder_path):
