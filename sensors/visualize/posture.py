@@ -59,8 +59,8 @@ def plot_postural_displacements(displacement_store_path: str, subject_id: str, s
     # generate full file paths
     displacement_files = sorted([os.path.join(subject_folder_path, displacement_file) for displacement_file in displacement_files])
 
-    # get dates from the file names
-    acquisition_dates = sorted([extract_date_from_path(displacement_file, date_pattern=r'(\d{2}-\d{2}-\d{4})') for displacement_file in displacement_files])
+    # get dates from the file names and sort the dates chronologically
+    acquisition_dates = sorted([extract_date_from_path(displacement_file, r'(\d{2}-\d{2}-\d{4})') for displacement_file in displacement_files], key=lambda d: datetime.strptime(d, "%d-%m-%Y"))
 
     # Load all displacement arrays
     displacement_data = [np.load(f) for f in displacement_files]
