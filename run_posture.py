@@ -25,7 +25,7 @@ GENERATE_PLOTS = True
 # ------------------------------------------------------------------------------------------------------------------- #
 # file constants
 # ------------------------------------------------------------------------------------------------------------------- #
-DRIVE = 'E'
+DRIVE = 'D'
 DATASET_PATH = 'Backup PrevOccupAI_PLUS Data\\data'
 DATA_FOLDER_PATH = f"{DRIVE}:\\Backup PrevOccupAI_PLUS Data\\data"
 OH_PROFILE_PATH = f"{DRIVE}:\\Backup PrevOccupAI_PLUS Data\\OH_profiles"
@@ -102,7 +102,7 @@ if GENERATE_POSTURE_OH_PROFILE:
                         subject_height_m = subject_height / 100
 
                         # check if the metrics have already been extracted, otherwise extract
-                        if len(oh_profile[SENSOR_METRICS_KEY][POSTURE_KEY]) < 1:
+                        if len(oh_profile[SENSOR_METRICS_KEY][POSTURE_KEY]) < 100000000:
 
                             # iterate through the day folders
                             for date_folder in os.listdir(folder_path):

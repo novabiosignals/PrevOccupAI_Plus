@@ -48,7 +48,7 @@ DISPLACEMENT_FILE_NAME_SUFFIX = "displacements.npy"
 # ------------------------------------------------------------------------------------------------------------------- #
 def get_posture_metrics(day_folder_path: str, fs: int, w_size_HAR: float, subject_id: str,
                         subject_height_m: float,displacement_store_path: str,
-                        min_sitting_time_min = 5.0 ,yaw_range_limit_deg: float = 60,
+                        min_sitting_time_min = 5.0 ,yaw_range_limit_deg: float = 60.0,
                         ) -> Dict:
     """
     Extracts metrics related to seated posture. Before the extraction of metrics, the data is pre-processed and
@@ -172,42 +172,44 @@ def _calculate_posture_metrics(df: pd.DataFrame, subject_height_m: float, fs: in
     # cycle over the block_ids to obtain metrics per activity block
     for block_num, block_df in df_posture_analysis.groupby([BLOCK_ID_COLUMN_NAME]):
 
-        # check whether the block is at least as long as the defined minimum sitting time
-        if len(block_df) * (1/fs) >= min_sitting_time_min:
+        # get the quaternions of the current block
+        block_quaternions = block_df[QUATERNION_COLUMNS].values
 
-            # get the quaternions of the current block
-            block_quaternions = block_df[QUATERNION_COLUMNS].values
+        # obtain postural displacement
+        block_displacement_matrix = _calculate_postural_displacement(block_quaternions, ref_rotation,
+                                                                     subject_height_m=subject_height_m,
+                                                                     yaw_range_limit=yaw_range_limit_deg)
 
-            # obtain postural displacement
-            block_displacement_matrix = _calculate_postural_displacement(block_quaternions, ref_rotation,
-                                                                         subject_height_m=subject_height_m,
-                                                                         yaw_range_limit=yaw_range_limit_deg)
+        # check whether there are values in the displacement matrix
+        # this would be the case if the subject would not be facing the computer outside of yaw range limit
+        if block_displacement_matrix.size * (1/fs) < min_sitting_time_min * 60:
+            continue
 
-            # check whether there are values in the displacement matrix
-            # this would be the case if the subject would not be facing the computer outside of yaw range limit
-            if block_displacement_matrix.size == 0:
-                continue
+        # extract the posture metrics from the displacement matrix
+        block_metrics_dict = _extract_postural_features(block_displacement_matrix, fs=fs)
 
-            # extract the posture metrics from the displacement matrix
-            block_metrics_dict = _extract_postural_features(block_displacement_matrix, fs=fs)
+        # init the metrics dict with values of the first iteration
+        if not metrics_dict:
+            metrics_dict = block_metrics_dict.copy()
 
-            # init the metrics dict with values of the first iteration
-            if not metrics_dict:
-                metrics_dict = block_metrics_dict.copy()
+        # add displacement matrix to the list
+        displacement_matrices.append(block_displacement_matrix)
 
-            # add displacement matrix to the list
-            displacement_matrices.append(block_displacement_matrix)
+        # update the metrics dictionary
+        metrics_dict[POSTURE_AP_RANGE_KEY] = max(metrics_dict[POSTURE_AP_RANGE_KEY],
+                                                 block_metrics_dict[POSTURE_AP_RANGE_KEY])
+        metrics_dict[POSTURE_ML_RANGE_KEY] = max(metrics_dict[POSTURE_ML_RANGE_KEY],
+                                                 block_metrics_dict[POSTURE_ML_RANGE_KEY])
+        metrics_dict[POSTURE_SWAY_LENGTH_KEY] = metrics_dict[POSTURE_SWAY_LENGTH_KEY] + block_metrics_dict[
+            POSTURE_SWAY_LENGTH_KEY]
+        metrics_dict[POSTURE_SWAY_VELOCITY_KEY] = metrics_dict[POSTURE_SWAY_VELOCITY_KEY] + block_metrics_dict[
+            POSTURE_SWAY_VELOCITY_KEY]
+        metrics_dict[POSTURE_SWAY_AREA_KEY] = metrics_dict[POSTURE_SWAY_AREA_KEY] + block_metrics_dict[
+            POSTURE_SWAY_AREA_KEY]
+        metrics_dict[POSTURE_ELLIPSE_KEY] = metrics_dict[POSTURE_ELLIPSE_KEY] + block_metrics_dict[POSTURE_ELLIPSE_KEY]
 
-            # update the metrics dictionary
-            metrics_dict[POSTURE_AP_RANGE_KEY] = max(metrics_dict[POSTURE_AP_RANGE_KEY],block_metrics_dict[POSTURE_AP_RANGE_KEY])
-            metrics_dict[POSTURE_ML_RANGE_KEY] = max(metrics_dict[POSTURE_ML_RANGE_KEY], block_metrics_dict[POSTURE_ML_RANGE_KEY])
-            metrics_dict[POSTURE_SWAY_LENGTH_KEY] = metrics_dict[POSTURE_SWAY_LENGTH_KEY] + block_metrics_dict[POSTURE_SWAY_LENGTH_KEY]
-            metrics_dict[POSTURE_SWAY_VELOCITY_KEY] = metrics_dict[POSTURE_SWAY_VELOCITY_KEY] + block_metrics_dict[POSTURE_SWAY_VELOCITY_KEY]
-            metrics_dict[POSTURE_SWAY_AREA_KEY] = metrics_dict[POSTURE_SWAY_AREA_KEY] + block_metrics_dict[POSTURE_SWAY_AREA_KEY]
-            metrics_dict[POSTURE_ELLIPSE_KEY] = metrics_dict[POSTURE_ELLIPSE_KEY] + block_metrics_dict[POSTURE_ELLIPSE_KEY]
-
-            # update counter
-            num_blocks += 1
+        # update counter
+        num_blocks += 1
 
 
     # calculate range ratio
@@ -291,19 +293,19 @@ def _calculate_postural_displacement(quaternions: np.ndarray, ref_rotation: R, s
     rotations = R.from_quat(quaternions)
 
     # invert yaw axis to have correct displacement
-    raw_euler = rotations.as_euler('xyz', degrees=False)
-    raw_euler[:, 1] = (-1) * raw_euler[:, 1]
-    rotations = R.from_euler('xyz', raw_euler, degrees=False)
+    #raw_euler = rotations.as_euler('xyz', degrees=False)
+    #raw_euler[:, 1] = (-1) * raw_euler[:, 1]
+    #rotations = R.from_euler('xyz', raw_euler, degrees=False)
 
     # compute relative difference between to reference orientation
     relative_rotations = ref_rotation.inv() * rotations
 
     # obtain euler angles
-    xyz_euler_angles = relative_rotations.as_euler('xyz', degrees=False)
+    xyz_euler_angles = relative_rotations.as_euler('yxz', degrees=False)
 
     # obtain pitch and roll angles
-    pitch = xyz_euler_angles[:, 0]  # x-axis
-    yaw = xyz_euler_angles[:, 1]  # y-axis
+    yaw = xyz_euler_angles[:, 0]  # x-axis
+    pitch = xyz_euler_angles[:, 1]  # y-axis
     roll = xyz_euler_angles[:, 2]  # z-axis
 
     # convert y-axis to degrees
@@ -315,6 +317,7 @@ def _calculate_postural_displacement(quaternions: np.ndarray, ref_rotation: R, s
     valid_roll = roll[valid_angles]
 
     # calculate displacement
+    #TODO add chest displacement (disance phone to spine -> the rotation axis is the spine)
     d_ap = trunk_length * np.sin(valid_pitch)
     d_lat = trunk_length * np.sin(valid_roll)
     d_vert = -trunk_length * (1.0 - np.cos(valid_roll) * np.cos(valid_pitch))
