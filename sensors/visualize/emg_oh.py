@@ -25,6 +25,7 @@ import numpy as np
 import pandas as pd
 from matplotlib.axes import Axes
 from datetime import datetime, timedelta
+from babel.dates import format_date
 from scipy.ndimage import uniform_filter1d
 
 from OH_profile.constants import (
@@ -122,15 +123,6 @@ COLOR_THRESHOLD_LINES = "#666666"
 BIN_COLORS = [COLOR_BELOW_USUAL, COLOR_TYPICAL_LOW, COLOR_TYPICAL_HIGH, COLOR_HIGH_FOR_YOU]
 BIN_LABELS_PT = ["Abaixo do habitual", "Típico-baixo", "Típico-alto", "Alto para si"]
 
-# Weekday labels for weekly overview (Monday to Friday)
-WEEKDAY_LABELS_PT = [
-    "Segunda-feira",
-    "Terça-feira",
-    "Quarta-feira",
-    "Quinta-feira",
-    "Sexta-feira",
-]
-
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # Helper Functions
@@ -139,6 +131,44 @@ WEEKDAY_LABELS_PT = [
 def ensure_parent(path: Path) -> None:
     """Create parent directories if they don't exist."""
     path.parent.mkdir(parents=True, exist_ok=True)
+
+
+def dates_to_weekdays(
+    dates: List[str],
+    date_format: str,
+    locale: str = "en",
+) -> List[str]:
+    """
+    Convert a list of date strings to localized weekday names.
+
+    :param dates: List of date strings
+    :param date_format: Format used to parse the input dates
+    :param locale: Locale code (e.g. 'en', 'pt', 'pt_PT')
+    :return: List of weekday names
+    """
+    fallback_formats = [
+        date_format,
+        "%d-%m-%Y",
+        "%Y/%m/%d",
+        "%d/%m/%Y",
+        "%Y_%m_%d",
+        "%d_%m_%Y",
+    ]
+
+    labels: List[str] = []
+    for date_str in dates:
+        parsed = None
+        for fmt in fallback_formats:
+            try:
+                parsed = datetime.strptime(date_str, fmt)
+                break
+            except ValueError:
+                continue
+        if parsed is None:
+            labels.append(date_str)
+            continue
+        labels.append(format_date(parsed, format="EEEE", locale=locale))
+    return labels
 
 
 def _annotate_missing(ax: Axes, text: str) -> None:
@@ -154,20 +184,20 @@ def _annotate_missing(ax: Axes, text: str) -> None:
 def _get_flagged_sessions(session_metrics_path: Optional[Path] = None) -> set:
     """
     Load flagged sessions from session_metrics.csv.
-    
+
     Returns set of tuples (subject_id, side, date, session_label) that are flagged.
     """
     if session_metrics_path is None:
-        session_metrics_path = Path(r"E:\Backup PrevOccupAI_PLUS Data\results\emg_pipeline\session_metrics.csv")
-    
+        session_metrics_path = Path(r"D:\Backup PrevOccupAI_PLUS Data\results\emg_pipeline\session_metrics.csv")
+
     if not session_metrics_path.exists():
         return set()
-    
+
     try:
         df = pd.read_csv(session_metrics_path)
         if 'mvc_quality_flag' not in df.columns:
             return set()
-        
+
         flagged = df[df['mvc_quality_flag'] == 'mvc_underestimated']
         return {
             (str(row['subject_id']), row['side'], row['date'], row['session_label'])
@@ -201,7 +231,7 @@ def _get_relative_bin_percentages(metrics: Dict[str, Any]) -> List[Optional[floa
 def create_weekly_baseline(p10: float, p50: float, p90: float) -> Dict[str, float]:
     """
     Create a weekly baseline dictionary for relative intensity binning.
-    
+
     :param p10: 10th percentile of weekly Active APDF.
     :param p50: 50th percentile (median).
     :param p90: 90th percentile.
@@ -216,11 +246,11 @@ def create_baseline_from_oh_profile(
 ) -> Optional[Dict[str, float]]:
     """
     Extract weekly baseline from an OH profile for timeline generation.
-    
+
     This function reads the pre-computed weekly Active APDF percentiles from
     an OH profile JSON and returns them as a baseline dictionary for use
     in timeline visualizations.
-    
+
     :param oh_profile: OH profile dictionary.
     :param side: 'left' or 'right'.
     :returns: Dict with 'p10', 'p50', 'p90' keys, or None if data not available.
@@ -229,19 +259,19 @@ def create_baseline_from_oh_profile(
         emg_data = oh_profile.get(SENSOR_METRICS_KEY, {}).get(EMG_KEY, {})
         weekly_agg = emg_data.get(EMG_WEEKLY_AGGREGATE_KEY, {})
         side_data = weekly_agg.get(side, {})
-        
+
         # Use helper to extract from nested structure
         active_apdf = get_emg_apdf_active(side_data)
         p10 = active_apdf.get('p10')
         p50 = active_apdf.get('p50')
         p90 = active_apdf.get('p90')
-        
+
         if p10 is not None and p50 is not None and p90 is not None:
             return create_weekly_baseline(p10=p10, p50=p50, p90=p90)
-        
+
     except Exception as e:
         print(f"[emg_oh] Error extracting baseline from OH profile: {e}")
-    
+
     return None
 
 
@@ -257,10 +287,10 @@ def plot_day_relative_bins_donut_from_json(
 ) -> Optional[List[Path]]:
     """
     Plot daily aggregate relative intensity bin donut charts (one per side).
-    
+
     This generates a donut chart showing the distribution of time spent in
     each relative intensity bin for the ENTIRE DAY (aggregate of all sessions).
-    
+
     :param oh_profile: OH profile dictionary containing EMG metrics.
     :param date: Date string to plot.
     :param plots_root: Root directory for plots.
@@ -277,7 +307,7 @@ def plot_day_relative_bins_donut_from_json(
         return None
 
     output_paths: List[Path] = []
-    
+
     for side in ("left", "right"):
         side_metrics = daily_agg.get(side)
         if side_metrics is None:
@@ -286,7 +316,7 @@ def plot_day_relative_bins_donut_from_json(
         bin_percentages = _get_relative_bin_percentages(side_metrics)
         # Replace None with 0
         bin_percentages = [p if p is not None else 0.0 for p in bin_percentages]
-        
+
         # Check if we have any data
         if sum(bin_percentages) == 0:
             continue
@@ -295,7 +325,7 @@ def plot_day_relative_bins_donut_from_json(
         ensure_parent(output_path)
 
         fig, ax = plt.subplots(figsize=(5.5, 5.5))
-        
+
         # Only include non-zero slices
         sizes = []
         colors = []
@@ -305,7 +335,7 @@ def plot_day_relative_bins_donut_from_json(
                 sizes.append(pct)
                 colors.append(RELATIVE_BIN_COLORS[i])
                 labels.append(RELATIVE_BIN_LABELS_PT[i])
-        
+
         wedges, texts = ax.pie(  # type: ignore[misc]
             sizes,
             colors=colors,
@@ -341,7 +371,7 @@ def plot_day_relative_bins_donut_from_json(
             frameon=True,
             prop={"size": 9},
         )
-        
+
         side_label = TRANSLATIONS_PT[side]
         ax.set_title(f"{subject_id} – {date} – {side_label}\n{TRANSLATIONS_PT['Relative Intensity (vs Weekly Baseline)']}")
         fig.subplots_adjust(bottom=0.2, top=0.88, left=0.1, right=0.9)
@@ -473,7 +503,7 @@ def plot_day_relative_bins_stacks_from_json(
                 if key in flagged_sessions:
                     text_x = 105 if side == "right" else -5
                     halign = "left" if side == "right" else "right"
-                    ax.text(text_x, float(y_pos), "*", fontsize=14, fontweight="bold", 
+                    ax.text(text_x, float(y_pos), "*", fontsize=14, fontweight="bold",
                            color="red", va="center", ha=halign)
 
         for y_pos, values in zip(y_positions, session_data_list):
@@ -489,8 +519,8 @@ def plot_day_relative_bins_stacks_from_json(
         ax.invert_yaxis()
         ax.set_axisbelow(True)
         ax.grid(axis="x", alpha=0.3, linestyle="--")
-        
-        # Remove all spines 
+
+        # Remove all spines
         ax.spines["top"].set_visible(False)
         ax.spines["left"].set_visible(False)
         ax.spines["right"].set_visible(False)
@@ -540,7 +570,7 @@ def plot_week_relative_bins_stacks_from_json(
 ) -> Optional[Path]:
     """
     Show session relative intensity bins per day, with left/right side-by-side, ordered by day.
-    
+
     Same format as the old "Week Rest vs Active" plot: 3 days per row, centered last row.
 
     :param oh_profile: OH profile dictionary containing EMG metrics.
@@ -585,14 +615,16 @@ def plot_week_relative_bins_stacks_from_json(
                 break
         if has_bins:
             break
-    
+
     if not has_bins:
         return None
+
+    weekday_labels = dates_to_weekdays(dates, "%Y-%m-%d", locale="pt_PT")
 
     # Layout: up to 3 days per row; center the final row when incomplete
     n_cols = min(3, len(dates))
     n_rows = int(np.ceil(len(dates) / n_cols))
-    
+
     # Wider figure for better readability
     fig = plt.figure(figsize=(6 * n_cols, (max(2.5, 1.2 * max_sessions_for_layout) + 0.6) * n_rows))
 
@@ -626,10 +658,7 @@ def plot_week_relative_bins_stacks_from_json(
         right_ax = fig.add_subplot(sub_gs[0, 2])
         label_ax = fig.add_subplot(sub_gs[0, 1])
         label_ax.axis("off")
-        if idx < len(WEEKDAY_LABELS_PT):
-            day_label = WEEKDAY_LABELS_PT[idx]
-        else:
-            day_label = f"{TRANSLATIONS_PT['Day']} {idx + 1}"
+        day_label = weekday_labels[idx] if idx < len(weekday_labels) else f"{TRANSLATIONS_PT['Day']} {idx + 1}"
         label_ax.set_title(day_label, fontweight="bold", fontsize=10)
 
         sessions = day_sessions.get(date, [])

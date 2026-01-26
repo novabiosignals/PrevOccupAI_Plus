@@ -4,16 +4,18 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import Sequence
+import pandas as pd
 
 from constants import MBAN
 from sensors.load.data_quality import FileQualityReport
 from sensors.load.dataset_loader import discover_daily_acquisitions
 from sensors.emg_pipeline import create_preprocess_config, run_emg_pipeline
+from sensors.visualize import generate_emg_plots_from_oh_profiles
 
 # ------------------------------------------------------------------------------------------------------------------- #
 # Configuration
 # ------------------------------------------------------------------------------------------------------------------- #
-MAIN_ROOT = Path(r"E:\Backup PrevOccupAI_PLUS Data") 
+MAIN_ROOT = Path(r"D:\Backup PrevOccupAI_PLUS Data")
 DATA_ROOT =  MAIN_ROOT / "data"
 PARTICIPANTS_CSV = Path("participants_info.csv")
 SELECTED_SENSORS = {MBAN: ["EMG"]}
@@ -140,11 +142,24 @@ def main(
 
         return artifacts
 
+    elif visualize:
+
+        # load participants csv
+        df = pd.read_csv(PARTICIPANTS_CSV, delimiter=';')
+
+        # get the subject_ids
+        subject_ids = df["subject_id"].unique().tolist()
+
+        # convert to string
+        subject_ids = list(map(str, subject_ids))
+
+        generate_emg_plots_from_oh_profiles(oh_profiles_path, subject_ids, PLOTS_ROOT)
+
     return None
 
 
 if __name__ == '__main__':
     # Run on ALL available subjects to assess 0.5% rest threshold meaningfulness
-    main(run_all=True, subject_filter=None)  
+    main(visualize=True, subject_filter=None)
 
 
