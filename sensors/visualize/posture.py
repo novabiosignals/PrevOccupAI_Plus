@@ -153,8 +153,6 @@ def plot_postural_displacements(displacement_store_path: str, subject_id: str, s
         handle_plot(save_dir=out_dir, filename=file_name, save=True)
 
 
-    print('test')
-
 
 
 
