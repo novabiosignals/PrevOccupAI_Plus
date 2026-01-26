@@ -122,6 +122,15 @@ COLOR_THRESHOLD_LINES = "#666666"
 BIN_COLORS = [COLOR_BELOW_USUAL, COLOR_TYPICAL_LOW, COLOR_TYPICAL_HIGH, COLOR_HIGH_FOR_YOU]
 BIN_LABELS_PT = ["Abaixo do habitual", "Típico-baixo", "Típico-alto", "Alto para si"]
 
+# Weekday labels for weekly overview (Monday to Friday)
+WEEKDAY_LABELS_PT = [
+    "Segunda-feira",
+    "Terça-feira",
+    "Quarta-feira",
+    "Quinta-feira",
+    "Sexta-feira",
+]
+
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # Helper Functions
@@ -590,8 +599,8 @@ def plot_week_relative_bins_stacks_from_json(
     # Use 2x columns to allow centering of 1 or 2 items in a 3-column layout
     grid_cols = n_cols * 2
     outer_gs = fig.add_gridspec(n_rows, grid_cols, wspace=0.35, hspace=0.6)
-    fig.suptitle(f"{subject_id} – {TRANSLATIONS_PT['Week Relative Intensity Overview']}", 
-                fontsize=14, fontweight="bold")
+    fig.suptitle(TRANSLATIONS_PT["Week Relative Intensity Overview"],
+                 fontsize=14, fontweight="bold")
 
     legend_handles: List[Any] = []
     legend_labels: List[str] = []
@@ -617,7 +626,10 @@ def plot_week_relative_bins_stacks_from_json(
         right_ax = fig.add_subplot(sub_gs[0, 2])
         label_ax = fig.add_subplot(sub_gs[0, 1])
         label_ax.axis("off")
-        day_label = f"{TRANSLATIONS_PT['Day']} {idx + 1}"
+        if idx < len(WEEKDAY_LABELS_PT):
+            day_label = WEEKDAY_LABELS_PT[idx]
+        else:
+            day_label = f"{TRANSLATIONS_PT['Day']} {idx + 1}"
         label_ax.set_title(day_label, fontweight="bold", fontsize=10)
 
         sessions = day_sessions.get(date, [])

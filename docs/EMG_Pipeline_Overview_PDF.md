@@ -206,6 +206,67 @@ PrevOccupAI_Plus/
 
 ---
 
+## EMG Metrics (Detailed)
+
+All EMG metrics are computed on **%MVC** signals (per session, per side). The pipeline uses a **rest threshold of 0.5% MVC** to separate active vs rest time. “Active” refers to samples $\ge 0.5\%$ MVC; “rest” refers to samples $< 0.5\%$ MVC.
+
+### 1) Session Metadata (`EMG_session`)
+
+- **`duration_s`**: Total recording duration in seconds.
+- **`mvc_peak`**: MVC reference value used for normalization (peak RMS from MVC calibration).
+- **`active_duration_s`**: Total time (seconds) with %MVC $\ge 0.5\%$.
+
+### 2) Intensity Metrics (`EMG_intensity`)
+
+- **`mean_percent_mvc`**: Mean %MVC across the whole session.
+- **`max_percent_mvc`**: Maximum %MVC observed in the session.
+- **`min_percent_mvc`**: Minimum %MVC observed in the session.
+- **`iemg_percent_seconds`**: Integrated EMG in %MVC-seconds. Computed as:
+
+$$
+\mathrm{iEMG}_{\%MVC\cdot s} = \sum_{t=1}^{N} \left(\%MVC_t\right)\cdot \Delta t
+$$
+
+### 3) APDF Percentiles (`EMG_apdf`)
+
+APDF (Amplitude Probability Distribution Function) is computed for:
+
+- **`full`**: includes all samples.
+- **`active`**: includes only samples $\ge 0.5\%$ MVC.
+
+For both `full` and `active`, the following percentiles are stored:
+
+- **`p10`**: 10th percentile
+- **`p50`**: 50th percentile (median)
+- **`p90`**: 90th percentile
+
+### 4) Rest & Recovery (`EMG_rest_recovery`)
+
+- **`rest_percent`**: Percent of time below 0.5% MVC.
+- **`gap_frequency_per_minute`**: Number of rest gaps per minute.
+- **`gap_count`**: Total number of rest gaps.
+- **`max_sustained_activity_s`**: Longest continuous active period (seconds).
+
+**Gap definition**: contiguous rest segments with a minimum duration of 0.25 s.
+
+### 5) Relative Intensity Bins (`EMG_relative_bins`)
+
+Each 5-second bin is classified relative to the **weekly Active APDF baseline** (P10, P50, P90). Percentages are expressed over **active time only**:
+
+- **`below_usual_pct`**: Active time $< P10$ ("light work for you")
+- **`typical_low_pct`**: Active time between $P10$ and $P50$
+- **`typical_high_pct`**: Active time between $P50$ and $P90$
+- **`high_for_you_pct`**: Active time $> P90$ ("unusually intense")
+
+### 6) Aggregates
+
+- **Daily aggregates** (`EMG_daily_metrics`): Same metric groups as above, summarized per day.
+- **Weekly aggregates** (`EMG_weekly_metrics`): Same metric groups as above, summarized per week.
+- **`session_count`**: number of sessions aggregated.
+- **`day_count`**: number of days aggregated.
+
+---
+
 ## Example Output: Session Timeline
 
 ```
