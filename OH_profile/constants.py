@@ -126,14 +126,14 @@ WRIST_SIGNIFICANT_ROT_PERC_KEY = 'WRIST_significant_rotation_percentage'
 # ENVIRONMENT SUB-KEYS
 # -------------------------------------------------------------------------------------------------------------------- #
 # these constants should have the following format: f'{physical_quantity}_....._{unit}'
-ENV_ILLUMINANCE_KEY = 'Illuminance_mean_lux'
+ENV_ILLUMINANCE_KEY = 'Iluminância_mean_lux'
 ENV_CO2_KEY = 'CO2_ppm'
 ENV_CO_KEY = 'CO_ppm'
 ENV_COV_KEY = 'COV_ppm'
 ENV_PM10_KEY = 'PM10_particles_ug/m3'
 ENV_PM025_KEY = 'PM2.5_particles_ug/m3'
-ENV_TEMPERATURE_KEY = 'Temperature_Celsius'
-ENV_REL_HUMIDITY_KEY = 'Humidity_relative_percentage'
+ENV_TEMPERATURE_KEY = 'Temperatura_Celsius'
+ENV_REL_HUMIDITY_KEY = 'Humidade_relativa_percentagem'
 
 
 # -------------------------------------------------------------------------------------------------------------------- #

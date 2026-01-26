@@ -33,19 +33,19 @@ from .constants import LIGHT_PREVOCCUPAI_BLUE
 # ------------------------------------------------------------------------------------------------------------------- #
 # legend labels
 REFERENCE_VALUE = 'Referência'
-REFERENCE_MAX = 'Referência (max.)'
-REFERENCE_MIN = 'Referência (min.)'
+REFERENCE_MAX = 'Ref. (max.)'
+REFERENCE_MIN = 'Ref. (min.)'
 MEASURED_VALUE = 'Valor medido'
 
 # reference values
-CO2_REFERENCE_VALUE_PPM = 1200
-CO_REFERENCE_VALUE_PPM = 9
-COV_REFERENCE_VALUE_PPM = 12
+CO2_REFERENCE_VALUE_PPM = 2500 # https://indoor.lbl.gov/sites/default/files/lbnl-44385.pdf
+CO_REFERENCE_VALUE_PPM = 9 # https://pmc.ncbi.nlm.nih.gov/articles/PMC7411428/
+COV_REFERENCE_VALUE_PPM = 200 # https://www.aivc.org/sites/default/files/airbase_10425.pdf
 ILLUMINANCE_REFERENCE_VALUE_LUX = 500 # https://oshwiki.osha.europa.eu/en/themes/ergonomics-office-work
 TEMPERATURE_REFERENCE_INTERVAL_CELSIUS = [19, 23] # https://oshwiki.osha.europa.eu/en/themes/ergonomics-office-work
 REL_HUMIDITY_REFERENCE_INTERVAL_PERC = [40, 60] # https://oshwiki.osha.europa.eu/en/themes/ergonomics-office-work
-PM10_REFERENCE_VALUE_UGM3 = 50
-PM025_REFERENCE_VALUE_UGM3 = 30
+PM10_REFERENCE_VALUE_UGM3 = 45 # https://www.who.int/publications/i/item/9789240034228?utm_source=chatgpt.com
+PM025_REFERENCE_VALUE_UGM3 = 15 # https://www.who.int/publications/i/item/9789240034228?utm_source=chatgpt.com
 
 # ppm plots filename
 CO2_CO_COV_PLOT_FILENAME = f"CO2_CO_COV_plot{PNG}"
@@ -97,7 +97,7 @@ def plot_environment_data(oh_profile: Dict[str, float], subject_id: str, output_
 
     # temperature
     temp_dict = {ENV_TEMPERATURE_KEY: oh_profile[ENV_TEMPERATURE_KEY]}
-    _plot_environmental_lines(temp_dict, output_folder_path, subject_id, filename=TEMPERATURE_FILENAME, reference_dict=REFERENCE_TEMPERATURE)
+    _plot_environmental_lines(temp_dict, output_folder_path, subject_id, filename=TEMPERATURE_FILENAME, reference_dict=REFERENCE_TEMPERATURE, generate_legend=False)
 
     # large particles
     particle_dict = {ENV_PM10_KEY: oh_profile[ENV_PM10_KEY], ENV_PM025_KEY: oh_profile[ENV_PM025_KEY]}
@@ -105,7 +105,7 @@ def plot_environment_data(oh_profile: Dict[str, float], subject_id: str, output_
 
     # illuminance
     lux_dict = {ENV_ILLUMINANCE_KEY: oh_profile[ENV_ILLUMINANCE_KEY]}
-    _plot_environmental_lines(lux_dict, output_folder_path, subject_id, filename=ILLUMINANCE_FILENAME, reference_dict=REFERENCE_ILLUMINANCE)
+    _plot_environmental_lines(lux_dict, output_folder_path, subject_id, filename=ILLUMINANCE_FILENAME, reference_dict=REFERENCE_ILLUMINANCE, generate_legend=False)
 
     # relative humidity
     hum_dict = {ENV_REL_HUMIDITY_KEY: oh_profile[ENV_REL_HUMIDITY_KEY]}
@@ -115,7 +115,7 @@ def plot_environment_data(oh_profile: Dict[str, float], subject_id: str, output_
 # private functions
 # ------------------------------------------------------------------------------------------------------------------- #
 def _plot_environmental_lines(data_dict: Dict[str, float], output_folder_path: str, subject_id: str, filename: str,
-                              reference_dict: dict | None = None) -> None:
+                              reference_dict: dict | None = None, generate_legend:bool = True) -> None:
     """
     Creates horizontal line plots for each item in `data_dict`. This dictionary can either have only one item or multiple items,
     as this function generates a plot with the same number of subplots as items in the dictionary. Examples of the dictionary:
@@ -252,7 +252,7 @@ def _plot_environmental_lines(data_dict: Dict[str, float], output_folder_path: s
     plt.tight_layout(rect=[0, 0, 1, 0.94])
 
     # plot legend
-    if legend_dict:
+    if legend_dict and generate_legend:
         fig.legend(handles=list(legend_dict.values()), labels=list(legend_dict.keys()),loc='upper center',
             bbox_to_anchor=(0.5, 1.05), fontsize=10, frameon=False, ncol=len(legend_dict))
 
