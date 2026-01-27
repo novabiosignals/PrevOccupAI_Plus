@@ -137,15 +137,16 @@ def _plot_noise_timeline_per_week(timeline_dict: dict, subject: str, save_dir: s
 
                 ax.plot([start_plot, end_plot], [y_idx, y_idx],
                         color=CLASS_COLORS.get(noise_class, "gray"),
-                        linewidth=10)
+                        linewidth=15)
 
     # Configure axes
     ax.set_yticks(range(len(unique_dates)))
-    ax.set_yticklabels([get_weekday_name(d, 'pt_PT.UTF-8') for d in unique_dates])
+    ax.set_yticklabels([get_weekday_name(d, 'pt_PT.UTF-8') for d in unique_dates], fontsize=14)
     ax.set_ylim(-0.5, len(unique_dates) - 0.5)
     ax.invert_yaxis()
 
     ax.xaxis.set_major_formatter(mdates.DateFormatter("%H:%M"))
+    ax.tick_params(axis="x", labelsize=14)
     ax.set_xlabel("Hora do Dia", fontsize=12)
     ax.set_title(f"Nível de ruído ao longo do dia", fontsize=14)
 
@@ -155,7 +156,7 @@ def _plot_noise_timeline_per_week(timeline_dict: dict, subject: str, save_dir: s
         spine.set_visible(False)
 
     ax.legend(handles=LEGEND_PATCHES, loc="upper center", bbox_to_anchor=(0.5, -0.15),
-              ncol=len(CLASS_COLORS), frameon=False, fontsize=12)
+              ncol=len(CLASS_COLORS), frameon=False, fontsize=14)
 
     plt.tight_layout(rect=[0, 0, 1, 0.95])
 
