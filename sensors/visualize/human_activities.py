@@ -380,7 +380,7 @@ def plot_activity_timeline_per_day(oh_profile: dict, subject_id: str, output_fol
         handle_plot(save_dir=output_path, filename=filename)
 
 
-def plot_steps_and_distance_per_day(har_metrics_dict: dict, subject_id: str, output_folder_path: str, age:int):
+def plot_steps_and_distance_per_day(har_metrics_dict: dict, subject_id: str, output_folder_path: str, age:int, locale='pt_PT.UTF-8'):
     """
     Plot daily step counts per acquisition day and annotate walked distance in meters.
 
@@ -424,12 +424,9 @@ def plot_steps_and_distance_per_day(har_metrics_dict: dict, subject_id: str, out
             # Sum steps and distance for the day
             total_steps += har_steps.get(HAR_NUM_STEPS_KEY, 0)
             total_distance += har_steps.get(HAR_DISTANCE_KEY, 0.0)
-        try:
-            # Convert date string to datetime object
-            date_obj = datetime.strptime(date_str, "%d-%m-%Y")
-            weekday = format_datetime(date_obj, "EEEE", locale="pt_PT").capitalize()
-        except Exception:
-            weekday = date_str
+
+        weekday = get_weekday_name(date_str, locale)
+        date_obj = datetime.strptime(date_str, "%d-%m-%Y")
 
 
         # Only include days with steps > 0
@@ -472,7 +469,7 @@ def plot_steps_and_distance_per_day(har_metrics_dict: dict, subject_id: str, out
             f"{real_steps}",
             va="center",
             ha="right",
-            fontsize=10,
+            fontsize=14,
             color="white",
             fontweight="bold"
         )
@@ -502,12 +499,12 @@ def plot_steps_and_distance_per_day(har_metrics_dict: dict, subject_id: str, out
     # Formatting main axis
     ax.set_xlabel("Número de passos", fontsize=12)
     #ax.set_ylabel("Dia", fontsize=12)
-    ax.set_title(f"Passos e distância percorrida", fontsize=14, pad=35)
+    # ax.set_title(f"Passos e distância percorrida", fontsize=14, pad=35)
     ax.tick_params(axis="x", labelsize=11)
     ax.tick_params(axis="y", labelsize=11)
     for spine in ax.spines.values():
         spine.set_visible(False)
-    ax.legend(frameon=False, loc="upper center", bbox_to_anchor=(0.5, 1.12), ncol=2)
+    ax.legend(frameon=False, loc="upper center", bbox_to_anchor=(0.5, 1.12), ncol=2, fontsize=12)
 
     # Distance column (right)
     ax_dist.set_xlim(0, 1)
@@ -520,9 +517,9 @@ def plot_steps_and_distance_per_day(har_metrics_dict: dict, subject_id: str, out
 
     # Add distance labels (in km) aligned with each day
     for i, distance in enumerate(distances):
-        ax_dist.text(0.5, i, f"{distance / 1000:.1f} km", va="center", ha="center", fontsize=10, color="black")
+        ax_dist.text(0.5, i, f"{distance / 1000:.1f} km", va="center", ha="center", fontsize=13, color="black")
 
-    ax_dist.set_title("Distância percorrida\nno local de trabalho", fontsize=11)
+    ax_dist.set_title("Distância percorrida\nno local de trabalho", fontsize=13)
 
     for spine in ax_dist.spines.values():
         spine.set_visible(False)
