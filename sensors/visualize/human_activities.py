@@ -464,7 +464,7 @@ def plot_steps_and_distance_per_day(har_metrics_dict: dict, subject_id: str, out
     # Add step count label at the end of each blue bar
     for bar, real_steps in zip(bars_blue, steps):
         ax.text(
-            bar.get_width() - 200,  # position near end of blue bar
+            bar.get_width() + 600,  # position near end of blue bar
             bar.get_y() + bar.get_height() / 2,
             f"{real_steps}",
             va="center",
