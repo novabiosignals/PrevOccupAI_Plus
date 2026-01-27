@@ -622,7 +622,7 @@ def plot_week_relative_bins_stacks_from_json(
     weekday_labels = dates_to_weekdays(dates, "%Y-%m-%d", locale="pt_PT")
 
     # Layout: up to 3 days per row; center the final row when incomplete
-    n_cols = min(3, len(dates))
+    n_cols = min(2, len(dates))
     n_rows = int(np.ceil(len(dates) / n_cols))
 
     # Wider figure for better readability
@@ -767,7 +767,7 @@ def plot_week_relative_bins_stacks_from_json(
 
     output_path = plots_root / subject_id / "week" / "relative_bins_sessions_week.png"
     ensure_parent(output_path)
-    fig.subplots_adjust(bottom=0.18, top=0.92, left=0.06, right=0.98)
+    fig.subplots_adjust(bottom=0.1, top=0.92, left=0.06, right=0.98)
     fig.savefig(output_path, format="png", dpi=150)
     plt.close(fig)
     return output_path
