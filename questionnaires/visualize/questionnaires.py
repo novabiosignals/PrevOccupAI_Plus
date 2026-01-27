@@ -78,11 +78,11 @@ LANG_MAPPING = {
     },
     "pt": {
         "likert": {
-            1: "Discordo totalmente",
+            1: "Discordo total.",
             2: "Discordo",
             3: "Neutro",
             4: "Concordo",
-            5: "Concordo totalmente"
+            5: "Concordo total."
         },
         "locale": "pt_PT"
     }
@@ -306,19 +306,27 @@ def generate_workload_plot(oh_profile: Dict[str, Any], subject_id: str, output_f
         for i, key in enumerate(x_labels)
     ]
 
+    # define number of columns
+    n_col = 3
+
+    # reorder the legends to be read from left to right
+    legend_handles_rowwise = _reorder_legend_rowwise(legend_handles, n_col)
+
     fig.legend(
-        handles=legend_handles,
+        handles=legend_handles_rowwise,
         loc="lower center",
-        ncol=len(legend_handles),
+        ncols=3,
         frameon=False,
         handlelength=0,
         handletextpad=0.4,
-        fontsize=14
+        columnspacing=1.5,
+        fontsize=14,
+        bbox_to_anchor = (0.5, -0.03)
     )
 
     # add suptitle
     #fig.suptitle("Resultados dos Questionários da Carga de Trabalho")
-    fig.subplots_adjust(top=0.82, bottom=0.25)
+    fig.subplots_adjust(top=0.90, bottom=0.25)
 
     # create output path
     output_path = create_dir(output_folder_path, os.path.join(f"{subject_id}", "questionnaire_plots"))
@@ -406,3 +414,25 @@ def _format_question_key(key: str, language: str) -> str:
 
     # fallback: replace underscores and capitalize first letter
     return key.replace("_", " ").capitalize()
+
+
+def _reorder_legend_rowwise(handles, ncol):
+    """
+    reorders legends so that they can be read from left to right.
+    :param handles:
+    :param ncol:
+    :return:
+    """
+    n = len(handles)
+    nrow = int(math.ceil(n / ncol))
+
+    # Pad with None so reshape works
+    padded = handles + [None] * (nrow * ncol - n)
+
+    arr = np.array(padded, dtype=object).reshape(nrow, ncol)
+
+    # Matplotlib fills column-wise → undo that
+    rowwise = arr.T.flatten()
+
+    # Remove padding
+    return [h for h in rowwise if h is not None]
