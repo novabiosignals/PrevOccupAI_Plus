@@ -254,11 +254,12 @@ def generate_workload_plot(oh_profile: Dict[str, Any], subject_id: str, output_f
         ax.spines["left"].set_visible(False)
 
         # transform the date to weekday
-        try:
-            weekday_str = format_datetime(datetime.strptime(acquisition_date, "%d-%m-%Y"), "EEEE",
-                                          locale="pt_PT")
-        except:
-            weekday_str = acquisition_date
+        weekday_str = get_weekday_name(acquisition_date, locale_string=f"{locale}.UTF-8")
+        # try:
+        #     weekday_str = format_datetime(datetime.strptime(acquisition_date, "%d-%m-%Y"), "EEEE",
+        #                                   locale="pt_PT")
+        # except:
+        #     weekday_str = acquisition_date
 
         x_positions = []
         x_labels = []
