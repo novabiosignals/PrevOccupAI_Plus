@@ -12,12 +12,15 @@ from OH_profile.constants import DAILY_QUESTIONNAIRE_DOMAIN_KEY, PAIN_DOMAIN_KEY
 # ------------------------------------------------------------------------------------------------------------------- #
 # constants
 # ------------------------------------------------------------------------------------------------------------------- #
-OH_PROFILE_PATH = r"C:\Users\srale\Desktop\OH_profiles"
-PAIN_DATA_PATH = r"E:\pain_data_prevoccupai_plus"
-PLOTS_OUTPUT_PATH = r"C:\Users\srale\Desktop\timeline_plots"
+
+
+DRIVE = 'D'
+OH_PROFILE_PATH = f"{DRIVE}:\\Backup PrevOccupAI_PLUS Data\\OH_profiles"
+PLOTS_OUTPUT_PATH = f"{DRIVE}:\\Backup PrevOccupAI_PLUS Data\\OH_plots"
+PAIN_DATA_PATH = f"{DRIVE}:\\Backup PrevOccupAI_PLUS Data\\data\\pain_data"
 GENERATE_OH_PROFILE = True
 GENERATE_PLOTS = True
-
+RERUN_OH_PAIN = False
 # ------------------------------------------------------------------------------------------------------------------- #
 # program starts here
 # ------------------------------------------------------------------------------------------------------------------- #
@@ -33,8 +36,7 @@ if GENERATE_OH_PROFILE:
         # open OH profile
         oh_profile = get_OH_profile(OH_PROFILE_PATH, subject_id)
 
-        if len(oh_profile[DAILY_QUESTIONNAIRE_DOMAIN_KEY][PAIN_DOMAIN_KEY]) < 1:
-
+        if RERUN_OH_PAIN:
 
             # extract metrics
             metrics_dict = qm.get_pain_metrics_per_day(folder_path=PAIN_DATA_PATH, subject_id=str(subject_id))
@@ -48,5 +50,6 @@ if GENERATE_OH_PROFILE:
 
         if GENERATE_PLOTS:
 
+            print(f"Generating pain plot for subject: {subject_id}")
             qv.generate_pain_plots(folder_path=PAIN_DATA_PATH, output_folder=PLOTS_OUTPUT_PATH, subject_id=str(subject_id))
 

@@ -321,7 +321,7 @@ def generate_workload_plot(oh_profile: Dict[str, Any], subject_id: str, output_f
     )
 
     # add suptitle
-    fig.suptitle("Resultados dos Questionários da Carga de Trabalho")
+    #fig.suptitle("Resultados dos Questionários da Carga de Trabalho")
     fig.subplots_adjust(top=0.82, bottom=0.25)
 
     # create output path
