@@ -76,7 +76,7 @@ def generate_pain_plots(folder_path: str, output_folder: str, subject_id: str) -
 
     # add top legend showing intensity colors
     legend_handles = [Line2D([0], [0], marker='o', color=color, label=intensity,
-                             markersize=6, linestyle='') for intensity, color in PAIN_COLORS.items()]
+                             markersize=8, linestyle='') for intensity, color in PAIN_COLORS.items()]
 
     fig.legend(handles=legend_handles,loc='upper center',ncol=len(PAIN_COLORS),fontsize=8,frameon=False,
         title="Escala de intensidade da dor")
