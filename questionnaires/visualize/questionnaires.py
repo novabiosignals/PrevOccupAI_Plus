@@ -240,7 +240,7 @@ def generate_workload_plot(oh_profile: Dict[str, Any], subject_id: str, output_f
     }
 
 
-    fig, axes = plt.subplots(1, len(work_load_dict), figsize=(18, 4), sharey=True)
+    fig, axes = plt.subplots(1, len(work_load_dict), figsize=(18, 6), sharey=True)
 
     axes = axes.flatten()
     x_labels = []
@@ -270,19 +270,19 @@ def generate_workload_plot(oh_profile: Dict[str, Any], subject_id: str, output_f
             # Thick horizontal line instead of bar
             ax.hlines(
                 y=value,
-                xmin=pos - 0.25,
-                xmax=pos + 0.25,
+                xmin=pos - 0.3,
+                xmax=pos + 0.3,
                 linewidth=7,
                 color=color
             )
 
         ax.set_xticks(x_positions)
-        ax.set_xticklabels([str(i + 1) for i in x_positions], fontsize=14)
-        ax.set_title(weekday_str, fontsize=15)
+        ax.set_xticklabels([str(i + 1) for i in x_positions], fontsize=18)
+        ax.set_title(weekday_str, fontsize=18)
 
         ax.set_ylim(0.5, 5.5)
         ax.set_yticks(LIKERT_VALUES)
-        ax.set_yticklabels([likert_labels[v] for v in LIKERT_VALUES], fontsize=14)
+        ax.set_yticklabels([likert_labels[v] for v in LIKERT_VALUES], fontsize=18)
 
         ax.grid(
             axis="y",
@@ -291,7 +291,7 @@ def generate_workload_plot(oh_profile: Dict[str, Any], subject_id: str, output_f
             alpha=0.7
         )
 
-    # transform legend labels
+            # transform legend labels
     if x_labels:
 
         x_labels =  [_format_question_key(label, language) for label in x_labels]
@@ -320,13 +320,19 @@ def generate_workload_plot(oh_profile: Dict[str, Any], subject_id: str, output_f
         handlelength=0,
         handletextpad=0.4,
         columnspacing=1.5,
-        fontsize=14,
-        bbox_to_anchor = (0.5, -0.03)
+        fontsize=16,
+        bbox_to_anchor = (0.5, -0.01)
     )
 
     # add suptitle
     #fig.suptitle("Resultados dos Questionários da Carga de Trabalho")
-    fig.subplots_adjust(top=0.90, bottom=0.25)
+    fig.subplots_adjust(
+        left=0.125,
+        right=0.99,
+        top=0.90,
+        bottom=0.22,
+        wspace=0.10
+    )
 
     # create output path
     output_path = create_dir(output_folder_path, os.path.join(f"{subject_id}", "questionnaire_plots"))
