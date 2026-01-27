@@ -270,19 +270,19 @@ def generate_workload_plot(oh_profile: Dict[str, Any], subject_id: str, output_f
             # Thick horizontal line instead of bar
             ax.hlines(
                 y=value,
-                xmin=pos - 0.35,
-                xmax=pos + 0.35,
-                linewidth=3,
+                xmin=pos - 0.25,
+                xmax=pos + 0.25,
+                linewidth=7,
                 color=color
             )
 
         ax.set_xticks(x_positions)
-        ax.set_xticklabels([str(i + 1) for i in x_positions])
-        ax.set_title(weekday_str)
+        ax.set_xticklabels([str(i + 1) for i in x_positions], fontsize=14)
+        ax.set_title(weekday_str, fontsize=15)
 
         ax.set_ylim(0.5, 5.5)
         ax.set_yticks(LIKERT_VALUES)
-        ax.set_yticklabels([likert_labels[v] for v in LIKERT_VALUES])
+        ax.set_yticklabels([likert_labels[v] for v in LIKERT_VALUES], fontsize=14)
 
         ax.grid(
             axis="y",
@@ -313,7 +313,7 @@ def generate_workload_plot(oh_profile: Dict[str, Any], subject_id: str, output_f
         frameon=False,
         handlelength=0,
         handletextpad=0.4,
-        fontsize=9
+        fontsize=14
     )
 
     # add suptitle

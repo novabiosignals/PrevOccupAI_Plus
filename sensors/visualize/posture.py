@@ -134,7 +134,7 @@ def plot_postural_displacements(displacement_store_path: str, subject_id: str, s
             weekday_str = get_weekday_name(acquisition_dates[i], locale_string=f"pt_PT.UTF-8")
 
             axs[i].set_ylabel("")
-            axs[i].set_xlabel(weekday_str, fontsize=10, labelpad=5)
+            axs[i].set_xlabel(weekday_str, fontsize=18, labelpad=5)
 
             # Add scale bar in first subplot
             if i == 0:
@@ -154,7 +154,7 @@ def plot_postural_displacements(displacement_store_path: str, subject_id: str, s
                 pos.height * 1.05
             ])
 
-        fig.suptitle(f"{view_name.replace('_', ' ')}", fontsize=12, y=0.97)
+        fig.suptitle(f"{view_name.replace('_', ' ')}", fontsize=20, y=0.97)
         plt.subplots_adjust(left=0.01, right=0.99, top=0.90, bottom=0.08, wspace=0.0, hspace=0.03)
         # plt.tight_layout()
 
