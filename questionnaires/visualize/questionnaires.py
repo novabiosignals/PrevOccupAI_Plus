@@ -21,14 +21,20 @@ import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
 import matplotlib.colors as clr
+from matplotlib.lines import Line2D
 import os
 import math
 import copy
+from babel.dates import format_datetime
+from datetime import datetime
 
 # internal imports
 from OH_profile.constants import (PSYCHOSOCIAL_COPSOQ_WORK_TYPE_KEY, PSYCHOSOCIAL_COPSOQ_POPULATION_KEY,
-                                  PSYCHOSOCIAL_MUEQ_WORK_TYPE_KEY, PSYCHOSOCIAL_MUEQ_POPULATION_KEY)
+                                  PSYCHOSOCIAL_MUEQ_WORK_TYPE_KEY, PSYCHOSOCIAL_MUEQ_POPULATION_KEY,
+                                  DAILY_QUESTIONNAIRE_DOMAIN_KEY, WORKLOAD_DOMAIN_KEY)
+from sensors.visualize import get_weekday_name
 from sensors.visualize.constants import RED, GREEN, YELLOW
+from sensors.visualize.plot_utils import handle_plot
 from utils import create_dir
 from constants import PNG
 import sensors.load as sl
@@ -48,6 +54,57 @@ ROSA_KEYS_KEEP = [
     ]
 
 FILE_FORMAT = PNG
+
+
+
+# Likert scale (5-point)
+
+LIKERT_SCALE = {
+    1: "Strongly disagree",
+    2: "Disagree",
+    3: "Neutral",
+    4: "Agree",
+    5: "Strongly agree"
+}
+
+LIKERT_VALUES = list(LIKERT_SCALE.keys())
+
+
+# Language mapping
+LANG_MAPPING = {
+    "eng": {
+        "likert": LIKERT_SCALE,
+        "locale": "en_US"
+    },
+    "pt": {
+        "likert": {
+            1: "Discordo totalmente",
+            2: "Discordo",
+            3: "Neutro",
+            4: "Concordo",
+            5: "Concordo totalmente"
+        },
+        "locale": "pt_PT"
+    }
+}
+
+QUESTION_LABEL_MAPPING = {
+    "pt": {
+        "focus_and_mental_strain": "Concentração e esforço mental",
+        "rushed_and_under_pressure": "Apressado e sobre pressão",
+        "frequent_interruptions": "Interrupções frequentes",
+        "more_effort_than_resources": "Mais esforço do que recursos",
+        "heavy_workload": "Carga de trabalho elevada"
+    },
+    "eng": {
+        # optional, if you want cleaner English labels
+        "focus_and_mental_strain": "Focus and mental strain",
+        "rushed_and_under_pressure": "Rushed and under pressure",
+        "frequent_interruptions": "Frequent interruptions",
+        "more_effort_than_resources": "More effort than resources",
+        "heavy_workload": "Heavy workload"
+    }
+}
 
 # ------------------------------------------------------------------------------------------------------------------- #
 # public functions
@@ -157,6 +214,127 @@ def generate_copsoq_mueq_plots(oh_profile: Dict[str, Any], subject: str, output_
         _create_heat_map(df, output_path, f"{filename_st}{FILE_FORMAT}", color_map= cmap, vmin=0, vmax=1, is_rosa=False)
 
 
+
+
+def generate_workload_plot(oh_profile: Dict[str, Any], subject_id: str, output_folder_path: str, language: str = "pt", color: str = "#577590") -> None:
+    """
+
+    :param oh_profile:
+    :param subject_id:
+    :param output_folder_path:
+    :param language:
+    :param color:
+    :return:
+    """
+
+    lang_cfg = LANG_MAPPING.get(language, LANG_MAPPING["eng"])
+    locale = lang_cfg["locale"]
+    likert_labels = lang_cfg["likert"]
+
+    # get the workload data from the oh_profile
+    work_load_dict = oh_profile[DAILY_QUESTIONNAIRE_DOMAIN_KEY][WORKLOAD_DOMAIN_KEY]
+
+    work_load_dict = {
+        k: v for k, v in work_load_dict.items()
+        if isinstance(v, dict) and len(v) > 0
+    }
+
+
+    fig, axes = plt.subplots(1, len(work_load_dict), figsize=(18, 4), sharey=True)
+
+    axes = axes.flatten()
+    x_labels = []
+
+    # cycle over the days and sub_dicts
+    for ax, (acquisition_date, sub_dict) in zip(axes, work_load_dict.items()):
+
+        # Remove spines (keep only bottom)
+        ax.spines["top"].set_visible(False)
+        ax.spines["right"].set_visible(False)
+        ax.spines["left"].set_visible(False)
+
+        # transform the date to weekday
+        try:
+            weekday_str = format_datetime(datetime.strptime(acquisition_date, "%d-%m-%Y"), "EEEE",
+                                          locale="pt_PT")
+        except:
+            weekday_str = acquisition_date
+
+        x_positions = []
+        x_labels = []
+
+        # pop the last question
+        sub_dict.pop('open_question')
+
+        for pos, (q_item, value) in enumerate(sub_dict.items()):
+
+            x_positions.append(pos)
+            x_labels.append(q_item)
+
+            # Thick horizontal line instead of bar
+            ax.hlines(
+                y=value,
+                xmin=pos - 0.35,
+                xmax=pos + 0.35,
+                linewidth=3,
+                color=color
+            )
+
+        ax.set_xticks(x_positions)
+        ax.set_xticklabels([str(i + 1) for i in x_positions])
+        ax.set_title(weekday_str)
+
+        ax.set_ylim(0.5, 5.5)
+        ax.set_yticks(LIKERT_VALUES)
+        ax.set_yticklabels([likert_labels[v] for v in LIKERT_VALUES])
+
+        ax.grid(
+            axis="y",
+            linestyle="--",
+            linewidth=0.8,
+            alpha=0.7
+        )
+
+    # transform legend labels
+    if x_labels:
+
+        x_labels =  [_format_question_key(label, language) for label in x_labels]
+
+
+    legend_handles = [
+        Line2D(
+            [], [],
+            linestyle=None,
+            label=rf"$\bf{{{i + 1}}}$ – {key}"
+        )
+        for i, key in enumerate(x_labels)
+    ]
+
+    fig.legend(
+        handles=legend_handles,
+        loc="lower center",
+        ncol=len(legend_handles),
+        frameon=False,
+        handlelength=0,
+        handletextpad=0.4,
+        fontsize=9
+    )
+
+    # add suptitle
+    fig.suptitle("Resultados dos Questionários da Carga de Trabalho")
+    fig.subplots_adjust(top=0.82, bottom=0.25)
+
+    # create output path
+    output_path = create_dir(output_folder_path, os.path.join(f"{subject_id}", "questionnaire_plots"))
+
+    # create file name
+    file_name = f'{subject_id}_carga_de_trabalho.png'
+
+    # save the plot
+    handle_plot(save_dir=output_path, filename=file_name, save=True)
+
+
+
 # ------------------------------------------------------------------------------------------------------------------- #
 # private functions
 # ------------------------------------------------------------------------------------------------------------------- #
@@ -215,3 +393,20 @@ def _create_heat_map(df: pd.DataFrame, output_path: str, filename: str, color_ma
     # Save figure
     plt.savefig(os.path.join(output_path, filename), bbox_inches='tight', dpi=300)
     plt.close()
+
+
+def _format_question_key(key: str, language: str) -> str:
+    """
+    Convert a question key to a human-readable label:
+    - replace underscores with spaces
+    - apply language translation if available
+
+    :param key: Original dictionary key
+    :param language: 'pt' or 'eng'
+    :return: Formatted question label
+    """
+    if key in QUESTION_LABEL_MAPPING.get(language, {}):
+        return QUESTION_LABEL_MAPPING[language][key]
+
+    # fallback: replace underscores and capitalize first letter
+    return key.replace("_", " ").capitalize()

@@ -104,9 +104,9 @@ def plot_postural_displacements(displacement_store_path: str, subject_id: str, s
             # Subsample data to every 100th sample
             day_array_sub = day_array[::100]
 
-            # Center data using median displacement
-            x_centered = day_array_sub[:, x_idx] - np.median(day_array_sub[:, x_idx]) + center_x
-            y_centered = day_array_sub[:, y_idx] - np.median(day_array_sub[:, y_idx]) + center_y
+            # Center data
+            x_centered = day_array_sub[:, x_idx]  + center_x
+            y_centered = day_array_sub[:, y_idx]  + center_y
 
             # KDE plot
             sns.kdeplot(
