@@ -12,9 +12,10 @@ from OH_profile.constants import DAILY_QUESTIONNAIRE_DOMAIN_KEY, PAIN_DOMAIN_KEY
 # ------------------------------------------------------------------------------------------------------------------- #
 # constants
 # ------------------------------------------------------------------------------------------------------------------- #
-OH_PROFILE_PATH = r"C:\Users\srale\Desktop\OH_profiles"
-PAIN_DATA_PATH = r"E:\pain_data_prevoccupai_plus"
-PLOTS_OUTPUT_PATH = r"C:\Users\srale\Desktop\timeline_plots"
+DRIVE = 'E'
+OH_PROFILE_PATH = f"{DRIVE}:\\Backup PrevOccupAI_PLUS Data\\OH_profiles"
+PAIN_DATA_PATH = f"{DRIVE}:\\pain_data_prevoccupai_plus"
+PLOTS_OUTPUT_PATH = f"{DRIVE}:\\Backup PrevOccupAI_PLUS Data\\OH_plots"
 GENERATE_OH_PROFILE = True
 GENERATE_PLOTS = True
 

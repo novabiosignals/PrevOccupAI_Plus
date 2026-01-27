@@ -367,7 +367,7 @@ def get_weekday_name(date_string, locale_string, date_format=DATE_FORMAT):
     return day_name
 
 
-def add_percentage_labels(ax,stacks: list[list[float]],fontsize: int = 10,use_axes: bool = False,
+def add_percentage_labels(ax,stacks: list[list[float]],fontsize: int = 12,use_axes: bool = False,
                           min_display_percent: float = 3) -> None:
     """
     Add percentage labels on top of stacked bars.
