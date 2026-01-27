@@ -18,8 +18,9 @@ import numpy as np
 from babel.dates import format_datetime
 from datetime import datetime
 
-from sensors.visualize.plot_utils import handle_plot
+
 # internal imports
+from sensors.visualize.plot_utils import handle_plot, get_weekday_name
 from utils import extract_date_from_path, create_dir
 
 # ------------------------------------------------------------------------------------------------------------------- #
@@ -88,7 +89,7 @@ def plot_postural_displacements(displacement_store_path: str, subject_id: str, s
         width, height = VIEW_DIMENSIONS[view_name]
 
         num_days = len(displacement_data)
-        fig, axs = plt.subplots(1, num_days, figsize=(5 * num_days, 4))
+        fig, axs = plt.subplots(1, num_days, figsize=(5 * num_days, 4), constrained_layout=False)
         if num_days == 1:
             axs = [axs]
 
@@ -118,17 +119,19 @@ def plot_postural_displacements(displacement_store_path: str, subject_id: str, s
                 ax=axs[i]
             )
 
+            # IMPORTANT: lock the view so KDE doesn't change it
+            axs[i].set_xlim(0, width)
+            axs[i].set_ylim(0, height)
+            axs[i].set_aspect('auto')
+            axs[i].margins(0)
+
             # Remove ticks and spines
             axs[i].tick_params(left=False, bottom=False, labelleft=False, labelbottom=False)
             for spine in axs[i].spines.values():
                 spine.set_visible(False)
 
             # Format date for title
-            try:
-                weekday_str = format_datetime(datetime.strptime(acquisition_dates[i], "%d-%m-%Y"), "EEEE",
-                                              locale="pt_PT")
-            except:
-                weekday_str = acquisition_dates[i]
+            weekday_str = get_weekday_name(acquisition_dates[i], locale_string=f"pt_PT.UTF-8")
 
             axs[i].set_ylabel("")
             axs[i].set_xlabel(weekday_str, fontsize=10, labelpad=5)
@@ -142,9 +145,18 @@ def plot_postural_displacements(displacement_store_path: str, subject_id: str, s
                             color='black', lw=2)
                 axs[i].text(x_start, y_start + 0.02, f"{scalebar_length} m", color='black', fontsize=9)
 
-        fig.suptitle(f"{view_name.replace('_', ' ')}", fontsize=12)
-        plt.subplots_adjust(left=0.03, right=0.97, top=0.92, bottom=0.08, wspace=0.03, hspace=0.03)
-        plt.tight_layout()
+        for ax in axs:
+            pos = ax.get_position()
+            ax.set_position([
+                pos.x0,
+                pos.y0,
+                pos.width * 1.05,
+                pos.height * 1.05
+            ])
+
+        fig.suptitle(f"{view_name.replace('_', ' ')}", fontsize=12, y=0.97)
+        plt.subplots_adjust(left=0.01, right=0.99, top=0.90, bottom=0.08, wspace=0.0, hspace=0.03)
+        # plt.tight_layout()
 
         # create file name
         file_name = f'{subject_id}_{view_name.replace("_", " ")}.png'

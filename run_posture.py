@@ -25,7 +25,7 @@ GENERATE_PLOTS = True
 # ------------------------------------------------------------------------------------------------------------------- #
 # file constants
 # ------------------------------------------------------------------------------------------------------------------- #
-DRIVE = 'E'
+DRIVE = 'D'
 DATASET_PATH = 'Backup PrevOccupAI_PLUS Data\\data'
 DATA_FOLDER_PATH = f"{DRIVE}:\\Backup PrevOccupAI_PLUS Data\\data"
 OH_PROFILE_PATH = f"{DRIVE}:\\Backup PrevOccupAI_PLUS Data\\OH_profiles"
@@ -43,7 +43,7 @@ FS = 100
 if GENERATE_POSTURE_OH_PROFILE:
 
     # cycle over the group folders ('group1', group2...)
-    for group_folder in ['group1']: #os.listdir(DATA_FOLDER_PATH):
+    for group_folder in os.listdir(DATA_FOLDER_PATH):
 
         # it t's not a folder ignore
         if os.path.isdir(os.path.join(DATA_FOLDER_PATH, group_folder)):
