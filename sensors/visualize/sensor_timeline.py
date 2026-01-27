@@ -125,8 +125,8 @@ def generate_sensor_timeline_plot(week_metadata_dict: Dict[str, Dict[str, Dict[s
         labels=["Sem dados", f"{ACQUISITION_TIME_SECONDS // 60} minutos"],
         handler_map={RefLine: HandlerRefLine()},
         loc='upper right',
-        bbox_to_anchor=(1, 0.95),  # outside
-        frameon=False, borderaxespad=0.0, handleheight=1, handlelength=2,
+        bbox_to_anchor=(0.875, 1.01),  # outside
+        frameon=False, borderaxespad=0.0, handleheight=1, handlelength=2, ncols=2
     )
     subject_output_path = create_dir(output_folder_path, str(subject_id))
     # Save figure

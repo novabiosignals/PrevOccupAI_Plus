@@ -29,7 +29,7 @@ PROCESS_WORKLOAD = True
 GENERATE_QUESTIONNAIRES_DATASET = False
 
 # generate OH profile
-GENERATE_OH_PROFILE = False
+GENERATE_OH_PROFILE = True
 RERUN_OH_PROFILE = False
 
 # generate visualizations
@@ -38,7 +38,7 @@ VISUALIZE = True
 # ------------------------------------------------------------------------------------------------------------------- #
 # file constants
 # ------------------------------------------------------------------------------------------------------------------- #
-DRIVE = 'D'
+DRIVE = 'E'
 DATASET_PATH = f'{DRIVE}:\\Backup PrevOccupAI_PLUS Data\\data'
 QUEST_DATASET_PATH = f'{DRIVE}:\\Backup PrevOccupAI_PLUS Data\\data'
 SCORES_OUT_PATH = f"{DRIVE}:\\Backup PrevOccupAI_PLUS Data\\questionnaire_scores"

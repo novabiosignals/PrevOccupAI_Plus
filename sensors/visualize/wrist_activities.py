@@ -145,7 +145,7 @@ def _plot_heatmap(df: pd.DataFrame, title: str, color_map: str, value_label: str
     ax_legend.axis('off')
     ax_legend.legend(handles=legend_handles, loc="upper center", bbox_to_anchor=(1.1, 1.5), frameon=False,)
 
-    fig.suptitle(title, fontsize=11, y=0.95)
+    fig.suptitle(title, fontsize=14, y=0.95)
     ax.set_xlabel("Aquisição")
     ax.set_ylabel("")
     # plt.tight_layout(rect=[0, 0, 0.84, 0.9])

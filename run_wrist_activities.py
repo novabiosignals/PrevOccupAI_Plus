@@ -20,7 +20,7 @@ GENERATE_PLOTS = True
 # ------------------------------------------------------------------------------------------------------------------- #
 # file constants
 # ------------------------------------------------------------------------------------------------------------------- #
-DRIVE = "D"
+DRIVE = "E"
 DATA_FOLDER_PATH = f"{DRIVE}:\\Backup PrevOccupAI_PLUS Data\\data"
 OH_PROFILE_PATH = f"{DRIVE}:\\Backup PrevOccupAI_PLUS Data\\OH_profiles"
 PLOTS_OUTPUT_PATH = f"{DRIVE}:\\Backup PrevOccupAI_PLUS Data\\OH_plots"
