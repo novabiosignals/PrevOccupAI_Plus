@@ -30,7 +30,7 @@ GENERATE_QUESTIONNAIRES_DATASET = False
 
 # generate OH profile
 GENERATE_OH_PROFILE = False
-RERUN_OH_PROFILE = True
+RERUN_OH_PROFILE = False
 
 # generate visualizations
 VISUALIZE = True
@@ -38,7 +38,7 @@ VISUALIZE = True
 # ------------------------------------------------------------------------------------------------------------------- #
 # file constants
 # ------------------------------------------------------------------------------------------------------------------- #
-DRIVE = 'E'
+DRIVE = 'D'
 DATASET_PATH = f'{DRIVE}:\\Backup PrevOccupAI_PLUS Data\\data'
 QUEST_DATASET_PATH = f'{DRIVE}:\\Backup PrevOccupAI_PLUS Data\\data'
 SCORES_OUT_PATH = f"{DRIVE}:\\Backup PrevOccupAI_PLUS Data\\questionnaire_scores"
@@ -238,17 +238,20 @@ if VISUALIZE:
         # check if there are biomechanical metrics to plot
         if len(oh_profile[SINGLE_INSTANCE_QUESTIONNAIRE_KEY][BIOMECHANICAL_DOMAIN_KEY]) > 0:
 
-            # plot rosa
-            qv.generate_biomec_env_plots(oh_profile[SINGLE_INSTANCE_QUESTIONNAIRE_KEY][BIOMECHANICAL_DOMAIN_KEY],
-                                                     subject_id, PLOTS_OUTPUT_PATH, filename_suffix='Rosa',keys_to_keep=ROSA_KEYS_KEEP, is_rosa=True)
+            # # plot rosa
+            # qv.generate_biomec_env_plots(oh_profile[SINGLE_INSTANCE_QUESTIONNAIRE_KEY][BIOMECHANICAL_DOMAIN_KEY],
+            #                                          subject_id, PLOTS_OUTPUT_PATH, filename_suffix='Rosa',keys_to_keep=ROSA_KEYS_KEEP, is_rosa=True)
+            #
+            # # plot environmental results
+            # qv.generate_biomec_env_plots(oh_profile= oh_profile[SINGLE_INSTANCE_QUESTIONNAIRE_KEY][ENVIRONMENTAL_DOMAIN_KEY],
+            #                                          subject=subject_id, output_folder_path=PLOTS_OUTPUT_PATH, filename_suffix='environment', is_rosa=False)
+            #
+            # # plot copsoq and mueq
+            # qv.generate_copsoq_mueq_plots(oh_profile[SINGLE_INSTANCE_QUESTIONNAIRE_KEY][PSYCHOSOCIAL_DOMAIN_KEY],
+            #                                           subject_id, PLOTS_OUTPUT_PATH)
 
-            # plot environmental results
-            qv.generate_biomec_env_plots(oh_profile= oh_profile[SINGLE_INSTANCE_QUESTIONNAIRE_KEY][ENVIRONMENTAL_DOMAIN_KEY],
-                                                     subject=subject_id, output_folder_path=PLOTS_OUTPUT_PATH, filename_suffix='environment', is_rosa=False)
-
-            # plot copsoq and mueq
-            qv.generate_copsoq_mueq_plots(oh_profile[SINGLE_INSTANCE_QUESTIONNAIRE_KEY][PSYCHOSOCIAL_DOMAIN_KEY],
-                                                      subject_id, PLOTS_OUTPUT_PATH)
+            # workload
+            qv.generate_workload_plot(oh_profile, subject_id, PLOTS_OUTPUT_PATH)
 
         else:
             print(f"No biomechanical metrics to plot for subject {subject_id}. \nPlease generate the oh profile first by setting {GENERATE_OH_PROFILE} to True.")

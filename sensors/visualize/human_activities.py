@@ -457,7 +457,7 @@ def plot_steps_and_distance_per_day(har_metrics_dict: dict, subject_id: str, out
 
     # Gray bar = recommended steps (capped at recommended_steps)
     ax.barh(dates, [recommended_steps] * len(dates),
-            color=GRAY, edgecolor="none", label=f"Passos diários recomendados para {age} anos: {recommended_steps}")
+            color=GRAY, edgecolor="none", label=f"Passos diários recomendados para uma pessoa de {age} anos: {recommended_steps}")
 
     # Blue bar = real steps (cortada ao recommended_steps)
     steps_capped = [min(s, recommended_steps) for s in steps]
@@ -501,7 +501,7 @@ def plot_steps_and_distance_per_day(har_metrics_dict: dict, subject_id: str, out
 
     # Formatting main axis
     ax.set_xlabel("Número de passos", fontsize=12)
-    ax.set_ylabel("Dia", fontsize=12)
+    #ax.set_ylabel("Dia", fontsize=12)
     ax.set_title(f"Passos e distância percorrida", fontsize=14, pad=35)
     ax.tick_params(axis="x", labelsize=11)
     ax.tick_params(axis="y", labelsize=11)

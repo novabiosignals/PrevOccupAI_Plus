@@ -14,11 +14,11 @@ from OH_profile.constants import SENSOR_METRICS_KEY, ENVIRONMENT_KEY
 # ------------------------------------------------------------------------------------------------------------------- #
 GENERATE_ENV_OH_PROFILE = True
 GENERATE_PLOTS = True
-RERUN_OH_PROFILE = False
+RERUN_OH_PROFILE = True
 # ------------------------------------------------------------------------------------------------------------------- #
 # file constants
 # ------------------------------------------------------------------------------------------------------------------- #
-DRIVE = 'E'
+DRIVE = 'D'
 OH_PROFILE_PATH = f"{DRIVE}:\\Backup PrevOccupAI_PLUS Data\\OH_profiles"
 PLOTS_OUTPUT_PATH = f"{DRIVE}:\\Backup PrevOccupAI_PLUS Data\\OH_plots"
 
