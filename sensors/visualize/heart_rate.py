@@ -833,7 +833,7 @@ def _add_weekday_labels(ax: plt.Axes, day_centers: list) -> None:
 
     # Loop through each day center and add the corresponding weekday label
     for x_center, weekday in day_centers:
-        ax.text(x_center, y_text, weekday, ha='center', va='top', fontsize=9)
+        ax.text(x_center, y_text, weekday, ha='center', va='top', fontsize=14)
 
 
 def _style_plot(ax: plt.Axes, x_cursor: float) -> None:

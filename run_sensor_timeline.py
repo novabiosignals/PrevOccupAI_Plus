@@ -20,7 +20,7 @@ GENERATE_SENSOR_TIMELINE = True
 # ------------------------------------------------------------------------------------------------------------------- #
 # file constants
 # ------------------------------------------------------------------------------------------------------------------- #
-DRIVE = 'E'
+DRIVE = 'D'
 DATASET_PATH = f'{DRIVE}:\\Backup PrevOccupAI_PLUS Data\\data'
 DATA_FOLDER_PATH = f"{DRIVE}:\\Backup PrevOccupAI_PLUS Data\\data"
 OH_PROFILE_PATH = f"{DRIVE}:\\Backup PrevOccupAI_PLUS Data\\OH_profiles"

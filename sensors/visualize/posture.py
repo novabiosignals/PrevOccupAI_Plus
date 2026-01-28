@@ -29,9 +29,9 @@ from utils import extract_date_from_path, create_dir
 RESOURCES_PATH = r".\sensors\visualize\resources"
 
 VIEW_DIMENSIONS = {
-        "Vista_Superior": (1.25, 1.25),   # width, height in meters
-        "Vista_Lateral": (1.25, 1.25),
-        "Vista_de_Costas": (1.50, 1.125)  # width = 1.50 m, height = 1.125 m
+        "Vista_Superior": (1.03, 1.03),   # width, height in meters
+        "Vista_Lateral": (1.03, 1.03),
+        "Vista_de_Costas": (1.23, 0.92)  # width = 1.50 m, height = 1.125 m
     }
 
 AP_AXIS = 0
@@ -77,9 +77,9 @@ def plot_postural_displacements(displacement_store_path: str, subject_id: str, s
     # Define view configuration: (view_name, x_idx, y_idx, image_path, (center_x, center_y))
     # Column indices: 0=AP, 1=ML, 2=Vertical
     views = [
-        ("Vista_Superior", ML_AXIS, AP_AXIS, view_images["Vista_Superior"], (0.65, 0.45)),  # ML vs AP
-        ("Vista_Lateral", AP_AXIS, VERT_AXIS, view_images["Vista_Lateral"], (0.5, 0.75)),  # AP vs Vertical
-        ("Vista_de_Costas", ML_AXIS, VERT_AXIS, view_images["Vista_de_Costas"], (0.75, 0.7))  # ML vs Vertical
+        ("Vista_Superior", ML_AXIS, AP_AXIS, view_images["Vista_Superior"], (0.54, 0.34)),  # ML vs AP
+        ("Vista_Lateral", AP_AXIS, VERT_AXIS, view_images["Vista_Lateral"], (0.39, 0.64)),  # AP vs Vertical
+        ("Vista_de_Costas", ML_AXIS, VERT_AXIS, view_images["Vista_de_Costas"], (0.615, 0.5975))  # ML vs Vertical
     ]
 
     # create directory to store plots
