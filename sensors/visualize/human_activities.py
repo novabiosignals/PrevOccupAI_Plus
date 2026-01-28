@@ -361,7 +361,7 @@ def plot_activity_timeline_per_day(oh_profile: dict, subject_id: str, output_fol
         risk_patch = Patch(facecolor=SITTING_RISK_COLOR,
                            label=f"Sentado > {MAX_CONTINUOUS_SITTING_S / 3600:.1f} h")
 
-        ax.legend(handles=[warning_patch, risk_patch],loc="center left",bbox_to_anchor=(1.02, 0.5),frameon=False,fontsize=11)
+        ax.legend(handles=[warning_patch, risk_patch],loc="center left",bbox_to_anchor=(0.64, 1.1),frameon=False,fontsize=11, ncols=2)
 
         for spine in ax.spines.values():
             spine.set_visible(False)

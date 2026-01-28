@@ -58,7 +58,7 @@ def plot_wrist_movements_heatmaps(oh_profile, subject: str, output_folder_path: 
     output_path = create_dir(output_folder_path, os.path.join(str(subject), "wrist_movements"))
 
     # generate heatmap for the significant accelerations
-    _plot_heatmap(heatmap_acc,f"Percentagem de movimentos significativos do pulso","YlOrBr","(%)",
+    _plot_heatmap(heatmap_acc,f"Percentagem de movimentos significativos do pulso","YlGnBu","(%)",
                   output_path, f"wrist_acceleration_{subject}{FILE_FORMAT}")
 
     # generate heatmap for the significant rotations
