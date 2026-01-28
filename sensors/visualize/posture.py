@@ -15,8 +15,8 @@ import os
 import matplotlib.pyplot as plt
 import seaborn as sns
 import numpy as np
-from babel.dates import format_datetime
 from datetime import datetime
+from tqdm import tqdm
 
 
 # internal imports
@@ -41,6 +41,155 @@ VERT_AXIS = 2
 # ------------------------------------------------------------------------------------------------------------------- #
 # public functions
 # ------------------------------------------------------------------------------------------------------------------- #
+def plot_postural_displacements_grid(displacement_store_path: str, subject_id: str, subject_sex: str, output_folder_path: str) -> None:
+    """
+    Creates a single figure with:
+      - rows = acquisition days
+      - columns = views (Vista Superior, Vista Lateral, Vista de Costas)
+    :param displacement_store_path:
+    :param subject_id:
+    :param subject_sex:
+    :param output_folder_path:
+    :return:
+    """
+
+    # generate path to subject folder containing the displacement data
+    subject_folder_path = os.path.join(displacement_store_path, subject_id)
+
+    # list files (filenames)
+    displacement_filenames = os.listdir(subject_folder_path)
+
+    # sort filenames by extracted date (chronologically)
+    displacement_filenames = sorted(
+        displacement_filenames,
+        key=lambda f: datetime.strptime(extract_date_from_path(f, r'(\d{2}-\d{2}-\d{4})'), "%d-%m-%Y")
+    )
+
+    # build full paths in the SAME order
+    displacement_files = [os.path.join(subject_folder_path, f) for f in displacement_filenames]
+
+    # extract dates in the SAME order
+    acquisition_dates = [extract_date_from_path(f, r'(\d{2}-\d{2}-\d{4})') for f in displacement_filenames]
+
+    # load displacement arrays
+    displacement_data = [np.load(f) for f in displacement_files]
+
+    # get the images for each view based on the sex of the subject
+    view_images = {
+        "Vista_Superior": fr"{RESOURCES_PATH}\top-view_{subject_sex}.png",
+        "Vista_Lateral": fr"{RESOURCES_PATH}\side-view_{subject_sex}.png",
+        "Vista_de_Costas": fr"{RESOURCES_PATH}\back-view_{subject_sex}.png"
+    }
+
+    # Define view configuration: (view_name, x_idx, y_idx, image_path, (center_x, center_y))
+    # Column indices: 0=AP, 1=ML, 2=Vertical
+    views = [
+        ("Vista Superior", ML_AXIS, AP_AXIS, view_images["Vista_Superior"], (0.54, 0.34)),      # ML vs AP
+        ("Vista Lateral",  AP_AXIS, VERT_AXIS, view_images["Vista_Lateral"], (0.39, 0.64)),     # AP vs Vertical
+        ("Vista das Costas", ML_AXIS, VERT_AXIS, view_images["Vista_de_Costas"], (0.615, 0.5975)) # ML vs Vertical
+    ]
+
+    num_days = len(displacement_data)
+    num_views = len(views)
+
+    # create directory to store plots
+    out_dir = create_dir(output_folder_path, os.path.join(subject_id, "posture_plots"))
+
+    # figure size heuristic (tune if needed)
+    fig_w = 4.2 * num_views
+    fig_h = 3.2 * max(num_days, 1)
+    fig, axs = plt.subplots(num_days, num_views, figsize=(fig_w, fig_h), constrained_layout=False)
+
+    # make axs always 2D
+    if num_days == 1 and num_views == 1:
+        axs = np.array([[axs]])
+    elif num_days == 1:
+        axs = np.array([axs])
+    elif num_views == 1:
+        axs = np.array([[ax] for ax in axs])
+
+    # column titles (views) on top row
+    for j, (view_title, *_rest) in enumerate(views):
+        axs[0, j].set_title(view_title, fontsize=16, pad=10)
+
+    # plot each day (row) and each view (col)
+    for i, day_array in enumerate(tqdm(displacement_data, desc="generating posture plot grid")):
+        # row label (weekday + date) on the first column only (cleaner)
+        weekday_str = get_weekday_name(acquisition_dates[i], locale_string="pt_PT.UTF-8")
+        row_label = f"{weekday_str}"
+
+        for j, (_view_title, x_idx, y_idx, bg_image, (center_x, center_y)) in enumerate(views):
+            ax = axs[i, j]
+
+            view_key = (
+                "Vista_Superior" if j == 0 else
+                "Vista_Lateral" if j == 1 else
+                "Vista_de_Costas"
+            )
+            width, height = VIEW_DIMENSIONS[view_key]
+
+            # background image
+            im = plt.imread(bg_image)
+            ax.imshow(im, extent=(0, width, 0, height))
+
+            # handle missing/empty day
+            if day_array is None or getattr(day_array, "size", 0) == 0:
+                ax.axis("off")
+                if j == 0:
+                    ax.text(0.02, 0.98, row_label, transform=ax.transAxes,
+                            va="top", ha="left", fontsize=12)
+                continue
+
+            # subsample
+            day_array_sub = day_array[::100]
+
+            # center data
+            x_centered = day_array_sub[:, x_idx] + center_x
+            y_centered = day_array_sub[:, y_idx] + center_y
+
+            # KDE
+            sns.kdeplot(
+                x=x_centered,
+                y=y_centered,
+                fill=True,
+                bw_adjust=0.5,
+                alpha=0.8,
+                ax=ax
+            )
+
+            # lock view
+            ax.set_xlim(0, width)
+            ax.set_ylim(0, height)
+            ax.set_aspect("auto")
+            ax.margins(0)
+
+            # remove ticks/spines
+            ax.tick_params(left=False, bottom=False, labelleft=False, labelbottom=False)
+            for spine in ax.spines.values():
+                spine.set_visible(False)
+
+            # row label on first column
+            if j == 0:
+                ax.text(0.02, 0.98, row_label, transform=ax.transAxes,
+                        va="top", ha="left", fontsize=12)
+
+            # scale bar only once (top-left cell), to avoid repetition
+            if i == 0 and j == 0:
+                scalebar_length = 0.15  # meters
+                x_start = width * 0.05
+                y_start = height * 0.05
+                ax.plot([x_start, x_start + scalebar_length], [y_start, y_start], color="black", lw=2)
+                ax.text(x_start, y_start + 0.02, f"{scalebar_length} m", color="black", fontsize=9)
+
+    # global spacing
+    plt.subplots_adjust(left=0.02, right=0.995, top=0.92, bottom=0.02, wspace=0.02, hspace=0.06)
+
+    # save single file
+    file_name = f"{subject_id}_posture_views_grid.png"
+    handle_plot(save_dir=out_dir, filename=file_name, save=True)
+
+
+
 def plot_postural_displacements(displacement_store_path: str, subject_id: str, subject_sex: str, output_folder_path: str) -> None:
     """
 
@@ -54,14 +203,16 @@ def plot_postural_displacements(displacement_store_path: str, subject_id: str, s
     # generate path to subject folder containing the displacement data
     subject_folder_path = os.path.join(displacement_store_path, subject_id)
 
-    # list files in the path
-    displacement_files = os.listdir(subject_folder_path)
+    # build full paths
+    displacement_files = [os.path.join(subject_folder_path, f) for f in os.listdir(subject_folder_path)]
 
     # generate full file paths
-    displacement_files = sorted([os.path.join(subject_folder_path, displacement_file) for displacement_file in displacement_files])
+    # sort files by extracted date
+    displacement_files = sorted(displacement_files, key=lambda f: datetime.strptime(
+        extract_date_from_path(f, r'(\d{2}-\d{2}-\d{4})'),"%d-%m-%Y"))
 
     # get dates from the file names and sort the dates chronologically
-    acquisition_dates = sorted([extract_date_from_path(displacement_file, r'(\d{2}-\d{2}-\d{4})') for displacement_file in displacement_files], key=lambda d: datetime.strptime(d, "%d-%m-%Y"))
+    acquisition_dates = [extract_date_from_path(displacement_file, r'(\d{2}-\d{2}-\d{4})') for displacement_file in displacement_files]
 
     # Load all displacement arrays
     displacement_data = [np.load(f) for f in displacement_files]
