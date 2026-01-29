@@ -38,14 +38,15 @@ REFERENCE_MIN = 'Ref. (min.)'
 MEASURED_VALUE = 'Valor medido'
 
 # reference values
-CO2_REFERENCE_VALUE_PPM = 2500 # https://indoor.lbl.gov/sites/default/files/lbnl-44385.pdf
-CO_REFERENCE_VALUE_PPM = 9 # https://pmc.ncbi.nlm.nih.gov/articles/PMC7411428/
-COV_REFERENCE_VALUE_PPM = 200 # https://www.aivc.org/sites/default/files/airbase_10425.pdf
+CO2_REFERENCE_VALUE_PPM = 1250 # https://files.diariodarepublica.pt/1s/2021/07/12602/0000200006.pdf
+CO_REFERENCE_VALUE_PPM = 9 # https://files.diariodarepublica.pt/1s/2021/07/12602/0000200006.pdf
+COV_REFERENCE_VALUE_PPM = 0.16 # https://www.aivc.org/sites/default/files/airbase_10425.pdf. COV can be multiple
+# compounds because it's a mixture, using toluene to calculate mass. COV = 600 µg/m³ (≈ 0.16 ppmv, toluene-equivalent; conversion at 20 °C, 1 atm)
 ILLUMINANCE_REFERENCE_VALUE_LUX = 500 # https://oshwiki.osha.europa.eu/en/themes/ergonomics-office-work
 TEMPERATURE_REFERENCE_INTERVAL_CELSIUS = [19, 23] # https://oshwiki.osha.europa.eu/en/themes/ergonomics-office-work
 REL_HUMIDITY_REFERENCE_INTERVAL_PERC = [40, 60] # https://oshwiki.osha.europa.eu/en/themes/ergonomics-office-work
-PM10_REFERENCE_VALUE_UGM3 = 45 # https://www.who.int/publications/i/item/9789240034228?utm_source=chatgpt.com
-PM025_REFERENCE_VALUE_UGM3 = 15 # https://www.who.int/publications/i/item/9789240034228?utm_source=chatgpt.com
+PM10_REFERENCE_VALUE_UGM3 = 50 # https://files.diariodarepublica.pt/1s/2021/07/12602/0000200006.pdf
+PM025_REFERENCE_VALUE_UGM3 = 25 # https://files.diariodarepublica.pt/1s/2021/07/12602/0000200006.pdf
 
 # ppm plots filename
 CO2_CO_COV_PLOT_FILENAME = f"CO2_CO_COV_plot{PNG}"
@@ -344,10 +345,12 @@ def _generate_yticks(ymin: float, ymax: float) -> np.ndarray:
     """
     Generate nicely rounded y-ticks based on the range (ymax - ymin) and number of digits.
 
+    - For values fully contained in [0, 1], a fixed step of 0.1 is used
     - For ranges < 100: step = 5 or 10
     - For ranges < 1000: step = 100 or 500
+    - For larger ranges: step scales with the order of magnitude
     - Always includes ymin and ymax
-    - Returns a numpy array of tick positions
+    - Returns a numpy array of tick positions limited to [ymin, ymax]
 
     :param ymin: Minimum y-value (usually 0 or reference)
     :param ymax: Maximum y-value (actual value or reference)
@@ -359,6 +362,14 @@ def _generate_yticks(ymin: float, ymax: float) -> np.ndarray:
 
     # Compute the range
     value_range = ymax - ymin
+
+    # values between 0 and 1
+    if ymin >= 0 and ymax <= 1:
+        step = 0.1
+        first_tick = math.floor(ymin / step) * step
+        last_tick = math.ceil(ymax / step) * step
+        ticks = np.arange(first_tick, last_tick + step / 2, step)
+        return ticks[(ticks >= ymin) & (ticks <= ymax)]
 
     # Determine order of magnitude
     magnitude = 10 ** math.floor(math.log10(value_range))
