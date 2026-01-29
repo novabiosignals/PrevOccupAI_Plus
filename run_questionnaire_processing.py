@@ -29,7 +29,7 @@ PROCESS_WORKLOAD = True
 GENERATE_QUESTIONNAIRES_DATASET = False
 
 # generate OH profile
-GENERATE_OH_PROFILE = True
+GENERATE_OH_PROFILE = False
 RERUN_OH_PROFILE = False
 
 # generate visualizations

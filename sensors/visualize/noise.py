@@ -28,11 +28,11 @@ from .plot_utils import handle_plot, get_weekday_name, add_percentage_labels
 from utils import create_dir
 from sensors.metrics.noise import NOISE_NEAR_SILENCE_KEY, NOISE_LOW_KEY, NOISE_DISTURBING_KEY, NOISE_HIGH_KEY, NOISE_TIMELINE_WLEN, NOISE_DISTRIBUTIONS_NOISE, W_SIZE_MINUTES
 from constants import DATE_FORMAT
-from .constants import GREEN, PALE_GREEN, YELLOW, RED
+from .constants import GREEN, PALE_GREEN, YELLOW, RED, STRONG_GREEN
 # ------------------------------------------------------------------------------------------------------------------- #
 # file specific constants
 # ------------------------------------------------------------------------------------------------------------------- #
-CLASS_COLORS = {NOISE_NEAR_SILENCE_KEY: GREEN,
+CLASS_COLORS = {NOISE_NEAR_SILENCE_KEY: STRONG_GREEN,
                 NOISE_LOW_KEY: PALE_GREEN,
                 NOISE_DISTURBING_KEY: YELLOW,
                 NOISE_HIGH_KEY: RED

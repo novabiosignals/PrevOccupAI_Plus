@@ -25,8 +25,6 @@ from matplotlib.lines import Line2D
 import os
 import math
 import copy
-from babel.dates import format_datetime
-from datetime import datetime
 
 # internal imports
 from OH_profile.constants import (PSYCHOSOCIAL_COPSOQ_WORK_TYPE_KEY, PSYCHOSOCIAL_COPSOQ_POPULATION_KEY,
@@ -403,6 +401,7 @@ def _create_heat_map(df: pd.DataFrame, output_path: str, filename: str, color_ma
     # Save figure
     plt.savefig(os.path.join(output_path, filename), bbox_inches='tight', dpi=300)
     plt.close()
+
 
 
 def _format_question_key(key: str, language: str) -> str:
