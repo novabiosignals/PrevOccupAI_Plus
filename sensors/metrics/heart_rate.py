@@ -180,7 +180,7 @@ def get_heart_rate_metrics(day_folder_path: str, hr_min: float, hr_max: float, f
         # check if the activity column is nan in more than half of the acquisition - phone stopped acquiring before watch
         if acquisitions_df[ACTIVITY_COLUMN_NAME].isna().mean() > 0.5:
 
-            print(f"No activity labels for this acquisition. Skipping...")
+            print(f"WARNING: No activity labels for this acquisition. Skipping...")
             continue
 
         # get hr features

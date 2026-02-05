@@ -16,12 +16,12 @@ from OH_profile.constants import SENSOR_METRICS_KEY, NOISE_KEY
 # ------------------------------------------------------------------------------------------------------------------- #
 GENERATE_NOISE_OH_PROFILE = True
 GENERATE_PLOTS = True
-RERUN_OH_PROFILE = False
+RERUN_OH_PROFILE = True
 
 # ------------------------------------------------------------------------------------------------------------------- #
 # file constants
 # ------------------------------------------------------------------------------------------------------------------- #
-DRIVE = "E"
+DRIVE = "D"
 DATASET_PATH = "Backup PrevOccupAI_PLUS Data\\data"
 DATA_FOLDER_PATH = f"{DRIVE}:\\{DATASET_PATH}"
 OH_PROFILE_PATH = f"{DRIVE}:\\Backup PrevOccupAI_PLUS Data\\OH_profiles"

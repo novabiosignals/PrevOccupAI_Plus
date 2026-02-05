@@ -54,8 +54,12 @@ def get_sensor_timeline_metrics(day_folder_path: str, fs: int) -> Dict:
     :param fs: the sampling frequency
     :return: A dictionary with the metrics
     """
-
+    # get acquisition date from folder path
     acquisition_date = extract_date_from_path(day_folder_path)
+
+    # inform user
+    print(f"\nprocessing data for date: {acquisition_date}")
+
 
     # init dictionary for holding the metrics for one day
     day_metrics_dict = {acquisition_date: {}}

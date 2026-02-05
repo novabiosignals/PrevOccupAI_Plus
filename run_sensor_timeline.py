@@ -35,7 +35,7 @@ W_SIZE = 5.0
 if GENERATE_SENSOR_TIMELINE:
 
     # cycle over the group folders ('group1', group2...)
-    for group_folder in os.listdir(DATA_FOLDER_PATH):
+    for group_folder in ['group5', 'group6', 'group7']: #os.listdir(DATA_FOLDER_PATH):
 
         # it t's not a folder ignore
         if os.path.isdir(os.path.join(DATA_FOLDER_PATH, group_folder)):

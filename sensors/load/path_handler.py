@@ -27,7 +27,7 @@ import re
 from pathlib import Path
 from typing import List, Dict
 from .subject_info import load_participants_info, get_muscleban_side
-from constants import PHONE, WATCH, MBAN, MAC_ADDRESS_PATTERN, PHONE_SENSORS, WATCH_SENSORS, MBAN_SENSORS, HEART
+from constants import PHONE, WATCH, MBAN, MAC_ADDRESS_PATTERN, PHONE_SENSORS, WATCH_SENSORS, MBAN_SENSORS, HEART, NOISE
 
 # ------------------------------------------------------------------------------------------------------------------- #
 # file specific constants
@@ -275,7 +275,7 @@ def _get_android_filepaths(device_name: str, sensor_list: List[str], folder_path
 
         # check for the string ANDROID but can not have WEAR
         files = [file for file in Path(folder_path).resolve().glob("**/*ANDROID*") if "WEAR" not in file.name
-                 and file.stat().st_size >= MIN_BYTES_INERTIAL]
+                 and (file.stat().st_size >= MIN_BYTES if NOISE in file.name else file.stat().st_size >= MIN_BYTES_INERTIAL)]
 
     else:
 

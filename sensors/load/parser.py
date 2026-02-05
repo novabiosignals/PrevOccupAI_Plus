@@ -89,6 +89,8 @@ def get_file_paths_by_device(folder_path: Union[str, os.PathLike]) -> Dict[str, 
     for filename in files:
 
         # ignore mvc
+        # TODO: this check should be improved -> it fails when there are other files that are neither StudioData nor
+        #  any of the wanted sensors
         if STUDIO_DATA in filename:
             continue
 

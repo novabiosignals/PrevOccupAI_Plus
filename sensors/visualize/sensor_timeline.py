@@ -163,6 +163,9 @@ def get_daily_acquisitions_metadata(daily_folder_path: str, fs: int) -> Dict[str
     # iterate through the folders pertaining to the different acquisitions on the same day
     for acquisition_folder in os.listdir(daily_folder_path):
 
+        # inform user
+        print(f"acquisition time: {acquisition_folder}")
+
         # generate folder_path
         acquisition_folder_path = os.path.join(daily_folder_path, acquisition_folder)
 
