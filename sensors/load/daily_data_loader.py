@@ -32,7 +32,7 @@ import math
 # internal imports
 from constants import PHONE, WATCH, VALID_MBAN_DATA, NSEQ, IMU_SENSORS, TIME_COLUMN_NAME, ROT, NOISE, HEART, MBAN
 from utils import extract_date_from_path
-from .path_handler import get_sensor_paths_per_device
+from .path_handler import get_sensor_paths_per_device, get_session_ids
 from .parser import extract_sensor_from_filename
 from sensors.process.interpolate import cubic_spline_interpolation, slerp_interpolation, zero_order_hold_interpolation, \
     interpolate_heart_rate_sensor
@@ -55,7 +55,7 @@ ROUNDING_FACTOR = 1000 # sampling rate  times 10
 # public functions
 # -------------------------------------------------------------------------------------------------------------------- #
 def load_daily_acquisitions(folder_path: str, load_devices: Dict[str, List[str]], fs_android: int = 100,
-                            padding_type: str = PADDING_SAME) -> Dict[str, Dict[str, pd.DataFrame]]:
+                            padding_type: str = PADDING_SAME) -> Tuple[Dict[str, Dict[str, pd.DataFrame]], Dict[str, int]]:
     """
     Load sensor data of an entire day.
 
@@ -83,13 +83,17 @@ def load_daily_acquisitions(folder_path: str, load_devices: Dict[str, List[str]]
     :param fs_android: the sampling rate to which all android sensors should be re-sampled to. Default: 100 (Hz)
     :param padding_type: padding which should be used to ensure that all sensors start and stop at the same time. The
                          following padding types are supported: 'same', 'zero'. Default: 'same'
-    :return: a nested dictionary containing the sensor data from the devices and sensors in load_sensors
+    :return: a nested dictionary containing the sensor data from the devices and sensors in load_sensors and a dictionary
+             containing the sessions and their IDs for the watch and muscleBAN recordings.
     """
     # innit dictionary to hold the dataframes
     dataframes_dict: Dict[str, Dict[str, pd.DataFrame]] = {}
 
     # get paths for all loaded devices/sensors sorted by device and acquisition time
     paths_dict = get_sensor_paths_per_device(folder_path, load_devices)
+
+    # get the session times and their corresponding session ID (the number of the session: 1 - 4)
+    session_ids_dict = get_session_ids(folder_path)
 
     # inform user
     print("\n# ------------------------------------------------------------------------ #")
@@ -151,12 +155,11 @@ def load_daily_acquisitions(folder_path: str, load_devices: Dict[str, List[str]]
     # inform user
     _create_loading_report(load_devices, dataframes_dict)
 
-    return dataframes_dict
+    return dataframes_dict, session_ids_dict
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # private functions
 # -------------------------------------------------------------------------------------------------------------------- #
-
 def _load_raw_data(sensor_paths_list: List[Path]) -> Tuple[List[pd.DataFrame], Dict[str, Any]]:
     """
     Loads sensor data contained in 'folder_path' into a list of pandas DataFrames. Each element in the list corresponds

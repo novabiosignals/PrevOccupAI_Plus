@@ -87,7 +87,7 @@ def get_human_activity_metrics(day_folder_path: str, fs: int, w_size_HAR: float,
     day_metrics_dict = {day_date: {}}
 
     # load the acquisition(s) for the day
-    df_dict = sensor_loader.load_daily_acquisitions(day_folder_path, load_devices={PHONE: [ACC, GYR, MAG, ROT]})
+    df_dict, _ = sensor_loader.load_daily_acquisitions(day_folder_path, load_devices={PHONE: [ACC, GYR, MAG, ROT]})
 
     if len(df_dict) == 0:
         return {}

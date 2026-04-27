@@ -72,7 +72,7 @@ def get_wrist_activity_metrics(day_folder_path: str, fs: int, w_size: float) -> 
     day_metrics_dict = {}
 
     # load_signals all acquisitions from the same day into a nested dictionary
-    df_dict = sl.load_daily_acquisitions(day_folder_path, load_devices=selected_sensors)
+    df_dict, session_ids_dict = sl.load_daily_acquisitions(day_folder_path, load_devices=selected_sensors)
 
     # if no data was loaded or there's no phone data, return empty dict
     if len(df_dict) == 0 or len(df_dict[PHONE]) == 0:
@@ -110,6 +110,10 @@ def get_wrist_activity_metrics(day_folder_path: str, fs: int, w_size: float) -> 
 
         # calculate significant movements
         metrics_dict = _calculate_significant_movements(acquisitions_df, fs=fs)
+
+        # add the session number to the acquisition metrics
+        session_time = list(metrics_dict.keys())[0]
+        metrics_dict[session_time][SESSION_KEY] = session_ids_dict[session_time]
 
         # add metrics for the session to the daily dictionary
         day_metrics_dict[date].update(metrics_dict)

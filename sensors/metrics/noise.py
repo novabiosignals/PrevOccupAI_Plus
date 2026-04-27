@@ -62,7 +62,7 @@ def get_noise_metrics(day_folder_path: str, fs: int, w_size_min: int = W_SIZE_MI
     day_metrics_dict = {date: {}}
 
     # load_signals all acquisitions from the same day into a nested dictionary
-    df_dict = sl.load_daily_acquisitions(day_folder_path, load_devices={PHONE: [NOISE]})
+    df_dict, _ = sl.load_daily_acquisitions(day_folder_path, load_devices={PHONE: [NOISE]})
 
     if len(df_dict) == 0:
         return {}

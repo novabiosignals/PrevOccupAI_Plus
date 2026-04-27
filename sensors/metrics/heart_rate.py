@@ -40,7 +40,7 @@ from utils import extract_date_from_path
 # ------------------------------------------------------------------------------------------------------------------- #
 
 # sensors to be loaded which are strictly needed for the HR plot
-selected_sensors = {PHONE: [ACC, GYR, MAG], # for HAR
+SELECTED_SENSORS = {PHONE: [ACC, GYR, MAG],  # for HAR
                     WATCH: [ACC, HEART]} # ACC to fill with NaN when the HR is not acquiring - do not remove ACC
 
 
@@ -91,7 +91,7 @@ def get_global_heart_rate_metrics(subject_data_folder_path: str, subject_age: in
         day_folder_path = os.path.join(subject_data_folder_path, date_folder)
 
         # load_signals all acquisitions from the same day into a nested dictionary
-        df_dict = sl.load_daily_acquisitions(day_folder_path, load_devices={WATCH: [HEART]})
+        df_dict, _ = sl.load_daily_acquisitions(day_folder_path, load_devices={WATCH: [HEART]})
 
         # if no data was loaded
         if len(df_dict) == 0:
@@ -143,7 +143,7 @@ def get_heart_rate_metrics(day_folder_path: str, hr_min: float, hr_max: float, f
     day_metrics_dict = {}
 
     # load_signals all acquisitions from the same day into a nested dictionary
-    df_dict = sl.load_daily_acquisitions(day_folder_path, load_devices=selected_sensors)
+    df_dict, session_ids_dict = sl.load_daily_acquisitions(day_folder_path, load_devices=SELECTED_SENSORS)
 
     # if no data was loaded or there's no phone data, return empty dict
     if len(df_dict) == 0 or len(df_dict[PHONE]) == 0:
@@ -185,6 +185,10 @@ def get_heart_rate_metrics(day_folder_path: str, hr_min: float, hr_max: float, f
 
         # get hr features
         acquisitions_metrics, nr_classes = _calculate_hr_metrics_per_acquisition(acquisitions_df, hr_min, hr_max)
+
+        # add the session number to the acquisition metrics
+        session_time = list(acquisitions_metrics.keys())[0]
+        acquisitions_metrics[session_time][SESSION_KEY] = session_ids_dict[session_time]
 
         # add to dict
         day_metrics_dict[date].update(acquisitions_metrics)

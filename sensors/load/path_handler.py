@@ -24,6 +24,8 @@ _validate_load_devices(...): check if input sensors and devices are valid
 # imports
 # -------------------------------------------------------------------------------------------------------------------- #
 import re
+import os
+from datetime import datetime
 from pathlib import Path
 from typing import List, Dict
 from .subject_info import load_participants_info, get_muscleban_side
@@ -60,7 +62,7 @@ def get_sensor_paths_per_device(folder_path: str, load_devices: Dict[str, List[s
       {device_name: {
             acquisition_time: [Path, Path, ...], ...},
           ...}
-    :param folder_path: Root folder containing all device acquisition data.
+    :param folder_path: Root folder containing all the acquisitions for a single day.
     :param load_devices: Dictionary with the devices and sensors to be loaded. (e.g.: {phone: [ACC, GYR, MAG], watch: [ACC]}
             Supported devices/sensors:
             {phone: [ACC, GYR, MAG, ROT, NOISE],
@@ -114,6 +116,28 @@ def get_sensor_paths_per_device(folder_path: str, load_devices: Dict[str, List[s
 
     return nested_paths_dict
 
+
+def get_session_ids(folder_path: str) -> Dict[str, int]:
+    """
+    Gets the session time and the corresponding ID for the folders that contain the watch and muscleBAN data.
+    The session ID is the session number (1 - 4).
+    :param folder_path:  Root folder containing all the acquisitions for a single day.
+    :return: Dictionary with the session time and the corresponding ID.
+             Example:
+             {'14-00-01': 1, '14-30-00': 2, '16-00-00': 3, '17-30-00': 4}
+    """
+
+    # get the valid date folders (only folders that contain watch and muscleBAN data
+    watch_mban_folders = _get_watch_mban_folders(folder_path)
+
+    # generate the dictionary
+    session_ids_dict = {}
+    for session_id, watch_mban_folder in enumerate(watch_mban_folders, start=1):
+        session_ids_dict[watch_mban_folder] = session_id
+
+
+    return session_ids_dict
+
 # -------------------------------------------------------------------------------------------------------------------- #
 # private functions
 # -------------------------------------------------------------------------------------------------------------------- #
@@ -132,7 +156,7 @@ def _get_device_files(device: str, sensor_list: List[str], folder_path: str) -> 
                         phone: [ACC, GYR, MAG, ROT, NOISE]
                         watch: [ACC, GYR, MAG, ROT, HR]
                         mban: [ACC, EMG]
-    :param folder_path: Root folder containing all device acquisition data.
+    :param folder_path: Root folder containing all the acquisitions for a single day..
     :return: list with paths
     """
     if device in (PHONE, WATCH):
@@ -386,3 +410,48 @@ def _validate_load_devices(load_devices: Dict[str, List[str]]) -> None:
                 f"Invalid sensors for device '{device}': {invalid_sensors}. "
                 f"Valid options are: {valid_sensors_per_device[device]}"
             )
+
+def _get_watch_mban_folders(folder_path: str):
+    """
+    gets all folder names containing watch or muscleBAN data
+    :param folder_path: Root folder containing all the acquisitions for a single day..
+    :return: list containing the folder names
+    """
+
+    # init list
+    valid_folders = []
+
+    # list all sub-folders in the path
+    sub_folders = os.listdir(folder_path)
+
+    # cycle over the sub-folders
+    for folder_name in sub_folders:
+
+        # create full path
+        sub_folder_path = os.path.join(folder_path, folder_name)
+
+        # ignore any files
+        if not os.path.isdir(sub_folder_path):
+            continue
+
+        # ignore folders that are not session times
+        try:
+            datetime.strptime(folder_name, "%H-%M-%S")
+        except ValueError:
+            continue
+
+        # check whether the folder contains any files from the phone
+        files = os.listdir(sub_folder_path)
+        has_invalid_file = any(
+            "ANDROID" in f and "WEAR" not in f
+            for f in files
+        )
+
+        # add the folder to the list
+        if not has_invalid_file:
+            valid_folders.append(folder_name)
+
+    # sort the folders
+    valid_folders.sort(key=lambda x:datetime.strptime(x, "%H-%M-%S"))
+
+    return valid_folders

@@ -140,3 +140,4 @@ ENV_REL_HUMIDITY_KEY = 'Humidade_relativa_percentagem'
 # GENERAL
 # -------------------------------------------------------------------------------------------------------------------- #
 DURATION_SECONDS_SUFFIX_KEY = '_duration_sec'
+SESSION_KEY = 'Session'

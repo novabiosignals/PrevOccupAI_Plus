@@ -24,7 +24,7 @@ HEART_RATE_WEEK = True
 # ------------------------------------------------------------------------------------------------------------------- #
 # file constants
 # ------------------------------------------------------------------------------------------------------------------- #
-DRIVE = "D"
+DRIVE = "E"
 DATA_FOLDER_PATH = f"{DRIVE}:\\Backup PrevOccupAI_PLUS Data\\data"
 QUESTIONNAIRE_RESULTS_PATH = f"{DRIVE}:\\Backup PrevOccupAI_PLUS Data\\questionnaire_scores"
 OH_PROFILE_PATH = f"{DRIVE}:\\Backup PrevOccupAI_PLUS Data\\OH_profiles"
@@ -113,7 +113,7 @@ if GENERATE_HEART_RATE_OH_PROFILE:
 
                         # check if the metrics have already been extracted
                         # if not then len = 1 since it has only the relative HR base metrics
-                        if len(oh_profile[SENSOR_METRICS_KEY][HEART_RATE_KEY]) < 2:
+                        if len(oh_profile[SENSOR_METRICS_KEY][HEART_RATE_KEY]) < 20000:
 
                             # iterate through the folders of the several days
                             for date_folder in os.listdir(folder_path):

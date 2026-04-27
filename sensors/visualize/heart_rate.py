@@ -32,11 +32,9 @@ import os
 import pandas as pd
 import numpy as np
 from typing import Dict, List, Tuple
-import matplotlib.pyplot as plt
 from matplotlib.ticker import MultipleLocator
 from matplotlib.lines import Line2D
 import matplotlib.pyplot as plt
-import matplotlib.gridspec as gridspec
 import copy
 import seaborn as sns
 from collections import defaultdict

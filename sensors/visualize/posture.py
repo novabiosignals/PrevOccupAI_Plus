@@ -28,20 +28,48 @@ from utils import extract_date_from_path, create_dir
 # ------------------------------------------------------------------------------------------------------------------- #
 RESOURCES_PATH = r".\sensors\visualize\resources"
 
+# view constants
+TOP_VIEW = "top-view"
+SIDE_VIEW = "side-view"
+BACK_VIEW = "back-view"
+
 VIEW_DIMENSIONS = {
-        "Vista_Superior": (1.03, 1.03),   # width, height in meters
-        "Vista_Lateral": (1.03, 1.03),
-        "Vista_de_Costas": (1.23, 0.92)  # width = 1.50 m, height = 1.125 m
+        TOP_VIEW: (1.03, 1.03),   # width, height in meters
+        SIDE_VIEW: (1.03, 1.03),
+        BACK_VIEW: (1.23, 0.92)  # width = 1.50 m, height = 1.125 m
     }
 
+
+# figure constants
 AP_AXIS = 0
 ML_AXIS = 1
 VERT_AXIS = 2
 
+
+# view language mapper
+LOCALE_PT = 'pt'
+LOCALE_ENG = 'eng'
+
+VIEW_TITLES = {
+    TOP_VIEW: {
+        LOCALE_PT: "Vista Superior",
+        LOCALE_ENG: "Top View",
+    },
+    SIDE_VIEW: {
+        LOCALE_PT: "Vista Lateral",
+        LOCALE_ENG: "Side View",
+    },
+    BACK_VIEW: {
+        LOCALE_PT: "Vista das Costas",
+        LOCALE_ENG: "Back View",
+    }
+}
+
+
 # ------------------------------------------------------------------------------------------------------------------- #
 # public functions
 # ------------------------------------------------------------------------------------------------------------------- #
-def plot_postural_displacements_grid(displacement_store_path: str, subject_id: str, subject_sex: str, output_folder_path: str) -> None:
+def plot_postural_displacements_grid(displacement_store_path: str, subject_id: str, subject_sex: str, output_folder_path: str, locale: str='pt') -> None:
     """
     Creates a single figure with:
       - rows = acquisition days
@@ -50,6 +78,7 @@ def plot_postural_displacements_grid(displacement_store_path: str, subject_id: s
     :param subject_id:
     :param subject_sex:
     :param output_folder_path:
+    :param locale:
     :return:
     """
 
@@ -76,17 +105,17 @@ def plot_postural_displacements_grid(displacement_store_path: str, subject_id: s
 
     # get the images for each view based on the sex of the subject
     view_images = {
-        "Vista_Superior": fr"{RESOURCES_PATH}\top-view_{subject_sex}.png",
-        "Vista_Lateral": fr"{RESOURCES_PATH}\side-view_{subject_sex}.png",
-        "Vista_de_Costas": fr"{RESOURCES_PATH}\back-view_{subject_sex}.png"
+        TOP_VIEW: fr"{RESOURCES_PATH}\top-view_{subject_sex}.png",
+        SIDE_VIEW: fr"{RESOURCES_PATH}\side-view_{subject_sex}.png",
+        BACK_VIEW: fr"{RESOURCES_PATH}\back-view_{subject_sex}.png"
     }
 
-    # Define view configuration: (view_name, x_idx, y_idx, image_path, (center_x, center_y))
+    # Define view configuration: (view_key, view_name, x_idx, y_idx, image_path, (center_x, center_y))
     # Column indices: 0=AP, 1=ML, 2=Vertical
     views = [
-        ("Vista Superior", ML_AXIS, AP_AXIS, view_images["Vista_Superior"], (0.54, 0.34)),      # ML vs AP
-        ("Vista Lateral",  AP_AXIS, VERT_AXIS, view_images["Vista_Lateral"], (0.39, 0.64)),     # AP vs Vertical
-        ("Vista das Costas", ML_AXIS, VERT_AXIS, view_images["Vista_de_Costas"], (0.615, 0.5975)) # ML vs Vertical
+        (TOP_VIEW, VIEW_TITLES[TOP_VIEW][locale], ML_AXIS, AP_AXIS, view_images[TOP_VIEW], (0.54, 0.34)),      # ML vs AP
+        (SIDE_VIEW, VIEW_TITLES[SIDE_VIEW][locale],  AP_AXIS, VERT_AXIS, view_images[SIDE_VIEW], (0.39, 0.64)),     # AP vs Vertical
+        (BACK_VIEW, VIEW_TITLES[BACK_VIEW][locale], ML_AXIS, VERT_AXIS, view_images[BACK_VIEW], (0.615, 0.5975)) # ML vs Vertical
     ]
 
     num_days = len(displacement_data)
@@ -109,24 +138,19 @@ def plot_postural_displacements_grid(displacement_store_path: str, subject_id: s
         axs = np.array([[ax] for ax in axs])
 
     # column titles (views) on top row
-    for j, (view_title, *_rest) in enumerate(views):
-        axs[0, j].set_title(view_title, fontsize=16, pad=10)
+    for col, (_, view_title, *_rest) in enumerate(views):
+        axs[0, col].set_title(view_title, fontsize=16, pad=10)
 
     # plot each day (row) and each view (col)
-    for i, day_array in enumerate(tqdm(displacement_data, desc="generating posture plot grid")):
+    for row, day_array in enumerate(tqdm(displacement_data, desc="generating posture plot grid")):
         # row label (weekday + date) on the first column only (cleaner)
-        weekday_str = get_weekday_name(acquisition_dates[i], locale_string="pt_PT.UTF-8")
-        row_label = f"{weekday_str}"
+        weekday_str = get_weekday_name(acquisition_dates[row], locale_string=f"{locale}_{locale.upper()}.UTF-8")
+        row_label = f"{weekday_str.title()}"
 
-        for j, (_view_title, x_idx, y_idx, bg_image, (center_x, center_y)) in enumerate(views):
-            ax = axs[i, j]
+        for col, (_view_key, _view_title, x_idx, y_idx, bg_image, (center_x, center_y)) in enumerate(views):
+            ax = axs[row, col]
 
-            view_key = (
-                "Vista_Superior" if j == 0 else
-                "Vista_Lateral" if j == 1 else
-                "Vista_de_Costas"
-            )
-            width, height = VIEW_DIMENSIONS[view_key]
+            width, height = VIEW_DIMENSIONS[_view_key]
 
             # background image
             im = plt.imread(bg_image)
@@ -135,7 +159,7 @@ def plot_postural_displacements_grid(displacement_store_path: str, subject_id: s
             # handle missing/empty day
             if day_array is None or getattr(day_array, "size", 0) == 0:
                 ax.axis("off")
-                if j == 0:
+                if col == 0:
                     ax.text(0.02, 0.98, row_label, transform=ax.transAxes,
                             va="top", ha="left", fontsize=12)
                 continue
@@ -169,12 +193,12 @@ def plot_postural_displacements_grid(displacement_store_path: str, subject_id: s
                 spine.set_visible(False)
 
             # row label on first column
-            if j == 0:
+            if col == 0:
                 ax.text(0.02, 0.98, row_label, transform=ax.transAxes,
                         va="top", ha="left", fontsize=12)
 
             # scale bar only once (top-left cell), to avoid repetition
-            if i == 0 and j == 0:
+            if row == 0 and col == 0:
                 scalebar_length = 0.15  # meters
                 x_start = width * 0.05
                 y_start = height * 0.05
@@ -185,7 +209,7 @@ def plot_postural_displacements_grid(displacement_store_path: str, subject_id: s
     plt.subplots_adjust(left=0.02, right=0.995, top=0.92, bottom=0.02, wspace=0.02, hspace=0.06)
 
     # save single file
-    file_name = f"{subject_id}_posture_views_grid.png"
+    file_name = f"{subject_id}_posture_views_grid.svg"
     handle_plot(save_dir=out_dir, filename=file_name, save=True)
 
 

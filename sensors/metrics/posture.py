@@ -89,7 +89,7 @@ def get_posture_metrics(day_folder_path: str, fs: int, w_size_HAR: float, subjec
     day_metrics_dict = {acquisition_date: {}}
 
     # load the acquisition(s) for the day
-    df_dict = sensor_loader.load_daily_acquisitions(day_folder_path, load_devices={PHONE: [ACC, GYR, MAG, ROT]})
+    df_dict, _ = sensor_loader.load_daily_acquisitions(day_folder_path, load_devices={PHONE: [ACC, GYR, MAG, ROT]})
 
     # pre-proces the data
     processed_df_dict = sensor_processor.apply_pre_processing_pipeline(df_dict)

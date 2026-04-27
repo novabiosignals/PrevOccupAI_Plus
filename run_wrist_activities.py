@@ -20,7 +20,7 @@ GENERATE_PLOTS = True
 # ------------------------------------------------------------------------------------------------------------------- #
 # file constants
 # ------------------------------------------------------------------------------------------------------------------- #
-DRIVE = "D"
+DRIVE = "E"
 DATA_FOLDER_PATH = f"{DRIVE}:\\Backup PrevOccupAI_PLUS Data\\data"
 OH_PROFILE_PATH = f"{DRIVE}:\\Backup PrevOccupAI_PLUS Data\\OH_profiles"
 PLOTS_OUTPUT_PATH = f"{DRIVE}:\\Backup PrevOccupAI_PLUS Data\\OH_plots"
@@ -64,7 +64,7 @@ if GENERATE_NOISE_OH_PROFILE:
                         oh_profile = get_OH_profile(OH_PROFILE_PATH, subject_id)
 
                         # check if the metrics have already been extracted, if not, extract noise metrics
-                        if len(oh_profile[SENSOR_METRICS_KEY][WRIST_KEY]) < 1:
+                        if len(oh_profile[SENSOR_METRICS_KEY][WRIST_KEY]) < 1000:
 
                             # iterate through the folders of the several days
                             for date_folder in os.listdir(folder_path):

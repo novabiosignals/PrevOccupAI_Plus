@@ -25,7 +25,7 @@ GENERATE_PLOTS = True
 # ------------------------------------------------------------------------------------------------------------------- #
 # file constants
 # ------------------------------------------------------------------------------------------------------------------- #
-DRIVE = 'D'
+DRIVE = 'E'
 DATASET_PATH = 'Backup PrevOccupAI_PLUS Data\\data'
 DATA_FOLDER_PATH = f"{DRIVE}:\\Backup PrevOccupAI_PLUS Data\\data"
 OH_PROFILE_PATH = f"{DRIVE}:\\Backup PrevOccupAI_PLUS Data\\OH_profiles"
@@ -136,4 +136,4 @@ if GENERATE_POSTURE_OH_PROFILE:
                                 sex = oh_profile[METADATA_KEY]['sexo']
 
                                 # generate posture plot
-                                oh_visualizer.plot_postural_displacements_grid(OH_DISPLACEMENT_DATA_PATH, subject_id=subject_id, subject_sex=sex, output_folder_path=OH_PLOTS_PATH)
+                                oh_visualizer.plot_postural_displacements_grid(OH_DISPLACEMENT_DATA_PATH, subject_id=subject_id, subject_sex=sex, output_folder_path=OH_PLOTS_PATH, locale='eng')
