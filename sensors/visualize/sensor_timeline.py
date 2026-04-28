@@ -39,7 +39,8 @@ import sensors.load
 from constants import ACQUISITION_TIME_SECONDS, MBAN_RIGHT
 from OH_profile.constants import SENSOR_TIMELINE_MISSING_TIMES_KEY, SENSOR_TIMELINE_TIMES_KEY, SENSOR_TIMELINE_START_TIMES_KEY, SENSOR_TIMELINE_END_TIMES_KEY
 from sensors.impute.impute_sensor_timeline import compute_end_times
-from .plot_utils import RefLine, HandlerRefLine, get_weekday_name
+from .plot_utils import RefLine, HandlerRefLine, get_day_string, get_weekday_name
+from utils import create_dir
 
 # ------------------------------------------------------------------------------------------------------------------- #
 # file specific constants
@@ -64,7 +65,7 @@ ACQUISITION_TIME_MINUTES = 20
 # ------------------------------------------------------------------------------------------------------------------- #
 
 def generate_sensor_timeline_plot(week_metadata_dict: Dict[str, Dict[str, Dict[str, Dict[str, list]]]],
-                                  output_folder_path: str, filename: str) -> None:
+                                  output_folder_path: str, filename: str, subject_id: str) -> None:
     """
     Generates a figure with the sensor timeline plots for all available days of the week for one subject.
     Each day is plotted in its own subplot with an independent x-axis.
@@ -124,13 +125,14 @@ def generate_sensor_timeline_plot(week_metadata_dict: Dict[str, Dict[str, Dict[s
         labels=["Sem dados", f"{ACQUISITION_TIME_SECONDS // 60} minutos"],
         handler_map={RefLine: HandlerRefLine()},
         loc='upper right',
-        bbox_to_anchor=(1, 0.95),  # outside
-        frameon=False, borderaxespad=0.0, handleheight=1, handlelength=2,
+        bbox_to_anchor=(0.875, 1.01),  # outside
+        frameon=False, borderaxespad=0.0, handleheight=1, handlelength=2, ncols=2
     )
-
+    subject_output_path = create_dir(output_folder_path, str(subject_id))
     # Save figure
-    plt.savefig(os.path.join(output_folder_path, filename), dpi=300, bbox_inches='tight')
+    plt.savefig(os.path.join(subject_output_path, filename), dpi=300, bbox_inches='tight')
 
+    plt.close()
 
 
 def get_daily_acquisitions_metadata(daily_folder_path: str, fs: int) -> Dict[str, Dict[str, list]]:
@@ -160,6 +162,9 @@ def get_daily_acquisitions_metadata(daily_folder_path: str, fs: int) -> Dict[str
 
     # iterate through the folders pertaining to the different acquisitions on the same day
     for acquisition_folder in os.listdir(daily_folder_path):
+
+        # inform user
+        print(f"acquisition time: {acquisition_folder}")
 
         # generate folder_path
         acquisition_folder_path = os.path.join(daily_folder_path, acquisition_folder)
@@ -272,7 +277,8 @@ def _visualize_daily_acquisitions(acquisitions_dict: Dict[str, Dict[str, list]],
     ax.set_xlabel("Tempo (hh:mm)", color='#06171C')
     ax.set_yticks([])
 
-    week_day, date_str = get_weekday_name(acquisition_date)
+    _, date_str = get_day_string(acquisition_date, 'pt_PT.UTF-8')
+    week_day = get_weekday_name(acquisition_date, 'pt_PT.UTF-8', date_format='%Y-%m-%d')
 
     if show_dates:
         ax.set_title(f"{week_day} | {date_str}", color='#06171C', fontsize=10, fontweight='bold')

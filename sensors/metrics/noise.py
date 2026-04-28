@@ -10,7 +10,6 @@ get_noise_metrics(...): Extracts metrics from the noise data from one day and sa
 [Private]
 _calculate_noise_metrics(...):  Extract features from noise data in dBA (statistics, class distributions, and durations).
 _classify_noise(...): Classifies a noise level (in dBA) into noise categories (near-silent, low noise, disruptive noise, high noise)
-_calculate_class_durations(...): Calculate the duration of each class in seconds and save it to a dictionary.
 _calculate_windowed_timeline_metrics(...): Calculates timeline metrics for noise data using a windowing approach.
 """
 # ------------------------------------------------------------------------------------------------------------------- #
@@ -23,7 +22,7 @@ from typing import Dict
 import HAR
 import sensors.load as sl
 from constants import NOISE, NOISE_CLASS_COLUMN_NAME, PHONE
-from .metric_utils import calculate_statistics, calculate_class_distributions
+from .metric_utils import calculate_statistics, calculate_class_distributions, calculate_class_durations
 from utils import extract_date_from_path
 from OH_profile.constants import *
 
@@ -34,7 +33,7 @@ from OH_profile.constants import *
 # noise limits dBA
 SILENCE_NOISE_LIMIT_DBA = 40
 LOW_NOISE_LIMIT_DBA = 60
-DISTURBING_NOISE_LIMIT_DBA = 8
+DISTURBING_NOISE_LIMIT_DBA = 80
 
 W_SIZE_MINUTES = 10
 NOISE_TIMELINE_WLEN = f'{NOISE_TIMELINE_KEY}_wlen-{W_SIZE_MINUTES}'
@@ -63,7 +62,10 @@ def get_noise_metrics(day_folder_path: str, fs: int, w_size_min: int = W_SIZE_MI
     day_metrics_dict = {date: {}}
 
     # load_signals all acquisitions from the same day into a nested dictionary
-    df_dict = sl.load_daily_acquisitions(day_folder_path, load_devices={PHONE: [NOISE]})
+    df_dict, _ = sl.load_daily_acquisitions(day_folder_path, load_devices={PHONE: [NOISE]})
+
+    if len(df_dict) == 0:
+        return {}
 
     # cycle over the dictionary containing the noise data of the day (usually it is only one recording but multiple could happen)
     for acquisition_time, df in df_dict[PHONE].items():
@@ -112,7 +114,7 @@ def _calculate_noise_metrics(df: pd.DataFrame, fs: int, start_time: str, window_
     class_distributions = calculate_class_distributions(df, NOISE_CLASS_COLUMN_NAME)
 
     # calculate class durations
-    class_durations = _calculate_class_durations(df, fs, class_distributions)
+    class_durations = calculate_class_durations(df, fs, class_distributions)
 
     # calculate timeline metrics
     timeline_metrics = _calculate_windowed_timeline_metrics(df, NOISE_CLASS_COLUMN_NAME, start_time, fs, window_size_min=window_size_min)
@@ -130,7 +132,7 @@ def _classify_noise(dba_value: float) -> str:
     """
     Classifies a noise level (in dBA) into a noise category based on EU Directive 2003/10/EC ([1] https://eur-lex.europa.eu/eli/dir/2003/10/)
     exposure limits and on disruptive noise thresholds for enclosed office environments, as described in
-    [2] https://www.sciencedirect.com/science/article/pii/S0360132324011557.
+    [2] https://www.sciencedirect.com/science/article/pii/S0360132324011557, [3] https://oshwiki.osha.europa.eu/en/themes/ergonomics-office-work
 
     Given the office context, noise levels above 80 dBA are classified as "high noise" according to the EU directive.
     Prolonged and consistent exposure to such levels may require preventive measures to avoid hearing impairment.
@@ -140,7 +142,7 @@ def _classify_noise(dba_value: float) -> str:
 
     Considering these two references, the following classes were derived:
         - ≤ 40 dBA: NEAR_SILENCE_NOISE -> Near-silent room
-        - 40-60 dBA: LOW_NOISE -> low, non-disruptive noise [2]
+        - 40-60 dBA: LOW_NOISE -> low, non-disruptive noise [2], [3]
         - 60–80 dBA: DISRUPTIVE_NOISE -> Disruptive background noise that heavily impacts a worker's concentration and emotional arousal levels. [2]
         - ≥ 80 dBA: HIGH_NOISE -> High noise level that may require preventive action to avoid hearing impairment during prolonged exposure. [1]
 
@@ -162,31 +164,6 @@ def _classify_noise(dba_value: float) -> str:
     # else it's high noise ≥ 80
     else:
         return NOISE_HIGH_KEY
-
-
-def _calculate_class_durations(df: pd.DataFrame, fs: int, class_distributions: Dict[str, float]) -> Dict[str, float]:
-    """
-    Calculate the duration of each class in seconds and save it to a dictionary.
-
-    :param df: The dataframe containing the noise data
-    :param fs: The sampling frequency of the noise recorder
-    :param class_distributions: A dictionary with the class distributions {class_1: 0.5, class_2: 0.5}
-    :return: A dictionary with the class durations {total_dur_s: float , class_1_dur_s: float, class_2_dur_s: float}
-    """
-
-    # init dict to store the durations
-    durations_dict = {}
-
-    # calculate the total duration in seconds of the noise data
-    total_dur_s = len(df) / fs
-
-    # cycle over the dictionary with the class distributions
-    for class_name, distribution in class_distributions.items():
-
-        durations_dict[f"{class_name}{DURATION_SECONDS_SUFFIX}"] = round(distribution * total_dur_s, 4)
-
-    return durations_dict
-
 
 def _calculate_windowed_timeline_metrics(df: pd.DataFrame, column_name: str, start_time: str, fs: int,
                                          window_size_min: int) -> Dict[str, str]:
@@ -216,24 +193,55 @@ def _calculate_windowed_timeline_metrics(df: pd.DataFrame, column_name: str, sta
     # convert Index to DatetimeIndex object for the resample function
     df.index = pd.to_datetime(df.index, format="%H:%M:%S.%f")
 
-    # window dataframe
-    for window_start, window_df in df.resample(f"{window_size_min}min"):
+    # trackers for merged segments
+    current_class = None
+    current_start = None
+    current_end = None
 
-        # most common class (mode returns a pandas.Series with the most common class -> 0 class_A)
-        most_common_class = window_df[column_name].mode()
+    for _, window_df in df.resample(f"{window_size_min}min"):
+        # resample can produce empty windows (depending on alignment) -> skip them safely
+        if window_df.empty:
+            continue
 
-        # get the most common class in this window
-        most_common_class = most_common_class.iloc[0]
+        # most common class in this window
+        mode_series = window_df[column_name].mode()
+        if mode_series.empty:
+            # if column is all NaN in this window, skip
+            continue
+        window_class = mode_series.iloc[0]
 
-        # get start and end timestamps
         window_start = window_df.index[0]
         window_end = window_df.index[-1]
 
-        key = (
-            f"{window_start.strftime('%H:%M:%S.%f')[:-3]}"
-            f"_{window_end.strftime('%H:%M:%S.%f')[:-3]}"
-        )
+        if current_class is None:
+            # initialize first segment
+            current_class = window_class
+            current_start = window_start
+            current_end = window_end
+            continue
 
-        timeline_metrics[key] = most_common_class
+        if window_class == current_class:
+            # extend current segment
+            current_end = window_end
+        else:
+            # close previous segment
+            key = (
+                f"{current_start.strftime('%H:%M:%S.%f')[:-3]}"
+                f"_{current_end.strftime('%H:%M:%S.%f')[:-3]}"
+            )
+            timeline_metrics[key] = current_class
+
+            # start new segment
+            current_class = window_class
+            current_start = window_start
+            current_end = window_end
+
+    # close the last open segment
+    if current_class is not None:
+        key = (
+            f"{current_start.strftime('%H:%M:%S.%f')[:-3]}"
+            f"_{current_end.strftime('%H:%M:%S.%f')[:-3]}"
+        )
+        timeline_metrics[key] = current_class
 
     return timeline_metrics

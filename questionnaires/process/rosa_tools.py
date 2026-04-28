@@ -216,7 +216,7 @@ def calc_a_score(df: pd.DataFrame, pure_rosa: bool) -> pd.DataFrame:
 
         chair_score_min = rosa_sc.card_a['min']
         chair_score_max = rosa_sc.card_a['max_horizontal_new']
-        df['ROSA_score_a_adapted'] = ((df['ROSA_score_a'] - chair_score_min)/(chair_score_max - chair_score_min)).round(2)
+        df['ROSA_score_a_adapted'] = ((df['ROSA_score_a'] - chair_score_min)/(chair_score_max - chair_score_min)).round(4)
 
         # keep only the relevant columns
         df = df[['id.1', 'ROSA_score_a_adapted']]
@@ -287,10 +287,10 @@ def calc_b_c_scores(df: pd.DataFrame, pure_rosa: bool) -> pd.DataFrame:
     else:
 
         # normalise the scores
-        monitor_score = normalise_to_range(monitor_score, rosa_sc.card_b, score_type='vertical', answer='monitor').round(2)
-        telefone_score = normalise_to_range(telefone_score, rosa_sc.card_b, score_type='horizontal', answer='telefone').round(2)
-        mouse_score = normalise_to_range(mouse_score, rosa_sc.card_c, score_type='vertical', answer='mouse').round(2)
-        keyboard_score = normalise_to_range(keyboard_score, rosa_sc.card_c, score_type='horizontal', answer='keyboard').round(2)
+        monitor_score = normalise_to_range(monitor_score, rosa_sc.card_b, score_type='vertical', answer='monitor').round(4)
+        telefone_score = normalise_to_range(telefone_score, rosa_sc.card_b, score_type='horizontal', answer='telefone').round(4)
+        mouse_score = normalise_to_range(mouse_score, rosa_sc.card_c, score_type='vertical', answer='mouse').round(4)
+        keyboard_score = normalise_to_range(keyboard_score, rosa_sc.card_c, score_type='horizontal', answer='keyboard').round(4)
 
         # add the calculated scores as new columns
         df['ROSA_monitor_adapted_norm'] = monitor_score
@@ -334,6 +334,6 @@ def calc_final_rosa_score(df_a_scores: pd.DataFrame, df_b_c_scores: pd.DataFrame
     scores_df['ROSA_final'] = scores_df.apply(lambda x: get_score_from_card(x['ROSA_score_a'], x['ROSA_monitor_peripherals'], rosa_sc.card_final), axis=1)
 
     # min max normalization
-    scores_df['ROSA_final_normalized'] = ((scores_df['ROSA_final'] - 1) / (10 - 1)).round(2)
+    scores_df['ROSA_final_normalized'] = ((scores_df['ROSA_final'] - 1) / (10 - 1)).round(4)
 
     return scores_df

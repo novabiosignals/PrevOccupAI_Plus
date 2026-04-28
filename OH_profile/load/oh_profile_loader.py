@@ -19,33 +19,12 @@ import json
 from pathlib import Path
 from typing import Dict
 
+# internal imports
+from OH_profile.constants import *
 # -------------------------------------------------------------------------------------------------------------------- #
 # constants
 # -------------------------------------------------------------------------------------------------------------------- #
-# file suffix
-JSON_FILE_SUFFIX = '_OH_profile.json'
 
-# json dict keys
-METADATA_KEY = 'meta_data'
-
-SINGLE_INSTANCE_QUESTIONNAIRE_KEY = 'single_instance_questionnaires'
-PERSONAL_DOMAIN_KEY = 'personal'
-BIOMECHANICAL_DOMAIN_KEY = 'biomechanical'
-PSYCHOSOCIAL_DOMAIN_KEY = 'psychosocial'
-ENVIRONMENTAL_DOMAIN_KEY = 'environmental'
-
-DAILY_QUESTIONNAIRE_DOMAIN_KEY = 'daily_questionnaires'
-WORKLOAD_DOMAIN_KEY = 'workload'
-PAIN_DOMAIN_KEY = 'pain'
-
-SENSOR_METRICS_KEY = 'sensor_metrics'
-SENSOR_TIMELINE_KEY = 'sensor_timeline'
-HAR_KEY = 'human_activities'
-HEART_RATE_KEY = 'heart_rate'
-POSTURE_KEY = 'posture'
-NOISE_KEY = 'noise'
-EMG_KEY = 'emg'
-WRIST_KEY = 'wrist_activities'
 # -------------------------------------------------------------------------------------------------------------------- #
 # public functions
 # -------------------------------------------------------------------------------------------------------------------- #
@@ -109,7 +88,8 @@ def _generate_OH_profile_json_skeleton() -> Dict:
             POSTURE_KEY: {},
             NOISE_KEY: {},
             EMG_KEY: {},
-            WRIST_KEY: {}
+            WRIST_KEY: {},
+            ENVIRONMENT_KEY: {}
         }
     }
 

@@ -1,6 +1,7 @@
 <component name="ProjectDictionaryState">
   <dictionary name="project">
     <words>
+      <w>aceleração</w>
       <w>altura</w>
       <w>ambiente</w>
       <w>anos</w>
@@ -10,6 +11,7 @@
       <w>autonomia</w>
       <w>bacharelato</w>
       <w>baixa</w>
+      <w>biomec</w>
       <w>biomecanico</w>
       <w>cadeira</w>
       <w>caminhada</w>
@@ -33,6 +35,7 @@
       <w>estar</w>
       <w>estilo</w>
       <w>exigencias</w>
+      <w>figsize</w>
       <w>fisica</w>
       <w>física</w>
       <w>graduado</w>
@@ -49,9 +52,12 @@
       <w>liderança</w>
       <w>ligeiramente</w>
       <w>linestyle</w>
+      <w>localizacao</w>
+      <w>mavg</w>
       <w>mban</w>
       <w>mbans</w>
       <w>mdates</w>
+      <w>medido</w>
       <w>meses</w>
       <w>mestrado</w>
       <w>minutos</w>
@@ -65,8 +71,10 @@
       <w>obrigatório</w>
       <w>occup</w>
       <w>organizacao</w>
+      <w>ospaq</w>
       <w>passado</w>
       <w>pausas</w>
+      <w>percecao</w>
       <w>percentagem</w>
       <w>pesado</w>
       <w>pessoais</w>
@@ -76,9 +84,11 @@
       <w>psicosocial</w>
       <w>psicossocial</w>
       <w>qualidade</w>
+      <w>referência</w>
       <w>relacoes</w>
       <w>rotvec</w>
       <w>secundário</w>
+      <w>segunda</w>
       <w>semana</w>
       <w>sentada</w>
       <w>sentado</w>
@@ -98,6 +108,8 @@
       <w>valores</w>
       <w>vigorosa</w>
       <w>viúvo</w>
+      <w>xlabel</w>
+      <w>ylabel</w>
       <w>zacc</w>
       <w>ºano</w>
     </words>

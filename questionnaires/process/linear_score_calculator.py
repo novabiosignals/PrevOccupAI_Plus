@@ -224,7 +224,7 @@ def _calculate_mean_scores(all_results_df: pd.DataFrame, score_type: str, averag
         bo_df = bo_df.drop(columns=['id.1'], errors='ignore')
 
         # calculate statistics and save in a dataframe
-        scores_df = pd.DataFrame([fo_df.mean().round(2), bo_df.mean().round(2)], index=['mean_FO', 'mean_BO'])
+        scores_df = pd.DataFrame([fo_df.mean().round(4), bo_df.mean().round(4)], index=['mean_FO', 'mean_BO'])
 
     else:
         raise ValueError(
@@ -262,7 +262,7 @@ def _calculate_individual_scores(domain:str, results_df: pd.DataFrame, calculati
 
         # sum all values per row and normalize
         scores_series = results_df.sum(axis=1)
-        scores_series_norm = ((scores_series - min(values))/(max_value - min(values))).round(2)
+        scores_series_norm = ((scores_series - min(values))/(max_value - min(values))).round(4)
 
     elif calculation_method == 'mean':
 
@@ -272,11 +272,11 @@ def _calculate_individual_scores(domain:str, results_df: pd.DataFrame, calculati
         if domain == ENVIRONMENT:
 
             # normalize
-            scores_series_norm = ((scores_series - min(values)) / (max_value - min(values))).round(2)
+            scores_series_norm = ((scores_series - min(values)) / (max_value - min(values))).round(4)
 
         else:
 
-            scores_series_norm = ((scores_series - min(scale)) / (max_value - min(scale))).round(2)
+            scores_series_norm = ((scores_series - min(scale)) / (max_value - min(scale))).round(4)
 
     else:
         raise ValueError(f"The calculation method {calculation_method} does not exist.")

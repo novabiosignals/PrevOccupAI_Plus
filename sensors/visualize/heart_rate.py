@@ -32,9 +32,9 @@ import os
 import pandas as pd
 import numpy as np
 from typing import Dict, List, Tuple
-import matplotlib.pyplot as plt
 from matplotlib.ticker import MultipleLocator
 from matplotlib.lines import Line2D
+import matplotlib.pyplot as plt
 import copy
 import seaborn as sns
 from collections import defaultdict
@@ -326,31 +326,28 @@ def _plot_hr_dist(distributions_dict: Dict, subject: str, show_acquisition_label
     handle_plot(save_dir=out_dir, save=True, filename=filename)
 
 
-def _plot_circular_hr_dist(hr_percentage_dict: Dict, subject: str, lower_limit: int = 30, upper_limit: int = 70,
-                           show_acquisition_labels: bool = True, save_path: str = '',
-                           color_scheme: Dict = HR_CLASS_COLORS, locale_string: str ='pt_PT.UTF-8') -> None:
+def _plot_circular_hr_dist(hr_percentage_dict: Dict,subject: str,lower_limit: int = 30,upper_limit: int = 70,
+    show_acquisition_labels: bool = True,save_path: str = "",color_scheme: Dict = HR_CLASS_COLORS,locale_string: str = "pt_PT.UTF-8",
+) -> None:
     """
     Plots a circular representation of heart rate class distribution for each acquisition per day.
-
-    :param hr_percentage_dict: Dictionary containing percentages of each heart rate class per acquisition.
-    :param subject: Subject identifier extracted from the device number (e.g., '001').
-    :param lower_limit: Lower bound for scaling the bar lengths. Default: 30
-    :param upper_limit: Upper bound for scaling the bar lengths. Default: 70
-    :param show_acquisition_labels: Whether to show acquisition labels as Roman numerals. Default: True
-    :param save_path: Directory to save the plot. If empty, saves in the current project folder.
-    :param color_scheme: Colors used for each heart rate class. Should match the number of classes. Default: HR_CLASS_COLORS
-    :param locale_string: Locale string for weekday names (used in the legend). Default: 'pt_PT.UTF-8'
-    :return: None
     """
 
     # Convert dictionary to a DataFrame
-    hr_percentage_dict , activity_proportions = _dict_to_hr_percentage_df(hr_percentage_dict)
+    hr_percentage_dict, activity_proportions = _dict_to_hr_percentage_df(hr_percentage_dict)
 
     # Order the classes
     hr_percentage_dict = hr_percentage_dict[DESIRED_ORDER]
 
     # Create figure and polar axes
-    fig, ax = plt.subplots(figsize=(14, 10), subplot_kw={'projection': 'polar'})
+    fig, ax = plt.subplots(figsize=(14, 10), subplot_kw={"projection": "polar"})
+
+    fig.subplots_adjust(left=0.02, right=0.78, top=0.88, bottom=0.05)
+    ax.set_position([0.00, 0.03, 0.79, 0.88])
+
+    # Turn off axes cleanly (avoid plt.axis('off') side effects)
+    ax.set_axis_off()
+    # --------------------------
 
     # Scale data to fit limits
     hr_percentage_dict = _scale_data(hr_percentage_dict, lower_limit, upper_limit)
@@ -358,22 +355,22 @@ def _plot_circular_hr_dist(hr_percentage_dict: Dict, subject: str, lower_limit: 
     # Plot circular bars
     width, angles = _plot_circ_bars(hr_percentage_dict, color_scheme, lower_limit, ax)
 
-    # Remove default grid
-    plt.axis('off')
-
     # Extract dates and times from index
     dates, times = _extract_date_time(hr_percentage_dict, date_to_weekday=False)
 
     # Convert dates to day/month/year format
     dates_fmt = [pd.to_datetime(d).strftime(DATE_FORMAT) for d in dates]
 
-    # Title
-    plt.title('Distribuição circular das classes de Frequência Cardíaca | {} a {}'.format(dates_fmt[0], dates_fmt[-1]))
+    # Title (use ax.set_title to keep it tied to the axes)
+    ax.set_title(
+        "Distribuição circular das classes de Frequência Cardíaca",
+        fontsize=20
+    )
 
     # Add color legend
     handles, labels = ax.get_legend_handles_labels()
     labels_pt = [LEGEND_PT.get(l, l) for l in labels]
-    ax.legend(handles, labels_pt, loc='center', fontsize=8)
+    ax.legend(handles, labels_pt, loc="center", fontsize=10)
 
     # Convert dates to weekdays
     dates_week = [get_weekday_name(date, locale_string) for date in dates]
@@ -382,39 +379,47 @@ def _plot_circular_hr_dist(hr_percentage_dict: Dict, subject: str, lower_limit: 
     legend_lines = generate_grouped_legend(dates_week, times)
 
     # Add lateral legend using fig.text; weekdays in bold
+    # IMPORTANT: x moved inward to avoid getting cut; also keep within the reserved right margin
+    x_text = 0.80
+    y0 = 0.88
+    dy = 0.03
     for i, line in enumerate(legend_lines):
-        if line.endswith(':'):  # Weekday
-            fig.text(0.87, 0.95 - i * 0.03, line, fontsize=9, va='top', ha='left', fontweight='bold')
-        else:
-            fig.text(0.87, 0.95 - i * 0.03, line, fontsize=9, va='top', ha='left')
+        fig.text(
+            x_text,
+            y0 - i * dy,
+            line,
+            fontsize=14,
+            va="top",
+            ha="left",
+            fontweight="bold" if line.endswith(":") else "normal",
+        )
 
     # Draw vertical lines to separate days
     acquisition_counts = pd.Series(dates_week).value_counts().sort_index().values
     pos = np.append([0], acquisition_counts[:-1])
     pos = np.cumsum(pos)
     pos = [angles[i] for i in pos]
-    pos = [p + width/2 for p in pos]  # Shift half bar width
+    pos = [p + width / 2 for p in pos]  # Shift half bar width
     ax.vlines(pos, lower_limit - 5, upper_limit + 12, color="#FFFFFF", linewidth=6.5)
 
     # Show acquisition labels along the bars
     if show_acquisition_labels:
-        labels = generate_acquisition_labels(dates_week, times, mode='acq_num')
-        _show_acquisition_labels(angles, labels, ax, lower_limit)
+        acq_labels = generate_acquisition_labels(dates_week, times, mode="acq_num")
+        _show_acquisition_labels(angles, acq_labels, ax, lower_limit)
 
     # Add day labels
-    pos = np.append(pos, pos[0] + 2 * np.pi)
-    _show_day_labels(dates_week, pos, ax, 1.03)
+    pos2 = np.append(pos, pos[0] + 2 * np.pi)
+    _show_day_labels(dates_week, pos2, ax, 1.03)
 
     # Make 'no data' bars slightly transparent
     _change_transparency_for_category(ax, NO_DATA)
-
-    # Adjust layout
-    fig.tight_layout()
 
     # Save or show the plot
     out_dir = create_dir(save_path, os.path.join(f'{subject}', "HR_distributions"))
     filename = f'HR_plot_circular_{subject}.png'
     handle_plot(save_dir=out_dir, save=True, filename=filename)
+
+
 
 
 def _plot_circ_bars(hr_percentage_df, color_scheme, lower_limit, ax):
@@ -538,7 +543,7 @@ def _show_acquisition_labels(angles, labels, ax, lower_limit):
 
     for angle, label in zip(angles, labels):
 
-        ax.text(x=angle, y=lower_limit - 5, s=label, va='center', ha='center')
+        ax.text(x=angle, y=lower_limit - 5, s=label, va='center', ha='center', fontsize=14)
 
 
 def _change_transparency_for_category(ax, category, alpha=0.5):
@@ -632,7 +637,7 @@ def _show_day_labels(dates, sep_pos, ax, y_pos, fontweight='semibold'):
     # add the day labels to the plot
     for date, pos_start, pos_end in zip(pd.Series(dates).unique(), sep_pos[:-1], sep_pos[1:]):
         ax.text((pos_start + pos_end) / 2, y_pos, date, ha='center',
-                clip_on=False, transform=ax.get_xaxis_transform(), fontweight=fontweight)
+                clip_on=False, transform=ax.get_xaxis_transform(), fontweight=fontweight, fontsize=16)
 
 
 def _extract_hr_min_max_by_subject_day_session(hr_metrics: dict) -> Dict:
@@ -787,10 +792,10 @@ def _draw_bars(ax: plt.Axes, plot_items: list, bar_color: str) -> None:
         if draw_text:
             # Numeric labels
             for y, value in [(mn_plot, mn_plot), (mx_plot, mx_plot)]:
-                ax.text(x, y,f"{value:.0f}",ha='center',va='center',fontsize=7,fontweight='bold',zorder=4)
+                ax.text(x, y,f"{value:.0f}",ha='center',va='center',fontsize=9,fontweight='bold',zorder=4)
         else:
             # Vertical "Sem dados" label
-            ax.text(x,(mn_plot + mx_plot) / 2,"Sem dados",rotation=90,ha='center',va='center',fontsize=8,fontweight=600,
+            ax.text(x,(mn_plot + mx_plot) / 2,"Sem dados",rotation=90,ha='center',va='center',fontsize=9,fontweight=600,
                 color='white',zorder=4)
 
 
@@ -826,7 +831,7 @@ def _add_weekday_labels(ax: plt.Axes, day_centers: list) -> None:
 
     # Loop through each day center and add the corresponding weekday label
     for x_center, weekday in day_centers:
-        ax.text(x_center, y_text, weekday, ha='center', va='top', fontsize=9)
+        ax.text(x_center, y_text, weekday, ha='center', va='top', fontsize=14)
 
 
 def _style_plot(ax: plt.Axes, x_cursor: float) -> None:

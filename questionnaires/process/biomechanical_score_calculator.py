@@ -4,11 +4,11 @@ Function to calculate rosa scores (pure and adapted) and to clean biomechanical 
 Available Functions
 -------------------
 [Public]
-calculate_rosa_scores(...): Calculates the final pure rosa score (not normalized and min-max normalized) for each subject of one group
 calculate_biomechanical_scores(...): Calculates the individual rosa scores and cleans the answers for the biomechanical questionnaires of one group.
 -------------------
 
 [Private]
+_calculate_rosa_scores(...): Calculates the final pure rosa score (not normalized and min-max normalized) for each subject of one group
 _get_design_escritorio_results(...): Calculate a score results for each subject.
 _get_equipamentos_results(...): Calculate b and c scores results for each subject.
 _get_incapacidade_dor_results(...): Cleans the dataframe with the questionnaire answers.
@@ -21,7 +21,7 @@ _get_incapacidade_dor_results(...): Cleans the dataframe with the questionnaire 
 import os
 from pathlib import Path
 import pandas as pd
-from typing import List
+from typing import List, Dict
 
 # internal imports
 from questionnaires.load.questionnaire_loader import load_questionnaire_answers
@@ -29,7 +29,7 @@ from utils import load_json_file, create_dir, extract_group_from_path, find_proj
 from constants import CONFIG_FOLDER_NAME, CSV
 import questionnaires.process.rosa_tools as rt
 import questionnaires.process.mappings.rosa_question_mappings as rosa_qm
-from questionnaires.process.mappings.questionnaire_mappings import ID_OLD_COLUMNS, ID_NEW_COLUMNS, ID_ANSWERS_MAP
+from questionnaires.process.mappings.questionnaire_mappings import ID_OLD_COLUMNS, ID_NEW_COLUMNS, ID_ANSWERS_MAP, ID_PAIN_PERCEPTION_MAPPING
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # constants
@@ -41,40 +41,8 @@ INCAPACIDADE_DOR = "Incapacidade e Sofrimento associados a Dor"
 # -------------------------------------------------------------------------------------------------------------------- #
 # public functions
 # -------------------------------------------------------------------------------------------------------------------- #
-def calculate_rosa_scores(folder_path: str, output_folder_path: str) -> None:
-    """
-    Calculates the final pure rosa score (not normalized and min-max normalized) for each subject of one group
-    and saves them as a csv file. Assumes that the questionnaire answers are stored in a directory such as:
-    '...\\group1\\biomechanical\\files.csv'.
 
-    (scores are based on: https://www.sciencedirect.com/science/article/pii/S0003687011000433?via%3Dihub)
-
-    :param folder_path: Path to the folder containing the several questionnaire domains (subfolders)
-    :param output_folder_path: Path to the folder where the scores will be saved.
-    :return: None
-    """
-
-    # load results_questionnaires for all domain questionnaires into a dictionary
-    # (keys: questionnaire id, values: dataframe with the results_questionnaires)
-    results_dict = load_questionnaire_answers(folder_path, domain="biomechanical")
-
-    # get the dataframe of equipamentos and design escritório
-    df_equip = results_dict['622581']
-    df_design = results_dict['537796']
-
-    # get rosa scores
-    df_a_scores = _get_design_escritorio_results(df_design, pure_rosa=True)
-    df_b_c_scores = _get_equipamentos_results(df_equip, pure_rosa=True)
-
-    # get final rosa scores
-    scores_df = rt.calc_final_rosa_score(df_a_scores, df_b_c_scores)
-
-    # save dataframe into a csv file
-    folder_path = create_dir(find_project_root(), os.path.join(output_folder_path, f"group{extract_group_from_path(folder_path)}"))
-    scores_df.to_csv(os.path.join(folder_path, f"rosa_scores{CSV}"))
-
-
-def calculate_biomechanical_scores(folder_path, pure_rosa: bool, output_folder_path: str) -> None:
+def calculate_biomechanical_scores(folder_path,output_folder_path: str) -> None:
     """
     Calculates the individual rosa scores and cleans the answers for the biomechanical questionnaires of one group. Assumes that
     the questionnaire answers are stored in a directory such as: '...\\group1\\biomechanical\\files.csv'
@@ -109,11 +77,11 @@ def calculate_biomechanical_scores(folder_path, pure_rosa: bool, output_folder_p
 
         if questionnaire_name == DESIGN_ESCRITORIO:
 
-            results_df = _get_design_escritorio_results(answers_df, pure_rosa=pure_rosa)
+            results_df = _get_design_escritorio_results(answers_df, pure_rosa=False)
 
         elif questionnaire_name == EQUIPAMENTOS:
 
-            results_df = _get_equipamentos_results(answers_df, pure_rosa=pure_rosa)
+            results_df = _get_equipamentos_results(answers_df, pure_rosa=False)
 
         # it's incapacidade....
         else:
@@ -131,10 +99,16 @@ def calculate_biomechanical_scores(folder_path, pure_rosa: bool, output_folder_p
         list_dfs.append(results_df)
 
     # concat dataframes horizontally to have all personal questionnaires
-    final_df = pd.concat(list_dfs, axis=1)
+    biomechanical_df = pd.concat(list_dfs, axis=1)
 
     # fill NaN values with 0
-    final_df.fillna(0, inplace=True)
+    biomechanical_df.fillna('N', inplace=True)
+
+    # calculate pure rosa scores
+    rosa_scores_df = _calculate_rosa_scores(results_dict)
+
+    # cocat to have all the scores in the same df
+    final_df = pd.concat([biomechanical_df, rosa_scores_df], axis=1)
 
     # save dataframe into a csv file
     folder_path = create_dir(find_project_root(), os.path.join(output_folder_path, f"group{extract_group_from_path(folder_path)}"))
@@ -144,6 +118,32 @@ def calculate_biomechanical_scores(folder_path, pure_rosa: bool, output_folder_p
 # -------------------------------------------------------------------------------------------------------------------- #
 # private functions
 # -------------------------------------------------------------------------------------------------------------------- #
+def _calculate_rosa_scores(biomechanical_dict: Dict) -> pd.DataFrame:
+    """
+    Calculates the final pure rosa score (not normalized and min-max normalized) for each subject of one group
+    and saves them as a csv file. Assumes that the questionnaire answers are stored in a directory such as:
+    '...\\group1\\biomechanical\\files.csv'.
+
+    (scores are based on: https://www.sciencedirect.com/science/article/pii/S0003687011000433?via%3Dihub)
+
+    :param biomechanical_dict: Dictionary where the keys are the biomechanical questionnaire id's and the values are the raw
+                                dataframes with the subject's answers
+    :return: a pandas DataFrame with the rosa scores
+    """
+
+    # get the dataframe of equipamentos and design escritório
+    df_equip = biomechanical_dict['622581']
+    df_design = biomechanical_dict['537796']
+
+    # get rosa scores
+    df_a_scores = _get_design_escritorio_results(df_design, pure_rosa=True)
+    df_b_c_scores = _get_equipamentos_results(df_equip, pure_rosa=True)
+
+    # get final rosa scores
+    rosa_scores_df = rt.calc_final_rosa_score(df_a_scores, df_b_c_scores)
+
+    return rosa_scores_df
+
 
 def _get_design_escritorio_results(results_df: pd.DataFrame, pure_rosa: bool) -> pd.DataFrame:
     """
@@ -203,12 +203,22 @@ def _get_incapacidade_dor_results(results_df: pd.DataFrame) -> pd.DataFrame:
     # create copy
     df = results_df.copy()
 
-    # Replace any column substring "SQ00X" with the new descriptive name
+    # rename incapacidade / sofrimento / intensidade columns
     for old, new in zip(ID_OLD_COLUMNS, ID_NEW_COLUMNS):
-        df.columns = df.columns.str.replace(old, new, regex=False)
+        mask = df.columns.str.contains(old) & (
+                df.columns.str.contains('incapacidade', case=False) |
+                df.columns.str.contains('sofrimento', case=False) |
+                df.columns.str.contains('intensidade', case=False) |
+                df.columns.str.contains('tempo', case=False) |
+                df.columns.str.contains('localizacao', case=False)
+        )
+        df.columns = df.columns.where(~mask, df.columns.str.replace(old, new, regex=False))
+
+    # rename pain perception columns
+    df.rename(columns=ID_PAIN_PERCEPTION_MAPPING, inplace=True)
 
     # replace missing values with '0'
-    df = df.fillna('0')
+    df = df.fillna('N')
 
     # iterate through the columns
     for col in df.columns:

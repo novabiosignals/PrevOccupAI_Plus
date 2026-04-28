@@ -42,7 +42,6 @@ from utils import create_dir
 from constants import DATE_FORMAT
 from.constants import ROMAN_NUMBERS
 
-
 # ------------------------------------------------------------------------------------------------------------------- #
 # class
 # ------------------------------------------------------------------------------------------------------------------- #
@@ -161,7 +160,6 @@ def plot_timeline_per_acquisition(day_metrics_dict: Dict, day: str, subject: str
         handle_plot(save_dir=output_path, save=True, filename=filename)
 
 
-
 def get_day_string(date_string: str, locale_string: str = "Portuguese_Portugal.1252") -> Tuple[str, str]:
     """
     Gets the day as a string (i.e. Mon, Tue, Wednesday, etc.) from a date string in the language of the defined locale
@@ -264,7 +262,7 @@ def generate_grouped_legend(dates: List[str], times: List[str]) -> List[str]:
     return legend_lines
 
 
-def handle_plot(save_dir:str, save=False, filename="plot.png")-> None:
+def handle_plot(save_dir:str, save=True, filename="plot.png")-> None:
     """
     Handles the display and saving of matplotlib plots based on user-defined options.
 
@@ -339,16 +337,16 @@ def reconstruct_df_from_dict(timeline_metrics_dict: Dict[str, str], fs: int, cla
     return df
 
 
-def get_weekday_name(date_string, locale_string):
+def get_weekday_name(date_string, locale_string, date_format=DATE_FORMAT):
     """
     Returns the name of the day for a given date string in a specified locale.
 
-    :param date_string: the date string in 'YYYY-MM-DD' format
+    :param date_string: the date string in 'DD-MM-YYYY' format
     :param locale_string: the locale string (e.g., 'pt_BR', 'en_US') used to localize the day name
     :return: the localized day name without '-feira' and properly encoded in UTF-8
     """
     # parse the date string into a datetime object
-    date_time = datetime.strptime(date_string, DATE_FORMAT)
+    date_time = datetime.strptime(date_string, date_format)
 
     try:
         # set the locale for date formatting
@@ -367,3 +365,55 @@ def get_weekday_name(date_string, locale_string):
     day_name = day_name.encode('latin1').decode('utf-8', errors='ignore')
 
     return day_name
+
+
+def add_percentage_labels(ax,stacks: list[list[float]],fontsize: int = 14,use_axes: bool = False,
+                          min_display_percent: float = 3) -> None:
+    """
+    Add percentage labels on top of stacked bars.
+    Skips any percentage smaller than `min_display_percent`.
+
+    :param ax: matplotlib Axes object
+    :param stacks: list of lists, each sublist is the heights of one "layer" in the stack (0–100)
+    :param fontsize: font size for the labels
+    :param use_axes: if True, interpret heights as fractions of axes height (0–1)
+    :param min_display_percent: percentages smaller than this are not shown
+    """
+    if not stacks:
+        return
+
+    n_bars = len(stacks[0])
+    n_layers = len(stacks)
+
+    for i in range(n_bars):
+        bottom_accum = 0
+
+        # Get the original values for this bar
+        layer_vals_orig = [stacks[j][i] for j in range(n_layers)]
+
+        # Skip layers smaller than min_display_percent
+        display_flags = [val >= min_display_percent for val in layer_vals_orig]
+
+        # Round for display if needed
+        layer_vals = [round(val) for val in layer_vals_orig]
+        if sum(display_flags) > 0:
+            layer_vals[-1] = 100 - sum(layer_vals[:-1])  # ensure total 100
+
+        for j, val in enumerate(layer_vals):
+            layer_height = layer_vals_orig[j]
+
+            if not display_flags[j] or layer_height <= 0:
+                bottom_accum += layer_height
+                continue
+
+            # Decide vertical alignment
+            y_pos = bottom_accum + layer_height / 2
+            va = 'center'
+
+            if use_axes:
+                y_frac = y_pos / 100
+                ax.text(0.5 if n_bars == 1 else i,y_frac,f"{val}%",ha='center',va=va,fontsize=fontsize,transform=ax.transAxes)
+            else:
+                ax.text(i,y_pos,f"{val}%",ha='center',va=va,fontsize=fontsize)
+
+            bottom_accum += layer_height

@@ -248,7 +248,6 @@ def _load_all_muscleban_data(file_path: Path) -> pd.DataFrame:
     :param file_path: Path to the muscleban file to be loaded.
     :return:  A DataFrame containing the EMG and ACC data from the muscleban
     """
-
     # load data into a csv file
     sensor_df = pd.read_csv(file_path, delimiter = '\t', header=None, skiprows=3)
 

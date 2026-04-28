@@ -24,32 +24,53 @@ _validate_load_devices(...): check if input sensors and devices are valid
 # imports
 # -------------------------------------------------------------------------------------------------------------------- #
 import re
+import os
+from datetime import datetime
 from pathlib import Path
 from typing import List, Dict
 from .subject_info import load_participants_info, get_muscleban_side
-from constants import PHONE, WATCH, MBAN, MAC_ADDRESS_PATTERN, PHONE_SENSORS, WATCH_SENSORS, MBAN_SENSORS, HEART
+from constants import PHONE, WATCH, MBAN, MAC_ADDRESS_PATTERN, PHONE_SENSORS, WATCH_SENSORS, MBAN_SENSORS, HEART, NOISE
 
 # ------------------------------------------------------------------------------------------------------------------- #
 # file specific constants
 # ------------------------------------------------------------------------------------------------------------------- #
 MIN_BYTES = 1500
-MIN_BYTES_INERTIAL = 1000000
+MIN_BYTES_INERTIAL = 2000000
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # public functions
 # -------------------------------------------------------------------------------------------------------------------- #
 
 def get_sensor_paths_per_device(folder_path: str, load_devices: Dict[str, List[str]]):
-    """Resolve every acquisition file per device so loaders can open them later.
+    """
+    Load, filter, and organize sensor file paths for multiple devices into a nested dictionary.
 
-        The helper performs several steps: validate inputs, gather raw paths, split MuscleBAN files into
-        individual sides, group everything by acquisition folder, and finally keep the preferred file
-        (largest/OSCompatible) per slot.
+    This function does the following:
+      (1). Load all file paths from the input `folder_path`, grouped by device type.
 
-        :param folder_path: Absolute or relative path pointing at a single day folder (e.g. ``.../2025-09-24``).
-        :param load_devices: Mapping of device names to sensor lists, mirroring ``SELECTED_SENSORS`` in ``main_emg``.
-        :returns: Nested dict ``device -> acquisition_label -> [Path, ...]`` ready for :func:`load_daily_acquisitions`.
-        """
+         - For phone and watch devices, loads only the sensors defined in load_devices.
+         - For MBAN devices, load_signals all MBAN files (from both left and right mbans).
+
+      (1.1). If MBAN is to be loaded, split its files into separate sides ('mban_left', 'mban_right').
+
+      (2). Group the collected file paths by acquisition time (folder names with the format hh-mm-ss).
+
+      (2.1). For the MBAN, keep only the largest file for each acquisition.
+
+    Final Output:
+      Returns a nested dictionary in the form:
+      {device_name: {
+            acquisition_time: [Path, Path, ...], ...},
+          ...}
+    :param folder_path: Root folder containing all the acquisitions for a single day.
+    :param load_devices: Dictionary with the devices and sensors to be loaded. (e.g.: {phone: [ACC, GYR, MAG], watch: [ACC]}
+            Supported devices/sensors:
+            {phone: [ACC, GYR, MAG, ROT, NOISE],
+             watch: [ACC, GYR, MAG, ROT, HR],
+             mban: [ACC, EMG]}
+
+    :return: Nested dictionary mapping each device to its acquisition times and corresponding file paths.
+    """
     # innit dict for holding the unsorted paths
     paths_dict: Dict[str, List[Path]] = {}
 
@@ -95,6 +116,28 @@ def get_sensor_paths_per_device(folder_path: str, load_devices: Dict[str, List[s
 
     return nested_paths_dict
 
+
+def get_session_ids(folder_path: str) -> Dict[str, int]:
+    """
+    Gets the session time and the corresponding ID for the folders that contain the watch and muscleBAN data.
+    The session ID is the session number (1 - 4).
+    :param folder_path:  Root folder containing all the acquisitions for a single day.
+    :return: Dictionary with the session time and the corresponding ID.
+             Example:
+             {'14-00-01': 1, '14-30-00': 2, '16-00-00': 3, '17-30-00': 4}
+    """
+
+    # get the valid date folders (only folders that contain watch and muscleBAN data
+    watch_mban_folders = _get_watch_mban_folders(folder_path)
+
+    # generate the dictionary
+    session_ids_dict = {}
+    for session_id, watch_mban_folder in enumerate(watch_mban_folders, start=1):
+        session_ids_dict[watch_mban_folder] = session_id
+
+
+    return session_ids_dict
+
 # -------------------------------------------------------------------------------------------------------------------- #
 # private functions
 # -------------------------------------------------------------------------------------------------------------------- #
@@ -108,10 +151,13 @@ def _get_device_files(device: str, sensor_list: List[str], folder_path: str) -> 
     Note: for the mban, this function does not handle keeping only the selected sensors (EMG or ACC), since all data is
     in the same file. This is handled when loading the data into pandas dataframes
 
-    :param device: Device key such as ``phone`` or ``mban``.
-    :param sensor_list: Sensors requested for that device.
-    :param folder_path: Root folder containing all device acquisition data.
-    :return: List of :class:`Path` objects prior to acquisition grouping.
+    :param device: str pertaining to the device name. Supported devices: 'phone', 'watch', 'mban'
+    :param sensor_list: list of sensors to load_signals for each device. Supported sensors per device:
+                        phone: [ACC, GYR, MAG, ROT, NOISE]
+                        watch: [ACC, GYR, MAG, ROT, HR]
+                        mban: [ACC, EMG]
+    :param folder_path: Root folder containing all the acquisitions for a single day..
+    :return: list with paths
     """
     if device in (PHONE, WATCH):
 
@@ -125,10 +171,13 @@ def _get_device_files(device: str, sensor_list: List[str], folder_path: str) -> 
 
 
 def _keep_largest_file_per_acquisition(grouped_acquisitions_dict: Dict[str, List[Path]]) -> Dict[str, List[Path]]:
-    """Keep a single high-quality file per acquisition slot.
+    """
+    Keeps only the largest file for each acquisition time in the dictionary.
+    If the largest file is smaller than 1.5 KB, the acquisition is removed.
 
-    :param grouped_acquisitions_dict: Dict mapping acquisition label → list of candidate paths.
-    :returns: Same dict but with each value containing either one preferred file or nothing.
+    :param grouped_acquisitions_dict: Dict mapping acquisition time -> list of Paths
+    :return: The same dict, with only the largest file kept per acquisition,
+             or no entry if the largest file is too small.
     """
 
     # Store acquisition times to delete later (to avoid modifying dict while iterating)
@@ -137,16 +186,20 @@ def _keep_largest_file_per_acquisition(grouped_acquisitions_dict: Dict[str, List
     # Loop through each acquisition time and its associated list of file paths
     for acq_time, paths in grouped_acquisitions_dict.items():
 
-        if not paths:
-            to_delete.append(acq_time)
-            continue
+        # Ensure the list is not empty
+        if paths:
 
-        preferred = _select_preferred_mban_file(acq_time, paths)
-        if preferred is None or preferred.stat().st_size < MIN_BYTES:
-            to_delete.append(acq_time)
-            continue
+            # Find the file with the largest size
+            largest = max(paths, key=lambda p: p.stat().st_size)
 
-        grouped_acquisitions_dict[acq_time] = [preferred]
+            # Check if the largest file is >= MIN_BYTES
+            if largest.stat().st_size >= MIN_BYTES:
+
+                # Keep only the largest file
+                grouped_acquisitions_dict[acq_time] = [largest]
+            else:
+                # Mark acquisition for deletion if largest file is too small
+                to_delete.append(acq_time)
 
     # Remove acquisitions where the biggest file in < MIN_BYTES
     for acq_time in to_delete:
@@ -268,11 +321,11 @@ def _get_android_filepaths(device_name: str, sensor_list: List[str], folder_path
 
         # check for the string ANDROID but can not have WEAR
         files = [file for file in Path(folder_path).resolve().glob("**/*ANDROID*") if "WEAR" not in file.name
-                 and file.stat().st_size >= MIN_BYTES_INERTIAL]
+                 and (file.stat().st_size >= MIN_BYTES if NOISE in file.name else file.stat().st_size >= MIN_BYTES_INERTIAL)]
 
     else:
 
-        # check for the string ANDROID but can not have WEAR
+        # check for the string WEAR
         files = [file for file in Path(folder_path).resolve().glob("**/*WEAR*")
                  if (file.stat().st_size >= MIN_BYTES if HEART in file.name else file.stat().st_size >= MIN_BYTES_INERTIAL)]
 
@@ -379,3 +432,48 @@ def _validate_load_devices(load_devices: Dict[str, List[str]]) -> None:
                 f"Invalid sensors for device '{device}': {invalid_sensors}. "
                 f"Valid options are: {valid_sensors_per_device[device]}"
             )
+
+def _get_watch_mban_folders(folder_path: str):
+    """
+    gets all folder names containing watch or muscleBAN data
+    :param folder_path: Root folder containing all the acquisitions for a single day..
+    :return: list containing the folder names
+    """
+
+    # init list
+    valid_folders = []
+
+    # list all sub-folders in the path
+    sub_folders = os.listdir(folder_path)
+
+    # cycle over the sub-folders
+    for folder_name in sub_folders:
+
+        # create full path
+        sub_folder_path = os.path.join(folder_path, folder_name)
+
+        # ignore any files
+        if not os.path.isdir(sub_folder_path):
+            continue
+
+        # ignore folders that are not session times
+        try:
+            datetime.strptime(folder_name, "%H-%M-%S")
+        except ValueError:
+            continue
+
+        # check whether the folder contains any files from the phone
+        files = os.listdir(sub_folder_path)
+        has_invalid_file = any(
+            "ANDROID" in f and "WEAR" not in f
+            for f in files
+        )
+
+        # add the folder to the list
+        if not has_invalid_file:
+            valid_folders.append(folder_name)
+
+    # sort the folders
+    valid_folders.sort(key=lambda x:datetime.strptime(x, "%H-%M-%S"))
+
+    return valid_folders

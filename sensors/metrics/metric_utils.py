@@ -4,8 +4,10 @@ Helper functions for extracting sensor metrics
 Available Functions
 -------------------
 [Public]
+split_df_by_non_nan_blocks(...): Split a DataFrame into contiguous non-NaN acquisition blocks.
 calculate_statistics(...): Compute summary statistics for a numeric column.
 calculate_class_distributions(...): Calculate class distributions for a specified column containing the class labels.
+calculate_class_durations(...): Calculate the duration of each class in seconds and save it to a dictionary.
 -------------------
 
 [Private]
@@ -15,11 +17,38 @@ calculate_class_distributions(...): Calculate class distributions for a specifie
 # imports
 # ------------------------------------------------------------------------------------------------------------------- #
 import pandas as pd
-from typing import Dict
+from typing import Dict, List
+
+from OH_profile.constants import DURATION_SECONDS_SUFFIX_KEY
+
 
 # ------------------------------------------------------------------------------------------------------------------- #
 # public functions
 # ------------------------------------------------------------------------------------------------------------------- #
+
+def split_df_by_non_nan_blocks(df: pd.DataFrame, column_name: str) -> List[pd.DataFrame]:
+    """
+    Split a DataFrame into contiguous blocks where 'column' is not NaN.
+
+    :param df: pandas DataFrame to be split
+    :param column_name: nameof the column to be used as reference
+    :return: List of DataFrames, each corresponding to a continuous non-NaN block of 'column'
+    """
+    # Boolean mask: True where column is not NaN
+    mask = df[column_name].notna()
+
+    # Identify block changes (each time mask changes value)
+    block_id = mask.ne(mask.shift()).cumsum()
+
+    # Keep only blocks where mask is True
+    blocks = [
+        group.copy()
+        for key, group in df.groupby(block_id)
+        if mask[group.index].iloc[0]
+    ]
+
+    return blocks
+
 
 def calculate_statistics(df: pd.DataFrame, column_name: str) -> Dict[str, float]:
     """
@@ -63,6 +92,31 @@ def calculate_class_distributions(df: pd.DataFrame, column_name: str, nr_decimal
     distributions = {class_name: round(distribution, nr_decimals) for class_name, distribution in distributions.items()}
 
     return distributions
+
+
+def calculate_class_durations(df: pd.DataFrame, fs: int, class_distributions: Dict[str, float], nr_decimals: int = 4) -> Dict[str, float]:
+    """
+    Calculate the duration of each class in seconds and save it to a dictionary.
+
+    :param df: The dataframe containing the noise data
+    :param fs: The sampling frequency of the noise recorder
+    :param class_distributions: A dictionary with the class distributions {class_1: 0.5, class_2: 0.5}
+    :param nr_decimals: number of decimal places to round the class distributions (Default = 4).
+    :return: A dictionary with the class durations {total_dur_s: float , class_1_dur_s: float, class_2_dur_s: float}
+    """
+
+    # init dict to store the durations
+    durations_dict = {}
+
+    # calculate the total duration in seconds of the noise data
+    total_dur_s = len(df) / fs
+
+    # cycle over the dictionary with the class distributions
+    for class_name, distribution in class_distributions.items():
+
+        durations_dict[f"{class_name}{DURATION_SECONDS_SUFFIX_KEY}"] = round(distribution * total_dur_s, nr_decimals)
+
+    return durations_dict
 
 
 def calculate_timeline_metrics(acquisition_df: pd.DataFrame, class_column_name: str, class_ignore: str = None) -> Dict[str, str]:

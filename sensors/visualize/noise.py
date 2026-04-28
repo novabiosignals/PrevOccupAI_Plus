@@ -11,7 +11,6 @@ plot_noise_timeline_per_day(...): Generates timeline plots using fixed-size wind
 -------------------
 """
 
-
 # ------------------------------------------------------------------------------------------------------------------- #
 # imports
 # ------------------------------------------------------------------------------------------------------------------- #
@@ -25,15 +24,15 @@ from matplotlib.ticker import FuncFormatter
 from typing import Dict
 
 # internal imports
-from .plot_utils import handle_plot, get_weekday_name
+from .plot_utils import handle_plot, get_weekday_name, add_percentage_labels
 from utils import create_dir
 from sensors.metrics.noise import NOISE_NEAR_SILENCE_KEY, NOISE_LOW_KEY, NOISE_DISTURBING_KEY, NOISE_HIGH_KEY, NOISE_TIMELINE_WLEN, NOISE_DISTRIBUTIONS_NOISE, W_SIZE_MINUTES
 from constants import DATE_FORMAT
-from .constants import GREEN, PALE_GREEN, YELLOW, RED
+from .constants import GREEN, PALE_GREEN, YELLOW, RED, STRONG_GREEN
 # ------------------------------------------------------------------------------------------------------------------- #
 # file specific constants
 # ------------------------------------------------------------------------------------------------------------------- #
-CLASS_COLORS = {NOISE_NEAR_SILENCE_KEY: GREEN,
+CLASS_COLORS = {NOISE_NEAR_SILENCE_KEY: STRONG_GREEN,
                 NOISE_LOW_KEY: PALE_GREEN,
                 NOISE_DISTURBING_KEY: YELLOW,
                 NOISE_HIGH_KEY: RED
@@ -138,15 +137,16 @@ def _plot_noise_timeline_per_week(timeline_dict: dict, subject: str, save_dir: s
 
                 ax.plot([start_plot, end_plot], [y_idx, y_idx],
                         color=CLASS_COLORS.get(noise_class, "gray"),
-                        linewidth=10)
+                        linewidth=15)
 
     # Configure axes
     ax.set_yticks(range(len(unique_dates)))
-    ax.set_yticklabels([get_weekday_name(d, 'pt_PT.UTF-8') for d in unique_dates])
+    ax.set_yticklabels([get_weekday_name(d, 'pt_PT.UTF-8') for d in unique_dates], fontsize=14)
     ax.set_ylim(-0.5, len(unique_dates) - 0.5)
     ax.invert_yaxis()
 
     ax.xaxis.set_major_formatter(mdates.DateFormatter("%H:%M"))
+    ax.tick_params(axis="x", labelsize=14)
     ax.set_xlabel("Hora do Dia", fontsize=12)
     ax.set_title(f"Nível de ruído ao longo do dia", fontsize=14)
 
@@ -156,7 +156,7 @@ def _plot_noise_timeline_per_week(timeline_dict: dict, subject: str, save_dir: s
         spine.set_visible(False)
 
     ax.legend(handles=LEGEND_PATCHES, loc="upper center", bbox_to_anchor=(0.5, -0.15),
-              ncol=len(CLASS_COLORS), frameon=False, fontsize=12)
+              ncol=len(CLASS_COLORS), frameon=False, fontsize=14)
 
     plt.tight_layout(rect=[0, 0, 1, 0.95])
 
@@ -223,6 +223,10 @@ def _plot_noise_distributions_per_week(distributions_dict: dict, subject: str, s
     for cls in all_classes:
         ax.bar(positions, class_props[cls], bottom=bottom, color=colors[cls], label=cls)
         bottom += np.array(class_props[cls])
+
+    # --- Add percentage labels ---
+    stacks = [class_props[cls] for cls in all_classes]
+    add_percentage_labels(ax, stacks, fontsize=10, min_display_percent=2)
 
     ax.grid(axis="y", color="lightgray", linestyle="--", linewidth=0.7)
     ax.set_axisbelow(True)

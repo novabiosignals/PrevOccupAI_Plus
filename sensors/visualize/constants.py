@@ -4,12 +4,19 @@
 
 GREEN = "#81C784"
 PALE_GREEN = "#A5D6A7"
+STRONG_GREEN = "#3F8D43"
 YELLOW = "#FFCC80"
 RED = "#EF9A9A"
 DEEP_RED = '#FF6A60'
 LIGHT_RED = '#F8C1C1'
 LIGHT_GRAY = '#E0E0E0'
 GRAY = '#B0B0B0'
+PREVOCCUPAI_BLUE = '#3C787E'
+LIGHT_PREVOCCUPAI_BLUE = '#6CA3A9'
+BLUE_STATE = '#7391AB'
+DUSTY_GRAPE = '#586189'
+REDDISH_BROWN = '#994636'
+SALMON = '#F19C93'
 # ------------------------------------------------------------------------------------------------------------------- #
 # label constants
 # ------------------------------------------------------------------------------------------------------------------- #

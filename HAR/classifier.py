@@ -37,6 +37,11 @@ from constants import ACC, GYR, MAG, ACTIVITY_COLUMN_NAME
 SENSORS_TO_LOAD = [ACC, GYR, MAG] # sensors to extract features from
 
 HAR_MODEL = "HAR_model_500.joblib"
+BLOCK_ID_COLUMN_NAME = 'block_id'  # TODO move this to constants
+
+CLASS_WALK = 2
+CLASS_STAND = 1
+CLASS_SIT = 0
 
 PROB_THRESHOLD = 0.85 # threshold for probability thresholding
 MIN_DURATIONS = {0: 20, 1: 30, 2: 5} # durations for 0 (sitting), 1 (standing), 2 (walking)
@@ -62,19 +67,26 @@ def classify_human_activities(phone_data_dict: Dict[str, pd.DataFrame], w_size: 
     # create copy of the dictionary to avoid overwriting any results_questionnaires
     classified_dict = copy.deepcopy(phone_data_dict)
 
+    # inform user
+    print("\n# ------------------------------------------------------------------------ #")
+    print(f"# ------------------ performing HAR classification  ------------------- #")
+    print("# ------------------------------------------------------------------------ #")
+    # load HAR the model
+    model, model_features = load_production_model(os.path.join(Path(__file__).parent, HAR_MODEL))
+
     # cycle over the dictionary with the daily acquisitions for the phone
     for acquisition_time, df in phone_data_dict.items():
 
         # extract features using TSFEL
         features_df = extract_features(df, sensors_to_load=SENSORS_TO_LOAD,w_size=w_size, fs=fs)
 
-        # load_signals the model
-        model, model_features = load_production_model(os.path.join(Path(__file__).parent, HAR_MODEL))
-
         # check if there are any missing features required for the classifier
         missing_features = [f for f in model_features if f not in features_df.columns]
         if missing_features:
             raise ValueError(f"Missing required features for the model: {missing_features}. ")
+
+        # inform user
+        print(f"--> classifying data (acquisition time: {acquisition_time})")
 
         # classify activities
         _, y_pred_exp = _apply_classification_pipeline(features_df[model_features], model, w_size=w_size, fs=fs,
@@ -88,6 +100,9 @@ def classify_human_activities(phone_data_dict: Dict[str, pd.DataFrame], w_size: 
 
          # add column to dataframe
         df[ACTIVITY_COLUMN_NAME] = y_pred_exp
+
+        # add block IDs based on changes in activity
+        df[BLOCK_ID_COLUMN_NAME] =  (df[ACTIVITY_COLUMN_NAME] != df[ACTIVITY_COLUMN_NAME].shift()).cumsum()
 
         # add to dict
         classified_dict[acquisition_time] = df

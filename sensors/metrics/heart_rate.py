@@ -17,7 +17,6 @@ _calculate_daily_class_proportions(...): Aggregate HR class proportions across a
 _get_min_heart_rate(...): Compute minimum HR across all acquisitions.
 _get_max_heart_rate(...): Estimate maximum HR from subject age.
 _extract_features_heart_rate(...): Extract per-acquisition HR features and class proportions.
-_split_df_by_non_nan_blocks(...): Split a DataFrame into contiguous non-NaN acquisition blocks.
 -------------------
 """
 # ------------------------------------------------------------------------------------------------------------------- #
@@ -34,15 +33,15 @@ import sensors.process as sp
 from constants import (ACTIVITY_COLUMN_NAME, HR_RATIO_COLUMN_NAME, HR_CLASS_COLUMN_NAME, WATCH_SUFFIX, ACC, GYR, MAG,
                        PHONE, WATCH, HEART)
 from OH_profile.constants import *
-from .metric_utils import calculate_statistics, calculate_class_distributions, calculate_timeline_metrics
+from .metric_utils import calculate_statistics, calculate_class_distributions, calculate_timeline_metrics, split_df_by_non_nan_blocks
 from utils import extract_date_from_path
 # ------------------------------------------------------------------------------------------------------------------- #
 # constants
 # ------------------------------------------------------------------------------------------------------------------- #
 
 # sensors to be loaded which are strictly needed for the HR plot
-selected_sensors = {PHONE: [ACC, GYR, MAG], # for HAR
-                    WATCH: [ACC,HEART]} # ACC to fill with NaN when the HR is not acquiring - do not remove ACC
+SELECTED_SENSORS = {PHONE: [ACC, GYR, MAG],  # for HAR
+                    WATCH: [ACC, HEART]} # ACC to fill with NaN when the HR is not acquiring - do not remove ACC
 
 
 # heart rate ratio per activity
@@ -92,7 +91,11 @@ def get_global_heart_rate_metrics(subject_data_folder_path: str, subject_age: in
         day_folder_path = os.path.join(subject_data_folder_path, date_folder)
 
         # load_signals all acquisitions from the same day into a nested dictionary
-        df_dict = sl.load_daily_acquisitions(day_folder_path, load_devices={WATCH: [HEART]})
+        df_dict, _ = sl.load_daily_acquisitions(day_folder_path, load_devices={WATCH: [HEART]})
+
+        # if no data was loaded
+        if len(df_dict) == 0:
+            return {}
 
         # iterate through all the acquisitions in the dictionary
         for time_key, df in df_dict[WATCH].items():
@@ -127,7 +130,6 @@ def get_heart_rate_metrics(day_folder_path: str, hr_min: float, hr_max: float, f
     :param w_size: The window size used for the human activity recognition model
     :return: A dictionary with the daily and per session metrics for this subject as follows:
     {"23-09-2025": {
-                    "HR_distributions_day": {...},
                     "15-00-00": {
                             "HR_BPM_stats": {...},
                             "HR_ratio_stats": {...},
@@ -141,7 +143,11 @@ def get_heart_rate_metrics(day_folder_path: str, hr_min: float, hr_max: float, f
     day_metrics_dict = {}
 
     # load_signals all acquisitions from the same day into a nested dictionary
-    df_dict = sl.load_daily_acquisitions(day_folder_path, load_devices=selected_sensors)
+    df_dict, session_ids_dict = sl.load_daily_acquisitions(day_folder_path, load_devices=SELECTED_SENSORS)
+
+    # if no data was loaded or there's no phone data, return empty dict
+    if len(df_dict) == 0 or len(df_dict[PHONE]) == 0:
+        return {}
 
     # pre-process data
     processed_df_dict = sp.apply_pre_processing_pipeline(df_dict, fs_android=fs)
@@ -153,7 +159,7 @@ def get_heart_rate_metrics(day_folder_path: str, hr_min: float, hr_max: float, f
     sync_df = sync_df[[ACTIVITY_COLUMN_NAME, f"{HEART}{WATCH_SUFFIX}", f"y_{ACC}{WATCH_SUFFIX}"]]
 
     # split into dataframes with just the watch data
-    acquisitions_dfs = _split_df_by_non_nan_blocks(sync_df, column_name=f"y_{ACC}{WATCH_SUFFIX}")
+    acquisitions_dfs = split_df_by_non_nan_blocks(sync_df, column_name=f"y_{ACC}{WATCH_SUFFIX}")
 
     # get date from path
     date = extract_date_from_path(day_folder_path)
@@ -174,11 +180,15 @@ def get_heart_rate_metrics(day_folder_path: str, hr_min: float, hr_max: float, f
         # check if the activity column is nan in more than half of the acquisition - phone stopped acquiring before watch
         if acquisitions_df[ACTIVITY_COLUMN_NAME].isna().mean() > 0.5:
 
-            print(f"No activity labels for this acquisition. Skipping...")
+            print(f"WARNING: No activity labels for this acquisition. Skipping...")
             continue
 
         # get hr features
         acquisitions_metrics, nr_classes = _calculate_hr_metrics_per_acquisition(acquisitions_df, hr_min, hr_max)
+
+        # add the session number to the acquisition metrics
+        session_time = list(acquisitions_metrics.keys())[0]
+        acquisitions_metrics[session_time][SESSION_KEY] = session_ids_dict[session_time]
 
         # add to dict
         day_metrics_dict[date].update(acquisitions_metrics)
@@ -335,30 +345,6 @@ def _classify_hr_ratio(activity: int, hr_ratio: float) -> str:
 
     # remaining is abnormal
     return HR_ELEVATED_KEY
-
-
-def _split_df_by_non_nan_blocks(df: pd.DataFrame, column_name: str) -> List[pd.DataFrame]:
-    """
-    Split a DataFrame into contiguous blocks where 'column' is not NaN.
-
-    :param df: pandas DataFrame to be split
-    :param column_name: nameof the column to be used as reference
-    :return: List of DataFrames, each corresponding to a continuous non-NaN block of 'column'
-    """
-    # Boolean mask: True where column is not NaN
-    mask = df[column_name].notna()
-
-    # Identify block changes (each time mask changes value)
-    block_id = mask.ne(mask.shift()).cumsum()
-
-    # Keep only blocks where mask is True
-    blocks = [
-        group.copy()
-        for key, group in df.groupby(block_id)
-        if mask[group.index].iloc[0]
-    ]
-
-    return blocks
 
 
 def _extract_features_heart_rate(acquisition_df: pd.DataFrame) -> Dict:
