@@ -19,6 +19,7 @@ from typing import Dict, List, Optional, Tuple
 import numpy as np
 import pandas as pd
 
+from constants import MVC
 from sensors.process.emg_preprocessing import bandpass_filter, tkeo, compute_tkeo_envelope
 
 
@@ -769,6 +770,6 @@ def pick_mvc(
     :returns: Tuple of (label, dataframe) or (None, None) if no MVC found.
     """
     for key, df in acquisitions.items():
-        if "mvc" in key.lower():
+        if MVC in key:
             return key, df
     return None, None

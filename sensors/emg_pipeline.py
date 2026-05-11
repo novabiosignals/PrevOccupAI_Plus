@@ -33,6 +33,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple, cast
 
+from OH_profile.constants import SESSION_KEY
+
 # Type alias for preprocessing configuration dictionary.
 # Keys typically include: fs, lowcut, highcut, smooth_sigma_ms, envelope_preview_seconds
 PreprocessConfig = Dict[str, Any]
@@ -173,10 +175,14 @@ def run_emg_pipeline(
 
     # Main per-day processing loop (first pass: compute metrics and cache signals)
     for day in day_descriptors:
+
+        # inform user
+        print(f'Processing subject: {day["subject_id"]}')
+
         # Track quality_records length before loading to identify new rejections
         records_before_load = len(quality_records)
         
-        day_data = load_day_acquisitions(day, selected_sensors, quality_log=quality_records)
+        day_data, session_ids_dict = load_day_acquisitions(day, selected_sensors, quality_log=quality_records)
         
         # Generate diagnostic plots for any sessions rejected during loading (e.g., ADC saturation)
         if generate_visuals and len(quality_records) > records_before_load:
@@ -194,6 +200,7 @@ def run_emg_pipeline(
         day_metrics, day_signals = _process_day(
             day,
             day_data,
+            session_ids_dict,
             config,
             percentiles,
             plots_root if generate_visuals else None,
@@ -573,6 +580,7 @@ def _plot_mvc_segments_with_diagnostics(
 def _process_day(
     day: dict,
     day_data: Dict[str, Dict[str, pd.DataFrame]],
+    session_ids_dict: Dict[str, str],
     config: PreprocessConfig,
     percentiles: Sequence[int],
     plots_root: Optional[Path],
@@ -584,6 +592,7 @@ def _process_day(
 
     :param day: Descriptor that points to folders and metadata (subject, group, MAC addresses).
     :param day_data: Nested dict shaped ``device -> session_label -> DataFrame`` from the loader.
+    :param session_ids_dict: Dictionary containing info on which acquisition time corresponds to which session.
     :param config: Shared preprocessing configuration for filtering/enveloping.
     :param percentiles: Percentiles used when building the APDF summary record.
     :param plots_root: Root path where visuals should be written, or ``None`` to skip.
@@ -816,6 +825,10 @@ def _process_day(
             side_label = metadata["side"]
             metrics, apdf = compute_session_metrics(percent_signal, config["fs"], metadata, percentiles)
             metrics["mvc_peak"] = mvc_peak  # Add MVC reference value (in mV)
+
+            # add session id to identify which session it is
+            metrics[SESSION_KEY] = session_ids_dict[session_label]
+
             day_metrics.append(metrics)
 
             # Cache signal for relative bin computation (keyed by unique session identifier)

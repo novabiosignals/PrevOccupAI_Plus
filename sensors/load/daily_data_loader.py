@@ -31,18 +31,20 @@ from tqdm import tqdm
 import math
 
 # internal imports
-from constants import PHONE, WATCH, VALID_MBAN_DATA, NSEQ, IMU_SENSORS, TIME_COLUMN_NAME, ROT, NOISE, HEART, MBAN
+from constants import PHONE, WATCH, VALID_MBAN_DATA, NSEQ, IMU_SENSORS, TIME_COLUMN_NAME, ROT, NOISE, HEART, MBAN, \
+    OS_COMPATIBLE
 from .data_quality import (
     DataQualityError,
     FileQualityReport,
-    assess_muscleban_dataframe,
-    add_report_context,
+    create_file_quality_report,
+    create_quality_issue,
+    assess_mban_data_validity,
+    write_info_to_report,
     describe_report,
-    is_report_valid,
-    MIN_MUSCLEBAN_SAMPLES,
-    MIN_MVC_OSCOMPATIBLE_SAMPLES,
+    report_contains_issues,
+    MESSAGE_KEY, CODE_KEY,
 )
-from .path_handler import get_sensor_paths_per_device
+
 from utils import extract_date_from_path
 from .path_handler import get_sensor_paths_per_device, get_session_ids
 from .parser import extract_sensor_from_filename
@@ -63,11 +65,12 @@ STARTING_TIMES = 'starting times'
 STOPPING_TIMES = 'stopping times'
 
 ROUNDING_FACTOR = 1000 # sampling rate  times 10
+
 # -------------------------------------------------------------------------------------------------------------------- #
 # public functions
 # -------------------------------------------------------------------------------------------------------------------- #
 def load_daily_acquisitions(folder_path: str, load_devices: Dict[str, List[str]], fs_android: int = 100,
-                            padding_type: str = PADDING_SAME) -> Tuple[Dict[str, Dict[str, pd.DataFrame]], Dict[str, int]]:
+                            padding_type: str = PADDING_SAME, quality_log: List[FileQualityReport] | None = None) -> Tuple[Dict[str, Dict[str, pd.DataFrame]], Dict[str, int]]:
     """
     Load sensor data of an entire day.
 
@@ -75,14 +78,6 @@ def load_daily_acquisitions(folder_path: str, load_devices: Dict[str, List[str]]
     folder_path pertains to the date of the acquisition and that inside there are subfolders regarding the scheduled
     acquisition times, with the correspondent sensor files. This function loads all the data from the devices and sensors
     defined in load_sensors, into a nested dictionary with the following format:
-def  load_daily_acquisitions(
-    folder_path: str,
-    load_devices: Dict[str, List[str]],
-    fs_android: int = 100,
-    padding_type: str = PADDING_SAME,
-    quality_log: List[FileQualityReport] | None = None,
-) -> Dict[str, Dict[str, pd.DataFrame]]:
-    Load every acquisition for the requested devices/sensors within a single day folder.
 
     {
     'phone': {'9-45-00': df},
@@ -103,6 +98,7 @@ def  load_daily_acquisitions(
     :param fs_android: the sampling rate to which all android sensors should be re-sampled to. Default: 100 (Hz)
     :param padding_type: padding which should be used to ensure that all sensors start and stop at the same time. The
                          following padding types are supported: 'same', 'zero'. Default: 'same'
+    :param quality_log: Optional mutable list that collects :class:`FileQualityReport` objects for skipped files.
     :return: a nested dictionary containing the sensor data from the devices and sensors in load_sensors and a dictionary
              containing the sessions and their IDs for the watch and muscleBAN recordings.
     """
@@ -148,7 +144,7 @@ def  load_daily_acquisitions(
                     try:
                         muscleban_sensor_data = _load_muscleban_data(paths_list[0], sensor_list_mban)
                     except DataQualityError as exc:
-                        report = add_report_context(exc.report, device, acquisition_time)
+                        report = write_info_to_report(exc.report, device_label=device, acquisition_label=acquisition_time)
                         if quality_log is not None:
                             quality_log.append(report)
                         print(
@@ -535,62 +531,69 @@ def _load_muscleban_data(file_path: Path, sensor_list: List[str]) -> pd.DataFram
     # inform user
     print(f"\nLoading muscleBAN data from file: {file_path.name}.")
 
-    def _raise_quality_error(code: str, message: str, rows: int = 0, cols: int = 0) -> None:
-        report: FileQualityReport = {
-            "file_path": file_path,
-            "issues": [{"code": code, "message": message}],
-            "rows": rows,
-            "columns": cols,
-        }
+    # load data into a dataframe and check for some basic file loading errors
+    try:
+
+        # read the data and extract the relevant columns (dropping MAG data as this is not reliable)
+        # mBAN columns: 0 - nseq; 2 - EMG; 3, 4, 5: Acc
+        sensor_df = _load_mban_file(file_path)
+
+    # empty file or file without tabular data
+    except pd_errors.EmptyDataError:
+
+        # generate report and raise error
+        report = create_file_quality_report(file_path=file_path, issues=[create_quality_issue("empty-file", "File does not contain tabular data")])
         raise DataQualityError(report)
 
-    # load data into a dataframe
-    try:
-        sensor_df = pd.read_csv(file_path, delimiter='\t', header=None, skiprows=3)
-    except pd_errors.EmptyDataError:
-        _raise_quality_error("empty-file", "File does not contain tabular data")
+    # file not found, permission to read file denied, file is a directory
     except OSError as exc:
-        _raise_quality_error("io-error", f"Unable to read file: {exc}")
+
+        # generate report and raise error
+        report = create_file_quality_report(file_path=file_path, issues=[create_quality_issue("io-error", f"Unable to read file: {exc}")])
+        raise DataQualityError(report)
 
     # remove NaN-only columns that may appear when reading the TSV
-    sensor_df = sensor_df.dropna(axis=1, how="all")
+    # sensor_df = sensor_df.dropna(axis=1, how="all")
 
-    if sensor_df.empty:
-        _raise_quality_error("empty-file", "File only contains headers", rows=0, cols=0)
-
-    # if there are 9 columns the second column is only zeros (happens in some firmware versions)
-    if len(sensor_df.columns) > 8:
-
-        # remove zero column
-        sensor_df = sensor_df.drop(sensor_df.columns[1], axis=1)
-
-    # remove MAG channels (last three columns) when available
-    if len(sensor_df.columns) >= 3:
-        sensor_df = sensor_df.drop(sensor_df.columns[-3:], axis=1)
-
-    available_cols = len(sensor_df.columns)
-    if available_cols == 0:
-        _raise_quality_error("no-columns", "No usable channels remained after cleaning")
-
-    # align the column names with the expected order (nSeq, EMG, ACCx/y/z)
-    keep = min(available_cols, len(VALID_MBAN_DATA))
-    sensor_df = sensor_df.iloc[:, :keep]
-    sensor_df.columns = VALID_MBAN_DATA[:keep]
-
-    # run data-quality checks before filtering specific sensors
-    acquisition_label = file_path.parent.name.strip().upper()
-    stem_upper = file_path.stem.upper()
-    is_oscompatible_mvc = acquisition_label == "MVC" and "OSCOMPATIBLE" in stem_upper
-    min_samples = MIN_MVC_OSCOMPATIBLE_SAMPLES if is_oscompatible_mvc else MIN_MUSCLEBAN_SAMPLES
-
-    report = assess_muscleban_dataframe(sensor_df, file_path, min_samples=min_samples)
-    if not is_report_valid(report):
+    # perform muscleBAN data quality assessment
+    report = assess_mban_data_validity(sensor_df, file_path)
+    if report_contains_issues(report):
         raise DataQualityError(report)
 
     # keep only the sensors in sensor list (plus nSeq)
-    cols_to_keep = [col for col in sensor_df.columns
-                    if any(sensor in col for sensor in sensor_list) or col == NSEQ]
+    cols_to_keep = [col for col in sensor_df.columns if col in sensor_list or col == NSEQ]
     sensor_df = sensor_df[cols_to_keep]
+
+    return sensor_df
+
+def _load_mban_file(file_path: Path) -> pd.DataFrame:
+    """
+    Load the muscleBAN data depending on whether it is an MVC file or a normal acquisition files.
+    MVC files were recording using the BiosignalStudio app. This app stores the recorded data without the DI (digital input)
+    column. All other recordings were acquired using the PrevOccupAI app, which uses an older version of the PLUX API.
+    This API still saves the DI column into the .txt files.
+    TODO: if the API is updated within the app at some point, then the loading of normal recordings needs to be updated.
+    :param file_path: Pathlib.Path to the file
+    :return: pandas.DataFrame containing the loaded data. For MVC files only the nseq and EMG are loaded. For normal
+    recording the nseq, EMG, and ACC columns are loaded.
+    """
+
+    # get the file name
+    file_name = file_path.stem.upper()
+
+    # check whether this is an MVC file
+    if OS_COMPATIBLE in file_name.upper():
+
+        # only load the nseq and EMG columns
+        # mBAN columns for MVC files: 0 - nseq; 1 - EMG; 2, 3, 4: Acc
+        sensor_df = pd.read_csv(file_path, delimiter='\t', header=None, skiprows=3)[[0, 1]]
+        sensor_df.columns = VALID_MBAN_DATA[0:2]
+
+    else:
+        # read the data and extract the relevant columns (dropping MAG data as this is not reliable and DI column)
+        # mBAN columns for normal acquisitions: 0 - nseq; 2 - EMG; 3, 4, 5: Acc
+        sensor_df = pd.read_csv(file_path, delimiter='\t', header=None, skiprows=3)[[0, 2, 3, 4, 5]]
+        sensor_df.columns = VALID_MBAN_DATA
 
     return sensor_df
 

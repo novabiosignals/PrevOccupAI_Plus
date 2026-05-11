@@ -29,7 +29,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import List, Dict
 from .subject_info import load_participants_info, get_muscleban_side
-from constants import PHONE, WATCH, MBAN, MAC_ADDRESS_PATTERN, PHONE_SENSORS, WATCH_SENSORS, MBAN_SENSORS, HEART, NOISE
+from constants import PHONE, WATCH, MBAN, MAC_ADDRESS_PATTERN, PHONE_SENSORS, WATCH_SENSORS, MBAN_SENSORS, HEART, NOISE, \
+    MVC, OS_COMPATIBLE
 
 # ------------------------------------------------------------------------------------------------------------------- #
 # file specific constants
@@ -186,20 +187,19 @@ def _keep_largest_file_per_acquisition(grouped_acquisitions_dict: Dict[str, List
     # Loop through each acquisition time and its associated list of file paths
     for acq_time, paths in grouped_acquisitions_dict.items():
 
-        # Ensure the list is not empty
-        if paths:
+        # obtain the largest EMG recording from the files (in case there is more than one)
+        path_to_largest_file = _get_largest_mban_recording(acq_time, paths)
 
-            # Find the file with the largest size
-            largest = max(paths, key=lambda p: p.stat().st_size)
+        # check if either a file was found or whether this file is too small
+        if path_to_largest_file is None or path_to_largest_file.stat().st_size < MIN_BYTES:
 
-            # Check if the largest file is >= MIN_BYTES
-            if largest.stat().st_size >= MIN_BYTES:
+            # mark acquisition for deletion (no viable data)
+            to_delete.append(acq_time)
 
-                # Keep only the largest file
-                grouped_acquisitions_dict[acq_time] = [largest]
-            else:
-                # Mark acquisition for deletion if largest file is too small
-                to_delete.append(acq_time)
+        else:
+            # add the path to the grouped acquisition
+            # (the path is wrapped in a list for the object to be consistent with ANDROID recordings)
+            grouped_acquisitions_dict[acq_time] = [path_to_largest_file]
 
     # Remove acquisitions where the biggest file in < MIN_BYTES
     for acq_time in to_delete:
@@ -208,26 +208,48 @@ def _keep_largest_file_per_acquisition(grouped_acquisitions_dict: Dict[str, List
     return grouped_acquisitions_dict
 
 
-def _select_preferred_mban_file(acq_time: str, paths: List[Path]) -> Path | None:
-    """Return the preferred file for an acquisition, favoring OSCompatible MVC recordings.
+def _get_largest_mban_recording(acq_folder_label: str, paths: List[Path]) -> Path | None:
+    """
+    Return the largest file for an mBAN acquisition. This is needed in cases that there are more than one mBAN file
+    contained in the folder containing the files (e.g., when the mBAN lost contact or for MVC folder)
+    For files within MVC folders the OSCompatible MVC recordings are only considered. The OSCompatible MVC recordings
+    have the same format as the normal EMG recordings (data in raw format). Thus, these are compatible with the
+    implemented data quality and processing pipeline.
 
-    :param acq_time: Acquisition label such as ``09-30-00`` or ``MVC``.
+    :param acq_folder_label: label of the folder containing the paths. These can either be a time in the format
+                             ``%H-%M-%S`` (e.g., ``09-30-00``) or just the string ``MVC`` (indicates that the folder
+                             contains the MVC files).
     :param paths: Candidate file paths for that slot.
     :returns: Chosen :class:`Path` or ``None`` when no acceptable file exists.
     """
 
-    acq_upper = acq_time.strip().upper()
-    candidates = paths
-    if acq_upper == "MVC":
-        os_compatible = [p for p in paths if "OSCOMPATIBLE" in p.stem.upper()]
-        if not os_compatible:
-            return None
-        candidates = os_compatible
-
-    if not candidates:
+    # check for empty paths list
+    if not paths:
         return None
 
-    return max(candidates, key=lambda p: p.stat().st_size)
+    # transform acquisition time to upper (just to ensure that it's always the same format)
+    folder_name = acq_folder_label.strip().upper()
+
+    # check whether the acq_time contains MVC
+    # The preferred file to read is the OSCompatible files
+    if folder_name == MVC:
+
+        # filter for OSCompatible files only
+        os_compatible_paths = [p for p in paths if OS_COMPATIBLE in p.stem.upper()]
+
+        # no OSCompatible files found
+        if not os_compatible_paths:
+            return None
+        paths_to_consider = os_compatible_paths
+
+    # only a normal acquisition folder
+    else:
+        paths_to_consider = paths
+
+    # obtain the largest path file based on the considered paths
+    path_to_largest_file = max(paths_to_consider, key=lambda p: p.stat().st_size)
+
+    return path_to_largest_file
 
 
 def _filter_mban_files(paths_dict: Dict[str, List[Path]]) -> Dict[str, List[Path]]:

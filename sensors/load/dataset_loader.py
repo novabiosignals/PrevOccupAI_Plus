@@ -96,8 +96,9 @@ def load_day_acquisitions(
 
     if selected_sensors is None:
         selected_sensors = {MBAN: ["EMG"]}
-    return load_daily_acquisitions(
-        str(day_descriptor["day_path"]),
-        selected_sensors,
-        quality_log=quality_log,
-    )
+
+    # TODO carry forward the session_ids_dict, for now it is omitted for compatibility
+    df_dict, session_ids_dict = load_daily_acquisitions(str(day_descriptor["day_path"]), selected_sensors,
+                                                        quality_log=quality_log,)
+
+    return df_dict, session_ids_dict

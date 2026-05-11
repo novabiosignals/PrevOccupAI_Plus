@@ -15,7 +15,7 @@ from sensors.visualize import generate_emg_plots_from_oh_profiles
 # ------------------------------------------------------------------------------------------------------------------- #
 # Configuration
 # ------------------------------------------------------------------------------------------------------------------- #
-MAIN_ROOT = Path(r"D:\Backup PrevOccupAI_PLUS Data")
+MAIN_ROOT = Path(r"E:\Backup PrevOccupAI_PLUS Data")
 DATA_ROOT =  MAIN_ROOT / "data"
 PARTICIPANTS_CSV = Path("participants_info.csv")
 SELECTED_SENSORS = {MBAN: ["EMG"]}
@@ -160,6 +160,6 @@ def main(
 
 if __name__ == '__main__':
     # Run on ALL available subjects to assess 0.5% rest threshold meaningfulness
-    main(visualize=True, subject_filter=None)
+    main(load_data=True, preprocess=True, visualize=True, subject_filter=None)
 
 

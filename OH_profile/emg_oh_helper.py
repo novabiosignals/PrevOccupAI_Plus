@@ -16,6 +16,8 @@ OH Profile EMG Structure:
 import pandas as pd
 from typing import Dict, Any
 
+from sspicon import SECPKG_ATTR_SESSION_KEY
+
 # OH profile imports
 from OH_profile.load import get_OH_profile
 from OH_profile.write import save_OH_profile, write_to_OH_profile
@@ -40,7 +42,7 @@ from OH_profile.constants import (
     EMG_BIN_TYPICAL_HIGH_PCT_KEY, EMG_BIN_HIGH_FOR_YOU_PCT_KEY,
     # Aggregation keys
     EMG_DAILY_AGGREGATE_KEY, EMG_WEEKLY_AGGREGATE_KEY,
-    EMG_SESSION_COUNT_KEY, EMG_DAY_COUNT_KEY,
+    EMG_SESSION_COUNT_KEY, EMG_DAY_COUNT_KEY, SESSION_KEY,
 )
 
 # -------------------------------------------------------------------------------------------------------------------- #
@@ -120,6 +122,8 @@ def _build_session_metrics_dict(row: pd.Series) -> Dict[str, Any]:
             EMG_BIN_TYPICAL_HIGH_PCT_KEY: row.get("bin_typical_high_pct", None),
             EMG_BIN_HIGH_FOR_YOU_PCT_KEY: row.get("bin_high_for_you_pct", None),
         },
+        # Session id
+        SESSION_KEY: row.get(SESSION_KEY, None),
     }
 
     return _round_floats(metrics, ndigits=4)

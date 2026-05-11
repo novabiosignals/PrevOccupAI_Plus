@@ -464,7 +464,7 @@ def _calc_psd_area(freqs: np.ndarray, psd: np.ndarray) -> float:
     """
     if len(freqs) < 2:
         return 0.0
-    return float(np.trapz(psd, freqs))
+    return float(np.trapezoid(psd, freqs))
 
 
 def _calc_peak_width(

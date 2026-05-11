@@ -349,7 +349,7 @@ def compute_session_metrics(
     min_val = float(np.min(signal_percent))
 
     # Integrated EMG (area under the curve)
-    iemg_val = float(np.trapz(signal_percent, dx=1 / fs)) if fs else float("nan")
+    iemg_val = float(np.trapezoid(signal_percent, dx=1 / fs)) if fs else float("nan")
 
     # Traditional APDF percentiles (all samples, for backward compatibility)
     apdf_result = compute_apdf(signal_percent, percentiles)
