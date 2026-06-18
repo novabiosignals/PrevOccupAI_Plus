@@ -133,7 +133,7 @@ def _calculate_posture_metrics(df: pd.DataFrame, subject_height_m: float, fs: in
     Calculates posture-related metrics and processes the data contained in df to store it later for more efficient
     plotting. The df should contain at least the phone's quaternion data: ['x_ROT', 'y_ROT', 'z_ROT', 'w_ROT'].
     The following metrics are calculated:
-    :param df: :param df: pandas.DataFrame containing the phone data and the corresponding HAR classification
+    :param df: pandas.DataFrame containing the phone data and the corresponding HAR classification
     :param fs: the sampling frequency
     :param min_sitting_time_min: the minimum sitting time in minutes that should be considered for performing posture analysis
     :param yaw_range_limit_deg: the range of yaw angles to consider, to define which range is considered for posture analysis.
@@ -317,7 +317,6 @@ def _calculate_postural_displacement(quaternions: np.ndarray, ref_rotation: R, s
     valid_roll = roll[valid_angles]
 
     # calculate displacement
-    #TODO add chest displacement (disance phone to spine -> the rotation axis is the spine)
     d_ap = trunk_length * np.sin(valid_pitch)
     d_lat = trunk_length * np.sin(valid_roll)
     d_vert = -trunk_length * (1.0 - np.cos(valid_roll) * np.cos(valid_pitch))
@@ -332,7 +331,7 @@ def _extract_postural_features(displacement_matrix: np.ndarray, fs: int) -> Dict
 
      Quijoux, F., Nicolaï, A., Chairi, I., Bargiotas, I., Ricard, D., Yelnik, A., ... & Audiffren, J. (2021).
      A review of center of pressure (COP) variables to quantify standing balance in elderly people:
-     Algorithms and open‐access code. Physiological reports, 9(22), e15067.
+     Algorithms and open‐access code. Physiological reports, 9(22), e15067. DOI:  https://doi.org/10.14814/phy2.15067
 
      The following features are extracted:
      (1) AP-range, ML-range, range ratio (table 3)
@@ -496,7 +495,8 @@ def _get_confidence_ellipse_area(displacement_matrix: np.ndarray) -> float:
     ml_rms = np.sqrt(np.mean(ml_displacement ** 2))
 
     # calculate confidence ellipse area
-    confidence_ellipse_area = scalar * quantiles * np.sqrt(ap_rms * ml_rms - covariance)
+    det = ap_rms**2 * ml_rms**2 - covariance**2
+    confidence_ellipse_area = scalar * quantiles * np.sqrt(det)
 
     return confidence_ellipse_area
 
@@ -538,7 +538,7 @@ def _round_metrics(metrics_dict: Dict, decimals: int = 2) -> None:
     # round the values
     for key, value in metrics_dict.items():
 
-        if key == POSTURE_SWAY_AREA_KEY:
+        if key in [POSTURE_SWAY_AREA_KEY, POSTURE_ELLIPSE_KEY]:
 
             metrics_dict[key] = np.round(value, 5)
 

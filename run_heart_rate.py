@@ -19,7 +19,7 @@ from sensors.metrics.heart_rate import HR_MIN_KEY, HR_MAX_KEY
 # ------------------------------------------------------------------------------------------------------------------- #
 GENERATE_HEART_RATE_OH_PROFILE = True
 HEART_RATE_TIMELINE = False
-HEART_RATE_WEEK = True
+HEART_RATE_WEEK = False
 
 # ------------------------------------------------------------------------------------------------------------------- #
 # file constants
@@ -113,7 +113,7 @@ if GENERATE_HEART_RATE_OH_PROFILE:
 
                         # check if the metrics have already been extracted
                         # if not then len = 1 since it has only the relative HR base metrics
-                        if len(oh_profile[SENSOR_METRICS_KEY][HEART_RATE_KEY]) < 20000:
+                        if len(oh_profile[SENSOR_METRICS_KEY][HEART_RATE_KEY]) <= 1:
 
                             # iterate through the folders of the several days
                             for date_folder in os.listdir(folder_path):

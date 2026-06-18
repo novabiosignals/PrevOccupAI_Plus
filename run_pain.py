@@ -14,13 +14,13 @@ from OH_profile.constants import DAILY_QUESTIONNAIRE_DOMAIN_KEY, PAIN_DOMAIN_KEY
 # ------------------------------------------------------------------------------------------------------------------- #
 
 
-DRIVE = 'D'
+DRIVE = 'E'
 OH_PROFILE_PATH = f"{DRIVE}:\\Backup PrevOccupAI_PLUS Data\\OH_profiles"
 PLOTS_OUTPUT_PATH = f"{DRIVE}:\\Backup PrevOccupAI_PLUS Data\\OH_plots"
 PAIN_DATA_PATH = f"{DRIVE}:\\Backup PrevOccupAI_PLUS Data\\data\\pain_data"
 GENERATE_OH_PROFILE = True
 GENERATE_PLOTS = True
-RERUN_OH_PAIN = False
+RERUN_OH_PAIN = True
 # ------------------------------------------------------------------------------------------------------------------- #
 # program starts here
 # ------------------------------------------------------------------------------------------------------------------- #

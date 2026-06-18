@@ -19,21 +19,21 @@ import questionnaires.metrics as qm
 # ------------------------------------------------------------------------------------------------------------------- #
 # flags to generate the scores
 GENERATE_SCORES = False
-PROCESS_PSYCHOSOCIAL = True
-PROCESS_PERSONAL = True
-PROCESS_ENVIRONMENT = True
-PROCESS_BIOMECHANICAL = True
-PROCESS_WORKLOAD = True
+PROCESS_PSYCHOSOCIAL = False
+PROCESS_PERSONAL = False
+PROCESS_ENVIRONMENT = False
+PROCESS_BIOMECHANICAL = False
+PROCESS_WORKLOAD = False
 
 # generate the raw dataset
 GENERATE_QUESTIONNAIRES_DATASET = False
 
 # generate OH profile
-GENERATE_OH_PROFILE = False
+GENERATE_OH_PROFILE = True
 RERUN_OH_PROFILE = False
 
 # generate visualizations
-VISUALIZE = True
+VISUALIZE = False
 
 # ------------------------------------------------------------------------------------------------------------------- #
 # file constants
@@ -230,7 +230,7 @@ if VISUALIZE:
     subject_id_list = sl.get_participant_ids_list(sl.load_participants_info())
 
     # cycle over the subject id's
-    for subject_id in subject_id_list:
+    for subject_id in ['80', '83']: #subject_id_list:
 
         # get oh profile
         oh_profile = get_OH_profile(OH_PROFILE_PATH, subject_id)

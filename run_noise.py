@@ -21,7 +21,7 @@ RERUN_OH_PROFILE = True
 # ------------------------------------------------------------------------------------------------------------------- #
 # file constants
 # ------------------------------------------------------------------------------------------------------------------- #
-DRIVE = "D"
+DRIVE = "E"
 DATASET_PATH = "Backup PrevOccupAI_PLUS Data\\data"
 DATA_FOLDER_PATH = f"{DRIVE}:\\{DATASET_PATH}"
 OH_PROFILE_PATH = f"{DRIVE}:\\Backup PrevOccupAI_PLUS Data\\OH_profiles"

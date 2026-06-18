@@ -74,12 +74,12 @@ def plot_postural_displacements_grid(displacement_store_path: str, subject_id: s
     Creates a single figure with:
       - rows = acquisition days
       - columns = views (Vista Superior, Vista Lateral, Vista de Costas)
-    :param displacement_store_path:
-    :param subject_id:
-    :param subject_sex:
-    :param output_folder_path:
-    :param locale:
-    :return:
+    :param displacement_store_path: the path where the displacement matrices for each subject are stored
+    :param subject_id: the subject ID
+    :param subject_sex: the subject sex
+    :param output_folder_path: the output folder path
+    :param locale: the language to use. Default: "pt"
+    :return: None
     """
 
     # generate path to subject folder containing the displacement data
@@ -216,12 +216,12 @@ def plot_postural_displacements_grid(displacement_store_path: str, subject_id: s
 
 def plot_postural_displacements(displacement_store_path: str, subject_id: str, subject_sex: str, output_folder_path: str) -> None:
     """
-
-    :param displacement_store_path:
-    :param subject_id:
-    :param subject_sex:
-    :param output_folder_path:
-    :return:
+    plots the postural displacement. Function currently unused
+    :param displacement_store_path: the path where the displacement matrices for each subject are stored
+    :param subject_id: the subject ID
+    :param subject_sex: the subject sex
+    :param output_folder_path: the output folder path
+    :return: None
     """
 
     # generate path to subject folder containing the displacement data

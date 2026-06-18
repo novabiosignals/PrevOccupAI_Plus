@@ -34,7 +34,7 @@ from sensors.visualize import get_weekday_name
 from sensors.visualize.constants import RED, GREEN, YELLOW
 from sensors.visualize.plot_utils import handle_plot
 from utils import create_dir
-from constants import PNG
+from constants import PNG, SVG
 import sensors.load as sl
 
 # ------------------------------------------------------------------------------------------------------------------- #
@@ -51,7 +51,7 @@ ROSA_KEYS_KEEP = [
         "final_normalized"
     ]
 
-FILE_FORMAT = PNG
+FILE_FORMAT = SVG
 
 
 
@@ -170,7 +170,6 @@ def generate_biomec_env_plots(oh_profile: Dict[str, Any], subject: str, output_f
     _create_heat_map(df, output_path, f"{filename_suffix}_plot_{subject}{FILE_FORMAT}", color_map=cmap,vmin=-1,
                      vmax=2, is_rosa=is_rosa)
 
-
 def generate_copsoq_mueq_plots(oh_profile: Dict[str, Any], subject: str, output_folder_path: str) -> None:
     """
     Generates the heat maps for the COPSOQ and MUEQ scores for one subject.
@@ -216,12 +215,14 @@ def generate_copsoq_mueq_plots(oh_profile: Dict[str, Any], subject: str, output_
 
 def generate_workload_plot(oh_profile: Dict[str, Any], subject_id: str, output_folder_path: str, language: str = "pt", color: str = "#577590") -> None:
     """
-
-    :param oh_profile:
-    :param subject_id:
-    :param output_folder_path:
-    :param language:
-    :param color:
+    Generates the workload plot. The plot displays the results of the workload questionaires.
+    A subplot is generated for each day. On the x-axis of the plot the different items are displayed
+    The y-axis represents the likert-scale level that was chosen by the worker. The levels are displayed as horizontal bars.
+    :param oh_profile: dictionary containing only the psychosocial questionnaire scores.
+    :param subject_id: subject identifier
+    :param output_folder_path: path to the folder where the plots should be saved
+    :param language: the language in which the data should be displayed. Default: "pt"
+    :param color: the color for displaying the levels
     :return:
     """
 

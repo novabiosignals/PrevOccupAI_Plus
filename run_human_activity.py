@@ -16,12 +16,12 @@ from utils import extract_group_from_path, extract_device_num_from_path
 # flags
 # ------------------------------------------------------------------------------------------------------------------- #
 GENERATE_HUMAN_ACTIVITY_OH_PROFILE = True
-GENERATE_PLOTS = True
+GENERATE_PLOTS = False
 # ------------------------------------------------------------------------------------------------------------------- #
 # file constants
 # ------------------------------------------------------------------------------------------------------------------- #
 
-DRIVE = 'D'
+DRIVE = 'E'
 DATASET_PATH = f'{DRIVE}:\\Backup PrevOccupAI_PLUS Data\\data'
 DATA_FOLDER_PATH = f"{DRIVE}:\\Backup PrevOccupAI_PLUS Data\\data"
 OH_PROFILE_PATH = f"{DRIVE}:\\Backup PrevOccupAI_PLUS Data\\OH_profiles"

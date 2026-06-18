@@ -188,7 +188,7 @@ def _get_flagged_sessions(session_metrics_path: Optional[Path] = None) -> set:
     Returns set of tuples (subject_id, side, date, session_label) that are flagged.
     """
     if session_metrics_path is None:
-        session_metrics_path = Path(r"D:\Backup PrevOccupAI_PLUS Data\results\emg_pipeline\session_metrics.csv")
+        session_metrics_path = Path(r"E:\Backup PrevOccupAI_PLUS Data\results\emg_pipeline\session_metrics.csv")
 
     if not session_metrics_path.exists():
         return set()
